@@ -47,6 +47,14 @@ class Validations
         ]);
     }
 
+    public static function validateAdminProfile(array $data)
+    {
+        return Validator::make($data, [
+            'user_id'           => 'required|uuid|exists:users,id',
+            'permission_level'  => 'nullable|string|in:super_admin,support_admin',
+        ]);
+    }
+
     public static function validateCategory(array $data)
     {
         return Validator::make($data, [
@@ -163,6 +171,26 @@ class Validations
         ]);
     }
 
+    public static function validateLessonProgress(array $data)
+    {
+        return Validator::make($data, [
+            'enrollment_id'  => 'required|uuid|exists:enrollments,id',
+            'lesson_id'      => 'required|uuid|exists:course_lessons,id',
+            'status'         => 'nullable|string|in:not_started,in_progress,completed',
+            'completed_at'   => 'nullable|date',
+        ]);
+    }
+
+    public static function validateCertificate(array $data)
+    {
+        return Validator::make($data, [
+            'enrollment_id'        => 'required|uuid|exists:enrollments,id',
+            'certificate_number'   => 'required|string|max:100',
+            'certificate_url'      => 'nullable|string',
+            'issued_at'            => 'nullable|date',
+        ]);
+    }
+
     public static function validateExam(array $data)
     {
         return Validator::make($data, [
@@ -271,6 +299,17 @@ class Validations
         ]);
     }
 
+    public static function validateCoursePricingHistory(array $data)
+    {
+        return Validator::make($data, [
+            'course_id'    => 'required|uuid|exists:courses,id',
+            'old_price'    => 'required|integer|min:0',
+            'new_price'    => 'required|integer|min:0',
+            'changed_by'   => 'required|uuid|exists:users,id',
+            'changed_at'   => 'nullable|date',
+        ]);
+    }
+
     public static function validateCourseRating(array $data)
     {
         return Validator::make($data, [
@@ -327,6 +366,30 @@ class Validations
             'image_url'     => 'nullable|string',
             'order_index'   => 'nullable|integer|min:0',
             'is_published'  => 'nullable|boolean',
+        ]);
+    }
+
+    public static function validateAdminAuditLog(array $data)
+    {
+        return Validator::make($data, [
+            'admin_id'     => 'required|uuid|exists:users,id',
+            'action'       => 'required|string|max:255',
+            'target_type'  => 'nullable|string|in:user,course,payment',
+            'target_id'    => 'nullable|uuid',
+            'notes'        => 'nullable|string',
+        ]);
+    }
+
+    public static function validatePlatformAnalyticsSnapshot(array $data)
+    {
+        return Validator::make($data, [
+            'snapshot_date'          => 'required|date',
+            'total_learners'         => 'nullable|integer|min:0',
+            'total_instructors'      => 'nullable|integer|min:0',
+            'total_courses'          => 'nullable|integer|min:0',
+            'total_enrollments'      => 'nullable|integer|min:0',
+            'total_revenue'          => 'nullable|integer|min:0',
+            'active_courses_count'   => 'nullable|integer|min:0',
         ]);
     }
 
