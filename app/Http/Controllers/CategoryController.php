@@ -111,7 +111,7 @@ class CategoryController extends Controller
             ], 403);
         }
 
-        $validator = Validations::validateCategory($request->all());
+        $validator = Validations::validateCategory($request->all(), $id);
 
         if ($validator->fails()) {
             return response()->json([

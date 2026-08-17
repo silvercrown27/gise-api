@@ -55,10 +55,16 @@ class Validations
         ]);
     }
 
-    public static function validateCategory(array $data)
+    public static function validateCategory(array $data, $categoryId = null)
     {
         return Validator::make($data, [
             'name'                => 'required|string|max:255',
+            'slug'                => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('categories', 'slug')->ignore($categoryId)->where(fn($q) => $q->whereNull('deleted_at')),
+            ],
             'description'         => 'nullable|string',
             'parent_category_id'  => 'nullable|uuid|exists:categories,id',
         ]);

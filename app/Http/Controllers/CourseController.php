@@ -14,13 +14,21 @@ class CourseController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Course::withCount(['enrollments', 'ratings']);
+            $query = Course::with('category')->withCount(['enrollments', 'ratings']);
 
             if ($q = trim($request->input('q', ''))) {
                 $query->where('title', 'like', '%' . $q . '%');
             }
 
-            $results = $query->orderBy('title', 'asc')->paginate(10);
+            if ($category = trim($request->input('category', ''))) {
+                $query->whereHas('category', function ($q) use ($category) {
+                    $q->where('slug', $category);
+                });
+            }
+
+            $query->where('status', 'published');
+
+            $results = $query->orderBy('title', 'asc')->paginate(9);
 
             return response()->json([
                 'status' => 200,
@@ -31,6 +39,33 @@ class CourseController extends Controller
             return response()->json([
                 'status'  => 500,
                 'message' => 'An error occurred while retrieving courses.',
+            ], 500);
+        }
+    }
+
+    public function popular(Request $request)
+    {
+        try {
+            $limit = (int) $request->input('limit', 6);
+            $limit = $limit > 0 && $limit <= 24 ? $limit : 6;
+
+            $results = Course::with('category')
+                ->withCount(['enrollments', 'ratings'])
+                ->where('status', 'published')
+                ->orderByDesc('enrollments_count')
+                ->orderByDesc('published_at')
+                ->limit($limit)
+                ->get();
+
+            return response()->json([
+                'status' => 200,
+                'data'   => $results,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@popular: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while retrieving popular courses.',
             ], 500);
         }
     }

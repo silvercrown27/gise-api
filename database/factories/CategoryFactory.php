@@ -14,8 +14,11 @@ class CategoryFactory extends Factory
 
     public function definition(): array
     {
+        $name = fake()->unique()->words(2, true);
+
         return [
-            'name' => fake()->unique()->words(2, true),
+            'name' => $name,
+            'slug' => \Illuminate\Support\Str::slug($name) . '-' . fake()->unique()->numberBetween(1000, 9999),
             'description' => fake()->optional()->sentence(),
             'parent_category_id' => null,
         ];

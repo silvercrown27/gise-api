@@ -64,8 +64,9 @@ Route::prefix('categories')->group(function () {
 });
 
 Route::prefix('courses')->group(function () {
-    Route::get('/',     [CourseController::class, 'index']);
-    Route::get('/{id}', [CourseController::class, 'show']);
+    Route::get('/',        [CourseController::class, 'index']);
+    Route::get('/popular', [CourseController::class, 'popular']);
+    Route::get('/{id}',    [CourseController::class, 'show']);
 });
 
 Route::prefix('cohorts')->group(function () {
