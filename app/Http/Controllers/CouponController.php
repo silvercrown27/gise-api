@@ -13,6 +13,15 @@ class CouponController extends Controller
 {
     public function index(Request $request)
     {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         try {
             $query = Coupon::query();
 
@@ -74,8 +83,17 @@ class CouponController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         try {
             $coupon = Coupon::find($id);
 

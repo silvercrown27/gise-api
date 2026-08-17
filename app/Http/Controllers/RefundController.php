@@ -13,6 +13,15 @@ class RefundController extends Controller
 {
     public function index(Request $request)
     {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         try {
             $query = Refund::query();
 
@@ -70,8 +79,17 @@ class RefundController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         try {
             $refund = Refund::find($id);
 
