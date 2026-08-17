@@ -56,8 +56,18 @@ class CertificateController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $data = $request->all();
             $certificate = Certificate::create($data);
+            $certificate->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -73,9 +83,10 @@ class CertificateController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
             $certificate = Certificate::find($id);
 
             if (!$certificate) {
@@ -83,6 +94,16 @@ class CertificateController extends Controller
                     'status'  => 404,
                     'message' => 'Certificate not found.',
                 ], 404);
+            }
+
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isOwner = $certificate->enrollment && (string) $certificate->enrollment->learner_id === (string) $request->user()->id;
+
+            if (!$isElevated && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             return response()->json([
@@ -111,6 +132,15 @@ class CertificateController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $certificate = Certificate::find($id);
 
             if (!$certificate) {
@@ -136,9 +166,18 @@ class CertificateController extends Controller
         }
     }
 
-    public function delete(string $id)
+    public function delete(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$user || $user->role !== 'admin') {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $certificate = Certificate::find($id);
 
             if (!$certificate) {

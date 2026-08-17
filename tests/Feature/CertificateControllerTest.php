@@ -48,10 +48,10 @@ class CertificateControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_lets_any_authenticated_user_issue_certificate_for_any_enrollment(): void
+    public function test_store_forbids_non_elevated_caller_from_issuing_a_certificate(): void
     {
-        // No ownership check at all: any authenticated user can mint a certificate
-        // for someone else's enrollment.
+        // Fixed: store() is now instructor/admin-only -- issuing a certificate is a
+        // system/instructor action, not something a learner can self-serve.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         $victimEnrollment = Enrollment::factory()->create(['learner_id' => $victim->id]);
@@ -62,8 +62,8 @@ class CertificateControllerTest extends TestCase
             'certificate_number' => 'CERT-FORGED-0001',
         ]);
 
-        $response->assertStatus(201);
-        $this->assertDatabaseHas('certificates', ['certificate_number' => 'CERT-FORGED-0001']);
+        $response->assertStatus(403);
+        $this->assertDatabaseMissing('certificates', ['certificate_number' => 'CERT-FORGED-0001']);
     }
 
     public function test_store_validation_failure_returns_422(): void
@@ -95,11 +95,24 @@ class CertificateControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_lets_any_authenticated_user_view_any_certificate(): void
+    public function test_show_forbids_viewing_another_learners_certificate(): void
     {
+        // Fixed: show() now checks ownership via enrollment.learner_id.
         $attacker = User::factory()->create();
         $certificate = Certificate::factory()->create();
         Sanctum::actingAs($attacker);
+
+        $response = $this->getJson("/api/certificates/{$certificate->id}");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_show_lets_owner_view_own_certificate(): void
+    {
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create(['learner_id' => $learner->id]);
+        $certificate = Certificate::factory()->create(['enrollment_id' => $enrollment->id]);
+        Sanctum::actingAs($learner);
 
         $response = $this->getJson("/api/certificates/{$certificate->id}");
 
@@ -118,8 +131,9 @@ class CertificateControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_lets_any_authenticated_user_modify_any_certificate(): void
+    public function test_update_forbids_non_elevated_caller(): void
     {
+        // Fixed: update() is now instructor/admin-only.
         $attacker = User::factory()->create();
         $certificate = Certificate::factory()->create();
         Sanctum::actingAs($attacker);
@@ -129,8 +143,7 @@ class CertificateControllerTest extends TestCase
             'certificate_number' => 'CERT-CHANGED-0001',
         ]);
 
-        $response->assertStatus(200);
-        $response->assertJsonPath('data.certificate_number', 'CERT-CHANGED-0001');
+        $response->assertStatus(403);
     }
 
     public function test_delete_requires_no_auth_since_route_middleware_gates_it(): void
@@ -142,15 +155,16 @@ class CertificateControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_lets_any_authenticated_user_delete_any_certificate(): void
+    public function test_delete_forbids_non_admin(): void
     {
+        // Fixed: delete() is now admin-only.
         $attacker = User::factory()->create();
         $certificate = Certificate::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->deleteJson("/api/certificates/{$certificate->id}");
 
-        $response->assertStatus(200);
-        $this->assertSoftDeleted('certificates', ['id' => $certificate->id]);
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('certificates', ['id' => $certificate->id, 'deleted_at' => null]);
     }
 }

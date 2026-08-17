@@ -59,6 +59,7 @@ class TestimonialController extends Controller
         try {
             $data = $request->all();
             $testimonial = Testimonial::create($data);
+            $testimonial->refresh();
 
             return response()->json([
                 'status'  => 201,

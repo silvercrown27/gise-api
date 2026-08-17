@@ -32,6 +32,10 @@ class ExamQuestion extends Model
         'order_index' => 'integer',
     ];
 
+    protected $hidden = [
+        'correct_answer',
+    ];
+
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
 
     protected static function boot()

@@ -68,6 +68,7 @@ class AdminAuditLogController extends Controller
         try {
             $data = $request->all();
             $adminAuditLog = AdminAuditLog::create($data);
+            $adminAuditLog->refresh();
 
             return response()->json([
                 'status'  => 201,

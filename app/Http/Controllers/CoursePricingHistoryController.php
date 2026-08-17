@@ -70,6 +70,7 @@ class CoursePricingHistoryController extends Controller
         try {
             $data = $request->all();
             $coursePricingHistory = CoursePricingHistory::create($data);
+            $coursePricingHistory->refresh();
 
             return response()->json([
                 'status'  => 201,

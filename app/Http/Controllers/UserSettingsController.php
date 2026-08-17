@@ -54,8 +54,18 @@ class UserSettingsController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
+            $isAdmin = $user && $user->role === 'admin';
+
             $data = $request->all();
+
+            if (!$isAdmin) {
+                $data['user_id'] = $request->user()->id;
+            }
+
             $userSetting = UserSettings::create($data);
+
+            $userSetting->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -71,9 +81,10 @@ class UserSettingsController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
             $userSetting = UserSettings::find($id);
 
             if (!$userSetting) {
@@ -81,6 +92,16 @@ class UserSettingsController extends Controller
                     'status'  => 404,
                     'message' => 'User setting not found.',
                 ], 404);
+            }
+
+            $isAdmin = $user && $user->role === 'admin';
+            $isOwner = (string) $userSetting->user_id === (string) $request->user()->id;
+
+            if (!$isAdmin && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             return response()->json([
@@ -109,6 +130,7 @@ class UserSettingsController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
             $userSetting = UserSettings::find($id);
 
             if (!$userSetting) {
@@ -118,7 +140,23 @@ class UserSettingsController extends Controller
                 ], 404);
             }
 
-            $userSetting->update($request->all());
+            $isAdmin = $user && $user->role === 'admin';
+            $isOwner = (string) $userSetting->user_id === (string) $request->user()->id;
+
+            if (!$isAdmin && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
+            $data = $request->all();
+
+            if (!$isAdmin) {
+                unset($data['user_id']);
+            }
+
+            $userSetting->update($data);
 
             return response()->json([
                 'status'  => 200,
@@ -134,9 +172,10 @@ class UserSettingsController extends Controller
         }
     }
 
-    public function delete(string $id)
+    public function delete(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
             $userSetting = UserSettings::find($id);
 
             if (!$userSetting) {
@@ -144,6 +183,16 @@ class UserSettingsController extends Controller
                     'status'  => 404,
                     'message' => 'User setting not found.',
                 ], 404);
+            }
+
+            $isAdmin = $user && $user->role === 'admin';
+            $isOwner = (string) $userSetting->user_id === (string) $request->user()->id;
+
+            if (!$isAdmin && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             $userSetting->delete();

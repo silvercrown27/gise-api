@@ -48,10 +48,10 @@ class CourseRatingControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_lets_any_authenticated_user_post_a_rating_for_another_learner(): void
+    public function test_store_forces_learner_id_to_caller_for_non_admin(): void
     {
-        // No ownership check: an attacker can submit a 5-star rating attributed to
-        // a victim's learner_id, or post fake negative reviews under someone else's name.
+        // Fixed: a non-admin caller's learner_id is always overwritten with their own
+        // id, so a learner cannot post a review attributed to someone else.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         $course = Course::factory()->create();
@@ -66,9 +66,10 @@ class CourseRatingControllerTest extends TestCase
 
         $response->assertStatus(201);
         $this->assertDatabaseHas('course_ratings', [
-            'learner_id' => $victim->id,
+            'learner_id' => $attacker->id,
             'rating' => 1,
         ]);
+        $this->assertDatabaseMissing('course_ratings', ['learner_id' => $victim->id]);
     }
 
     public function test_store_validation_failure_returns_422(): void
@@ -100,11 +101,27 @@ class CourseRatingControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_update_lets_any_authenticated_user_modify_any_rating(): void
+    public function test_update_forbids_modifying_another_learners_rating(): void
     {
+        // Fixed: update() now checks ownership.
         $attacker = User::factory()->create();
         $rating = CourseRating::factory()->create(['rating' => 5]);
         Sanctum::actingAs($attacker);
+
+        $response = $this->patchJson("/api/course-ratings/{$rating->id}", [
+            'course_id' => $rating->course_id,
+            'learner_id' => $rating->learner_id,
+            'rating' => 1,
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_update_lets_owner_modify_own_rating(): void
+    {
+        $learner = User::factory()->create();
+        $rating = CourseRating::factory()->create(['learner_id' => $learner->id, 'rating' => 5]);
+        Sanctum::actingAs($learner);
 
         $response = $this->patchJson("/api/course-ratings/{$rating->id}", [
             'course_id' => $rating->course_id,
@@ -138,11 +155,23 @@ class CourseRatingControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_lets_any_authenticated_user_delete_any_rating(): void
+    public function test_delete_forbids_deleting_another_learners_rating(): void
     {
+        // Fixed: delete() now checks ownership.
         $attacker = User::factory()->create();
         $rating = CourseRating::factory()->create();
         Sanctum::actingAs($attacker);
+
+        $response = $this->deleteJson("/api/course-ratings/{$rating->id}");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_delete_lets_owner_delete_own_rating(): void
+    {
+        $learner = User::factory()->create();
+        $rating = CourseRating::factory()->create(['learner_id' => $learner->id]);
+        Sanctum::actingAs($learner);
 
         $response = $this->deleteJson("/api/course-ratings/{$rating->id}");
 

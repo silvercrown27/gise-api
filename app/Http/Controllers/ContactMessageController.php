@@ -59,6 +59,7 @@ class ContactMessageController extends Controller
         try {
             $data = $request->all();
             $contactMessage = ContactMessage::create($data);
+            $contactMessage->refresh();
 
             return response()->json([
                 'status'  => 201,

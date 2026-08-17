@@ -59,6 +59,7 @@ class CourseLessonController extends Controller
         try {
             $data = $request->all();
             $courseLesson = CourseLesson::create($data);
+            $courseLesson->refresh();
 
             return response()->json([
                 'status'  => 201,

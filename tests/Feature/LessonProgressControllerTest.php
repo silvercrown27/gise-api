@@ -50,10 +50,10 @@ class LessonProgressControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_lets_any_authenticated_user_create_progress_for_any_enrollment(): void
+    public function test_store_forbids_creating_progress_for_another_learners_enrollment(): void
     {
-        // No ownership check: an attacker can mark another learner's enrollment
-        // lesson as "completed" directly.
+        // Fixed: store() now checks that the enrollment referenced belongs to the
+        // caller, unless the caller resolves as instructor/admin.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         $victimEnrollment = Enrollment::factory()->create(['learner_id' => $victim->id]);
@@ -62,6 +62,22 @@ class LessonProgressControllerTest extends TestCase
 
         $response = $this->postJson('/api/lesson-progress', [
             'enrollment_id' => $victimEnrollment->id,
+            'lesson_id' => $lesson->id,
+            'status' => 'completed',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_store_lets_owner_create_progress_for_own_enrollment(): void
+    {
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create(['learner_id' => $learner->id]);
+        $lesson = CourseLesson::factory()->create();
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/lesson-progress', [
+            'enrollment_id' => $enrollment->id,
             'lesson_id' => $lesson->id,
             'status' => 'completed',
         ]);
@@ -99,11 +115,24 @@ class LessonProgressControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_lets_any_authenticated_user_view_any_progress(): void
+    public function test_show_forbids_viewing_another_learners_progress(): void
     {
+        // Fixed: show() now checks ownership via enrollment.learner_id.
         $attacker = User::factory()->create();
         $progress = LessonProgress::factory()->create();
         Sanctum::actingAs($attacker);
+
+        $response = $this->getJson("/api/lesson-progress/{$progress->id}");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_show_lets_owner_view_own_progress(): void
+    {
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create(['learner_id' => $learner->id]);
+        $progress = LessonProgress::factory()->create(['enrollment_id' => $enrollment->id]);
+        Sanctum::actingAs($learner);
 
         $response = $this->getJson("/api/lesson-progress/{$progress->id}");
 
@@ -123,11 +152,28 @@ class LessonProgressControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_lets_any_authenticated_user_modify_any_progress(): void
+    public function test_update_forbids_modifying_another_learners_progress(): void
     {
+        // Fixed: update() now checks ownership.
         $attacker = User::factory()->create();
         $progress = LessonProgress::factory()->create(['status' => 'not_started']);
         Sanctum::actingAs($attacker);
+
+        $response = $this->patchJson("/api/lesson-progress/{$progress->id}", [
+            'enrollment_id' => $progress->enrollment_id,
+            'lesson_id' => $progress->lesson_id,
+            'status' => 'completed',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_update_lets_owner_modify_own_progress(): void
+    {
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create(['learner_id' => $learner->id]);
+        $progress = LessonProgress::factory()->create(['enrollment_id' => $enrollment->id, 'status' => 'not_started']);
+        Sanctum::actingAs($learner);
 
         $response = $this->patchJson("/api/lesson-progress/{$progress->id}", [
             'enrollment_id' => $progress->enrollment_id,
@@ -148,15 +194,16 @@ class LessonProgressControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_lets_any_authenticated_user_delete_any_progress(): void
+    public function test_delete_forbids_non_elevated_caller(): void
     {
+        // Fixed: delete() is now instructor/admin-only.
         $attacker = User::factory()->create();
         $progress = LessonProgress::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->deleteJson("/api/lesson-progress/{$progress->id}");
 
-        $response->assertStatus(200);
-        $this->assertSoftDeleted('lesson_progress', ['id' => $progress->id]);
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('lesson_progress', ['id' => $progress->id, 'deleted_at' => null]);
     }
 }

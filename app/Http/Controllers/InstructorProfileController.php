@@ -68,6 +68,7 @@ class InstructorProfileController extends Controller
         try {
             $data = $request->all();
             $instructorProfile = InstructorProfile::create($data);
+            $instructorProfile->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -97,13 +98,17 @@ class InstructorProfileController extends Controller
             }
 
             $isAdmin = $user && $user->role === 'admin';
-            $isSelf = $instructorProfile->user_id === $request->user()->id;
+            $isSelf = (string) $instructorProfile->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
                 ], 403);
+            }
+
+            if ($isAdmin || $isSelf) {
+                $instructorProfile->makeVisible('payout_details');
             }
 
             return response()->json([
@@ -143,7 +148,7 @@ class InstructorProfileController extends Controller
             }
 
             $isAdmin = $user && $user->role === 'admin';
-            $isSelf = $user && $user->role === 'instructor' && $instructorProfile->user_id === $request->user()->id;
+            $isSelf = $user && $user->role === 'instructor' && (string) $instructorProfile->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
                 return response()->json([
@@ -152,7 +157,13 @@ class InstructorProfileController extends Controller
                 ], 403);
             }
 
-            $instructorProfile->update($request->all());
+            $data = $request->all();
+
+            if (!$isAdmin) {
+                unset($data['average_rating'], $data['verification_status']);
+            }
+
+            $instructorProfile->update($data);
 
             return response()->json([
                 'status'  => 200,

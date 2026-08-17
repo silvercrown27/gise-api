@@ -30,6 +30,10 @@ class InstructorProfile extends Model
         'average_rating' => 'float',
     ];
 
+    protected $hidden = [
+        'payout_details',
+    ];
+
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
 
     protected static function boot()

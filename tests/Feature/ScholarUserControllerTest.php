@@ -85,15 +85,17 @@ class ScholarUserControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_own_scholar_user_is_forbidden_due_to_type_mismatch(): void
+    public function test_show_own_scholar_user_succeeds(): void
     {
+        // Fixed: show() now casts both sides to string before comparing, so the
+        // owner can view their own scholar_users row.
         $user = User::factory()->create();
         $scholarUser = ScholarUser::factory()->create(['user_id' => $user->id]);
         Sanctum::actingAs($user);
 
         $response = $this->getJson("/api/scholar-users/{$scholarUser->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
     }
 
     public function test_show_other_users_scholar_user_is_forbidden(): void
@@ -119,12 +121,12 @@ class ScholarUserControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_own_scholar_user_is_forbidden_due_to_type_mismatch(): void
+    public function test_update_own_scholar_user_strips_role_and_cannot_self_promote(): void
     {
-        // This is the mass-assignment-relevant endpoint: if $isSelf worked, a learner
-        // could PATCH their own scholar_users row including 'role', granting themselves
-        // admin. It is currently blocked, but only by the incidental type-mismatch bug,
-        // not by any real authorization design (there is no role-change protection here).
+        // Fixed: the $isSelf comparison now works (string cast), so self-edit is
+        // reachable -- but 'role' is explicitly stripped from the payload for
+        // non-admin callers, so a learner cannot self-promote to admin even though
+        // they can now successfully edit their own row (e.g. phone/avatar_url).
         $user = User::factory()->create();
         $scholarUser = ScholarUser::factory()->create(['user_id' => $user->id, 'role' => 'learner']);
         Sanctum::actingAs($user);
@@ -134,7 +136,9 @@ class ScholarUserControllerTest extends TestCase
             'role' => 'admin',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.role', 'learner');
+        $this->assertDatabaseHas('scholar_users', ['id' => $scholarUser->id, 'role' => 'learner']);
     }
 
     public function test_update_validation_failure_returns_422_even_before_ownership_check(): void

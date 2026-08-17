@@ -64,6 +64,7 @@ class AdminProfileController extends Controller
         try {
             $data = $request->all();
             $adminProfile = AdminProfile::create($data);
+            $adminProfile->refresh();
 
             return response()->json([
                 'status'  => 201,

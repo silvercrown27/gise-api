@@ -67,7 +67,9 @@ class CouponController extends Controller
 
         try {
             $data = $request->all();
+            unset($data['times_used']);
             $coupon = Coupon::create($data);
+            $coupon->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -148,7 +150,9 @@ class CouponController extends Controller
                 ], 404);
             }
 
-            $coupon->update($request->all());
+            $data = $request->all();
+            unset($data['times_used']);
+            $coupon->update($data);
 
             return response()->json([
                 'status'  => 200,

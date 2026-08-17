@@ -64,6 +64,7 @@ class PlatformAnalyticsSnapshotController extends Controller
         try {
             $data = $request->all();
             $platformAnalyticsSnapshot = PlatformAnalyticsSnapshot::create($data);
+            $platformAnalyticsSnapshot->refresh();
 
             return response()->json([
                 'status'  => 201,

@@ -78,19 +78,17 @@ class CourseLeadControllerTest extends TestCase
         $response->assertStatus(422);
     }
 
-    public function test_show_lets_any_authenticated_user_view_any_lead(): void
+    public function test_show_forbids_non_elevated_caller(): void
     {
-        // show() has no auth/ownership check at all beyond the route's auth:sanctum
-        // middleware -- any authenticated user can view any lead's contact details
-        // (full_name, email, phone) regardless of who submitted it.
+        // Fixed: show() is now instructor/admin-only -- leads contain PII (email,
+        // phone) about prospective students and are not self-service by user_id.
         $attacker = User::factory()->create();
         $lead = CourseLead::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->getJson("/api/course-leads/{$lead->id}");
 
-        $response->assertStatus(200);
-        $response->assertJsonPath('data.email', $lead->email);
+        $response->assertStatus(403);
     }
 
     public function test_show_requires_authentication(): void
@@ -102,18 +100,21 @@ class CourseLeadControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_show_returns_404_for_missing_lead(): void
+    public function test_show_returns_403_for_non_elevated_caller_even_when_lead_missing(): void
     {
+        // Fixed: the role gate runs before the existence check, so a non-elevated
+        // caller gets 403 (not 404) regardless of whether the id exists.
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
         $response = $this->getJson('/api/course-leads/' . fake()->uuid());
 
-        $response->assertStatus(404);
+        $response->assertStatus(403);
     }
 
-    public function test_update_lets_any_authenticated_user_modify_any_lead(): void
+    public function test_update_forbids_non_elevated_caller(): void
     {
+        // Fixed: update() is now instructor/admin-only.
         $attacker = User::factory()->create();
         $lead = CourseLead::factory()->create(['status' => 'new']);
         Sanctum::actingAs($attacker);
@@ -126,8 +127,7 @@ class CourseLeadControllerTest extends TestCase
             'status' => 'converted',
         ]);
 
-        $response->assertStatus(200);
-        $response->assertJsonPath('data.status', 'converted');
+        $response->assertStatus(403);
     }
 
     public function test_update_requires_authentication(): void
@@ -144,16 +144,17 @@ class CourseLeadControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_lets_any_authenticated_user_delete_any_lead(): void
+    public function test_delete_forbids_non_elevated_caller(): void
     {
+        // Fixed: delete() is now instructor/admin-only.
         $attacker = User::factory()->create();
         $lead = CourseLead::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->deleteJson("/api/course-leads/{$lead->id}");
 
-        $response->assertStatus(200);
-        $this->assertSoftDeleted('course_leads', ['id' => $lead->id]);
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('course_leads', ['id' => $lead->id, 'deleted_at' => null]);
     }
 
     public function test_delete_requires_authentication(): void

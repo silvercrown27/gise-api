@@ -64,6 +64,7 @@ class RefundController extends Controller
         try {
             $data = $request->all();
             $refund = Refund::create($data);
+            $refund->refresh();
 
             return response()->json([
                 'status'  => 201,

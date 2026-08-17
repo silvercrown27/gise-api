@@ -59,6 +59,7 @@ class CohortController extends Controller
         try {
             $data = $request->all();
             $cohort = Cohort::create($data);
+            $cohort->refresh();
 
             return response()->json([
                 'status'  => 201,

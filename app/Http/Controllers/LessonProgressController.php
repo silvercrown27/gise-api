@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
+use App\Models\Enrollment;
 use App\Models\LessonProgress;
 use App\Models\ScholarUser;
 
@@ -52,8 +53,23 @@ class LessonProgressController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+
+            if (!$isElevated) {
+                $enrollment = Enrollment::find($request->input('enrollment_id'));
+
+                if (!$enrollment || (string) $enrollment->learner_id !== (string) $request->user()->id) {
+                    return response()->json([
+                        'status'  => 403,
+                        'message' => 'Forbidden.',
+                    ], 403);
+                }
+            }
+
             $data = $request->all();
             $lessonProgress = LessonProgress::create($data);
+            $lessonProgress->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -69,9 +85,10 @@ class LessonProgressController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
             $lessonProgress = LessonProgress::find($id);
 
             if (!$lessonProgress) {
@@ -79,6 +96,16 @@ class LessonProgressController extends Controller
                     'status'  => 404,
                     'message' => 'Lesson progress not found.',
                 ], 404);
+            }
+
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isOwner = $lessonProgress->enrollment && (string) $lessonProgress->enrollment->learner_id === (string) $request->user()->id;
+
+            if (!$isElevated && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             return response()->json([
@@ -107,6 +134,7 @@ class LessonProgressController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
             $lessonProgress = LessonProgress::find($id);
 
             if (!$lessonProgress) {
@@ -114,6 +142,16 @@ class LessonProgressController extends Controller
                     'status'  => 404,
                     'message' => 'Lesson progress not found.',
                 ], 404);
+            }
+
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isOwner = $lessonProgress->enrollment && (string) $lessonProgress->enrollment->learner_id === (string) $request->user()->id;
+
+            if (!$isElevated && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             $lessonProgress->update($request->all());
@@ -132,9 +170,18 @@ class LessonProgressController extends Controller
         }
     }
 
-    public function delete(string $id)
+    public function delete(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $lessonProgress = LessonProgress::find($id);
 
             if (!$lessonProgress) {

@@ -59,6 +59,7 @@ class CourseModuleController extends Controller
         try {
             $data = $request->all();
             $courseModule = CourseModule::create($data);
+            $courseModule->refresh();
 
             return response()->json([
                 'status'  => 201,

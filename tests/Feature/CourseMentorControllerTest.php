@@ -83,23 +83,18 @@ class CourseMentorControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_own_mentorship_is_forbidden_due_to_type_mismatch(): void
+    public function test_show_own_mentorship_succeeds(): void
     {
-        // show() checks $courseMentor->mentor_id === $request->user()->id directly, which
-        // in principle does NOT depend on the ScholarUser::find lookup bug. However, in
-        // practice $request->user()->id resolves as a Ramsey\Uuid object (via Sanctum's
-        // authenticated user instance) while $courseMentor->mentor_id (freshly loaded from
-        // the DB via Eloquent::find()) is a plain string. The strict === comparison between
-        // an object and a string is always false, so even a mentor viewing their own row
-        // is rejected. This is a second, independent bug beyond the documented
-        // ScholarUser::find(user_id-as-id) issue.
+        // Fixed: show() now casts both sides to string before comparing, so the
+        // Ramsey\Uuid object vs. plain string mismatch no longer blocks the genuine
+        // owner from viewing their own row.
         $mentor = User::factory()->create();
         $courseMentor = CourseMentor::factory()->create(['mentor_id' => $mentor->id]);
         Sanctum::actingAs($mentor);
 
         $response = $this->getJson("/api/course-mentors/{$courseMentor->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
     }
 
     public function test_show_other_users_mentorship_is_forbidden(): void

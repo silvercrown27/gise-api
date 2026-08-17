@@ -69,6 +69,7 @@ class ExamController extends Controller
         try {
             $data = $request->all();
             $exam = Exam::create($data);
+            $exam->refresh();
 
             return response()->json([
                 'status'  => 201,

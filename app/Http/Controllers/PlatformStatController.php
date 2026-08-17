@@ -59,6 +59,7 @@ class PlatformStatController extends Controller
         try {
             $data = $request->all();
             $platformStat = PlatformStat::create($data);
+            $platformStat->refresh();
 
             return response()->json([
                 'status'  => 201,

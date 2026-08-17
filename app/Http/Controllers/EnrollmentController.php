@@ -50,8 +50,18 @@ class EnrollmentController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+
             $data = $request->all();
+
+            if (!$isElevated) {
+                unset($data['enrollment_status'], $data['progress_percent'], $data['completed_at']);
+            }
+
             $enrollment = Enrollment::create($data);
+
+            $enrollment->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -67,9 +77,10 @@ class EnrollmentController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
             $enrollment = Enrollment::find($id);
 
             if (!$enrollment) {
@@ -77,6 +88,16 @@ class EnrollmentController extends Controller
                     'status'  => 404,
                     'message' => 'Enrollment not found.',
                 ], 404);
+            }
+
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isOwner = (string) $enrollment->learner_id === (string) $request->user()->id;
+
+            if (!$isElevated && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             return response()->json([
@@ -105,6 +126,7 @@ class EnrollmentController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
             $enrollment = Enrollment::find($id);
 
             if (!$enrollment) {
@@ -114,7 +136,23 @@ class EnrollmentController extends Controller
                 ], 404);
             }
 
-            $enrollment->update($request->all());
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isOwner = (string) $enrollment->learner_id === (string) $request->user()->id;
+
+            if (!$isElevated && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
+            $data = $request->all();
+
+            if (!$isElevated) {
+                unset($data['enrollment_status'], $data['progress_percent'], $data['completed_at']);
+            }
+
+            $enrollment->update($data);
 
             return response()->json([
                 'status'  => 200,
@@ -130,9 +168,10 @@ class EnrollmentController extends Controller
         }
     }
 
-    public function delete(string $id)
+    public function delete(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
             $enrollment = Enrollment::find($id);
 
             if (!$enrollment) {
@@ -140,6 +179,16 @@ class EnrollmentController extends Controller
                     'status'  => 404,
                     'message' => 'Enrollment not found.',
                 ], 404);
+            }
+
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isOwner = (string) $enrollment->learner_id === (string) $request->user()->id;
+
+            if (!$isElevated && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             $enrollment->delete();

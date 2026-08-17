@@ -47,11 +47,10 @@ class NotificationControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_lets_any_authenticated_user_create_a_notification_for_anyone(): void
+    public function test_store_forbids_non_elevated_caller(): void
     {
-        // NotificationController@store has NO validation and NO ownership check
-        // at all -- any authenticated user can create arbitrary notifications
-        // (potential for spam/phishing/social engineering) attributed to any user_id.
+        // Fixed: store() is now instructor/admin-only and validated, so an arbitrary
+        // authenticated user cannot spam notifications to any user_id.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         Sanctum::actingAs($attacker);
@@ -62,9 +61,10 @@ class NotificationControllerTest extends TestCase
             'message' => 'Click this link to claim your prize',
         ]);
 
-        $response->assertStatus(201);
-        $this->assertDatabaseHas('notifications', ['user_id' => $victim->id]);
+        $response->assertStatus(403);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $victim->id]);
     }
+
 
     public function test_show_requires_authentication(): void
     {
@@ -85,22 +85,48 @@ class NotificationControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_lets_any_authenticated_user_view_any_notification(): void
+    public function test_show_forbids_viewing_another_users_notification(): void
     {
+        // Fixed: show() now checks ownership.
         $attacker = User::factory()->create();
         $notification = Notification::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->getJson("/api/notifications/{$notification->id}");
 
+        $response->assertStatus(403);
+    }
+
+    public function test_show_lets_owner_view_own_notification(): void
+    {
+        $user = User::factory()->create();
+        $notification = Notification::factory()->create(['user_id' => $user->id]);
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson("/api/notifications/{$notification->id}");
+
         $response->assertStatus(200);
     }
 
-    public function test_update_lets_any_authenticated_user_modify_any_notification(): void
+    public function test_update_forbids_modifying_another_users_notification(): void
     {
+        // Fixed: update() now checks ownership.
         $attacker = User::factory()->create();
         $notification = Notification::factory()->create(['is_read' => false]);
         Sanctum::actingAs($attacker);
+
+        $response = $this->patchJson("/api/notifications/{$notification->id}", [
+            'is_read' => true,
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_update_lets_owner_mark_own_notification_read(): void
+    {
+        $user = User::factory()->create();
+        $notification = Notification::factory()->create(['user_id' => $user->id, 'is_read' => false]);
+        Sanctum::actingAs($user);
 
         $response = $this->patchJson("/api/notifications/{$notification->id}", [
             'is_read' => true,
@@ -119,11 +145,23 @@ class NotificationControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_lets_any_authenticated_user_delete_any_notification(): void
+    public function test_delete_forbids_deleting_another_users_notification(): void
     {
+        // Fixed: delete() now checks ownership.
         $attacker = User::factory()->create();
         $notification = Notification::factory()->create();
         Sanctum::actingAs($attacker);
+
+        $response = $this->deleteJson("/api/notifications/{$notification->id}");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_delete_lets_owner_delete_own_notification(): void
+    {
+        $user = User::factory()->create();
+        $notification = Notification::factory()->create(['user_id' => $user->id]);
+        Sanctum::actingAs($user);
 
         $response = $this->deleteJson("/api/notifications/{$notification->id}");
 

@@ -56,6 +56,7 @@ class CourseLeadController extends Controller
         try {
             $data = $request->all();
             $courseLead = CourseLead::create($data);
+            $courseLead->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -71,9 +72,18 @@ class CourseLeadController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$user || $user->role === 'learner') {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $courseLead = CourseLead::find($id);
 
             if (!$courseLead) {
@@ -109,6 +119,15 @@ class CourseLeadController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$user || $user->role === 'learner') {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $courseLead = CourseLead::find($id);
 
             if (!$courseLead) {
@@ -134,9 +153,18 @@ class CourseLeadController extends Controller
         }
     }
 
-    public function delete(string $id)
+    public function delete(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$user || $user->role === 'learner') {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $courseLead = CourseLead::find($id);
 
             if (!$courseLead) {

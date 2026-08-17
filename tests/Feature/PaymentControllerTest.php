@@ -48,11 +48,11 @@ class PaymentControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_lets_any_authenticated_user_record_a_completed_payment_for_anyone(): void
+    public function test_store_strips_status_and_gateway_transaction_id_for_non_elevated_callers(): void
     {
-        // No ownership check and status is fillable -- an attacker can insert a fake
-        // "completed" payment for any learner_id/course_id combination directly,
-        // without any interaction with a real payment gateway.
+        // Fixed: status/gateway_transaction_id/paid_at are stripped from the payload
+        // unless the caller resolves as instructor/admin, so a learner cannot fabricate
+        // a "completed" payment record without a real gateway interaction.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         $course = Course::factory()->create();
@@ -67,7 +67,8 @@ class PaymentControllerTest extends TestCase
         ]);
 
         $response->assertStatus(201);
-        $response->assertJsonPath('data.status', 'completed');
+        $response->assertJsonPath('data.status', 'pending');
+        $response->assertJsonPath('data.gateway_transaction_id', null);
     }
 
     public function test_store_validation_failure_returns_422(): void
@@ -99,22 +100,34 @@ class PaymentControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_lets_any_authenticated_user_view_any_payment(): void
+    public function test_show_forbids_viewing_another_learners_payment(): void
     {
-        // Information leakage: gateway_transaction_id and amount for another
-        // learner's payment are exposed with no ownership check.
+        // Fixed: show() now checks ownership (learner_id must match the caller) and
+        // rejects non-owners who don't resolve as instructor/admin.
         $attacker = User::factory()->create();
         $payment = Payment::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->getJson("/api/payments/{$payment->id}");
 
-        $response->assertStatus(200);
-        $response->assertJsonPath('data.gateway_transaction_id', $payment->gateway_transaction_id);
+        $response->assertStatus(403);
     }
 
-    public function test_update_lets_any_authenticated_user_mark_any_payment_completed(): void
+    public function test_show_lets_owner_view_own_payment(): void
     {
+        $learner = User::factory()->create();
+        $payment = Payment::factory()->create(['learner_id' => $learner->id]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->getJson("/api/payments/{$payment->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.id', (string) $payment->id);
+    }
+
+    public function test_update_forbids_modifying_another_learners_payment(): void
+    {
+        // Fixed: update() now checks ownership before allowing any change.
         $attacker = User::factory()->create();
         $payment = Payment::factory()->create(['status' => 'pending']);
         Sanctum::actingAs($attacker);
@@ -126,8 +139,26 @@ class PaymentControllerTest extends TestCase
             'status' => 'completed',
         ]);
 
+        $response->assertStatus(403);
+    }
+
+    public function test_update_strips_status_for_owner(): void
+    {
+        // Fixed: even the payment's own learner cannot self-mark it completed --
+        // status is stripped from the payload for non-elevated callers.
+        $learner = User::factory()->create();
+        $payment = Payment::factory()->create(['learner_id' => $learner->id, 'status' => 'pending']);
+        Sanctum::actingAs($learner);
+
+        $response = $this->patchJson("/api/payments/{$payment->id}", [
+            'learner_id' => $payment->learner_id,
+            'course_id' => $payment->course_id,
+            'amount' => $payment->amount,
+            'status' => 'completed',
+        ]);
+
         $response->assertStatus(200);
-        $response->assertJsonPath('data.status', 'completed');
+        $response->assertJsonPath('data.status', 'pending');
     }
 
     public function test_update_requires_authentication(): void
@@ -152,15 +183,17 @@ class PaymentControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_lets_any_authenticated_user_delete_any_payment(): void
+    public function test_delete_forbids_non_admin_even_for_own_payment(): void
     {
-        $attacker = User::factory()->create();
-        $payment = Payment::factory()->create();
-        Sanctum::actingAs($attacker);
+        // Fixed: delete() is now admin-only (financial records shouldn't be
+        // learner-deletable at all, even their own).
+        $learner = User::factory()->create();
+        $payment = Payment::factory()->create(['learner_id' => $learner->id]);
+        Sanctum::actingAs($learner);
 
         $response = $this->deleteJson("/api/payments/{$payment->id}");
 
-        $response->assertStatus(200);
-        $this->assertSoftDeleted('payments', ['id' => $payment->id]);
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('payments', ['id' => $payment->id, 'deleted_at' => null]);
     }
 }

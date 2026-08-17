@@ -76,15 +76,30 @@ class InstructorProfileControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_own_profile_is_forbidden_due_to_type_mismatch(): void
+    public function test_show_own_profile_succeeds_and_reveals_payout_details(): void
     {
+        // Fixed: show() now casts both sides to string before comparing, so the
+        // instructor who owns the profile can view it. payout_details is hidden by
+        // default (App\Models\InstructorProfile::$hidden) but explicitly made visible
+        // for the owner/admin in the controller.
         $instructor = User::factory()->create();
-        $profile = InstructorProfile::factory()->create(['user_id' => $instructor->id]);
+        $profile = InstructorProfile::factory()->create(['user_id' => $instructor->id, 'payout_details' => 'ACC-12345']);
         Sanctum::actingAs($instructor);
 
         $response = $this->getJson("/api/instructor-profiles/{$profile->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.payout_details', 'ACC-12345');
+    }
+
+    public function test_show_hides_payout_details_from_non_owner(): void
+    {
+        $profile = InstructorProfile::factory()->create(['payout_details' => 'ACC-SECRET']);
+
+        // No route currently allows a non-owner, non-admin caller through to see this
+        // profile at all (they'd get 403), but this test documents the model-level
+        // default independent of controller authorization.
+        $this->assertArrayNotHasKey('payout_details', $profile->toArray());
     }
 
     public function test_update_requires_authentication(): void

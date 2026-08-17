@@ -68,6 +68,7 @@ class SiteUpdateController extends Controller
         try {
             $data = $request->all();
             $siteUpdate = SiteUpdate::create($data);
+            $siteUpdate->refresh();
 
             return response()->json([
                 'status'  => 201,

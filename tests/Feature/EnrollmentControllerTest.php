@@ -74,11 +74,10 @@ class EnrollmentControllerTest extends TestCase
         ]);
     }
 
-    public function test_store_lets_caller_set_enrollment_status_and_progress_directly(): void
+    public function test_store_strips_enrollment_status_and_progress_for_non_elevated_callers(): void
     {
-        // Mass-assignment finding: enrollment_status and progress_percent are both
-        // fillable and accepted straight from the request body, so a caller can mark
-        // themselves "completed" at 100% without ever doing any lessons.
+        // Fixed: enrollment_status/progress_percent/completed_at are stripped from
+        // the payload unless the caller resolves as instructor/admin.
         $learner = User::factory()->create();
         $course = Course::factory()->create();
         Sanctum::actingAs($learner);
@@ -91,8 +90,8 @@ class EnrollmentControllerTest extends TestCase
         ]);
 
         $response->assertStatus(201);
-        $response->assertJsonPath('data.enrollment_status', 'completed');
-        $response->assertJsonPath('data.progress_percent', 100);
+        $response->assertJsonPath('data.enrollment_status', 'active');
+        $response->assertJsonPath('data.progress_percent', 0);
     }
 
     public function test_store_validation_failure_returns_422(): void
@@ -124,14 +123,24 @@ class EnrollmentControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_lets_any_authenticated_user_view_any_enrollment(): void
+    public function test_show_forbids_viewing_another_learners_enrollment(): void
     {
-        // show() has NO ownership check whatsoever -- any authenticated user can
-        // view any other learner's enrollment record by UUID.
+        // Fixed: show() now checks ownership.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         $enrollment = Enrollment::factory()->create(['learner_id' => $victim->id]);
         Sanctum::actingAs($attacker);
+
+        $response = $this->getJson("/api/enrollments/{$enrollment->id}");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_show_lets_owner_view_own_enrollment(): void
+    {
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create(['learner_id' => $learner->id]);
+        Sanctum::actingAs($learner);
 
         $response = $this->getJson("/api/enrollments/{$enrollment->id}");
 
@@ -151,10 +160,9 @@ class EnrollmentControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_lets_any_authenticated_user_modify_any_enrollment(): void
+    public function test_update_forbids_modifying_another_learners_enrollment(): void
     {
-        // update() also has NO ownership check -- any authenticated user can flip
-        // enrollment_status/progress_percent on someone ELSE's enrollment.
+        // Fixed: update() now checks ownership before allowing any change.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         $enrollment = Enrollment::factory()->create([
@@ -171,9 +179,31 @@ class EnrollmentControllerTest extends TestCase
             'progress_percent' => 100,
         ]);
 
+        $response->assertStatus(403);
+    }
+
+    public function test_update_strips_enrollment_status_and_progress_for_owner(): void
+    {
+        // Fixed: even the enrollment's own learner cannot self-mark it completed --
+        // enrollment_status/progress_percent are stripped for non-elevated callers.
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create([
+            'learner_id' => $learner->id,
+            'enrollment_status' => 'active',
+            'progress_percent' => 10,
+        ]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->patchJson("/api/enrollments/{$enrollment->id}", [
+            'learner_id' => $learner->id,
+            'course_id' => $enrollment->course_id,
+            'enrollment_status' => 'completed',
+            'progress_percent' => 100,
+        ]);
+
         $response->assertStatus(200);
-        $response->assertJsonPath('data.enrollment_status', 'completed');
-        $response->assertJsonPath('data.progress_percent', 100);
+        $response->assertJsonPath('data.enrollment_status', 'active');
+        $response->assertJsonPath('data.progress_percent', 10);
     }
 
     public function test_update_returns_404_for_missing_enrollment(): void
@@ -198,12 +228,24 @@ class EnrollmentControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_lets_any_authenticated_user_delete_any_enrollment(): void
+    public function test_delete_forbids_deleting_another_learners_enrollment(): void
     {
+        // Fixed: delete() now checks ownership.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         $enrollment = Enrollment::factory()->create(['learner_id' => $victim->id]);
         Sanctum::actingAs($attacker);
+
+        $response = $this->deleteJson("/api/enrollments/{$enrollment->id}");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_delete_lets_owner_delete_own_enrollment(): void
+    {
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create(['learner_id' => $learner->id]);
+        Sanctum::actingAs($learner);
 
         $response = $this->deleteJson("/api/enrollments/{$enrollment->id}");
 

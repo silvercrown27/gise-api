@@ -424,4 +424,14 @@ class Validations
             'value'    => 'nullable|string',
         ]);
     }
+
+    public static function validateNotification(array $data)
+    {
+        return Validator::make($data, [
+            'user_id'  => 'required|uuid|exists:users,id',
+            'type'     => 'required|string|in:payment,enrollment,certificate,rating,system',
+            'message'  => 'required|string',
+            'is_read'  => 'nullable|boolean',
+        ]);
+    }
 }

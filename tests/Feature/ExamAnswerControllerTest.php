@@ -50,11 +50,10 @@ class ExamAnswerControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_lets_any_authenticated_user_set_is_correct_and_marks_directly(): void
+    public function test_store_strips_is_correct_and_marks_awarded_for_non_elevated_callers(): void
     {
-        // Mass-assignment: is_correct and marks_awarded are both settable straight
-        // from the request body -- a learner can self-report a correct answer with
-        // full marks without any server-side grading logic being involved.
+        // Fixed: is_correct/marks_awarded are stripped from the payload unless the
+        // caller resolves as instructor/admin, so a learner cannot self-grade.
         $attacker = User::factory()->create();
         $submission = ExamSubmission::factory()->create();
         $question = ExamQuestion::factory()->create();
@@ -69,8 +68,8 @@ class ExamAnswerControllerTest extends TestCase
         ]);
 
         $response->assertStatus(201);
-        $response->assertJsonPath('data.is_correct', true);
-        $response->assertJsonPath('data.marks_awarded', 10);
+        $response->assertJsonPath('data.is_correct', null);
+        $response->assertJsonPath('data.marks_awarded', null);
     }
 
     public function test_store_validation_failure_returns_422(): void
@@ -102,19 +101,33 @@ class ExamAnswerControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_lets_any_authenticated_user_view_any_answer(): void
+    public function test_show_forbids_viewing_another_learners_answer(): void
     {
+        // Fixed: show() now checks ownership via submission.learner_id.
         $attacker = User::factory()->create();
         $answer = ExamAnswer::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->getJson("/api/exam-answers/{$answer->id}");
 
+        $response->assertStatus(403);
+    }
+
+    public function test_show_lets_owner_view_own_answer(): void
+    {
+        $learner = User::factory()->create();
+        $submission = ExamSubmission::factory()->create(['learner_id' => $learner->id]);
+        $answer = ExamAnswer::factory()->create(['submission_id' => $submission->id]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->getJson("/api/exam-answers/{$answer->id}");
+
         $response->assertStatus(200);
     }
 
-    public function test_update_lets_any_authenticated_user_modify_any_answer(): void
+    public function test_update_forbids_modifying_another_learners_answer(): void
     {
+        // Fixed: update() now checks ownership before allowing any change.
         $attacker = User::factory()->create();
         $answer = ExamAnswer::factory()->create(['is_correct' => false, 'marks_awarded' => 0]);
         Sanctum::actingAs($attacker);
@@ -126,8 +139,27 @@ class ExamAnswerControllerTest extends TestCase
             'marks_awarded' => 10,
         ]);
 
+        $response->assertStatus(403);
+    }
+
+    public function test_update_strips_is_correct_and_marks_awarded_for_owner(): void
+    {
+        // Fixed: even the answer's own learner cannot self-grade via update().
+        $learner = User::factory()->create();
+        $submission = ExamSubmission::factory()->create(['learner_id' => $learner->id]);
+        $answer = ExamAnswer::factory()->create(['submission_id' => $submission->id, 'is_correct' => false, 'marks_awarded' => 0]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->patchJson("/api/exam-answers/{$answer->id}", [
+            'submission_id' => $answer->submission_id,
+            'question_id' => $answer->question_id,
+            'is_correct' => true,
+            'marks_awarded' => 10,
+        ]);
+
         $response->assertStatus(200);
-        $response->assertJsonPath('data.is_correct', true);
+        $response->assertJsonPath('data.is_correct', false);
+        $response->assertJsonPath('data.marks_awarded', 0);
     }
 
     public function test_update_requires_authentication(): void
@@ -151,15 +183,16 @@ class ExamAnswerControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_lets_any_authenticated_user_delete_any_answer(): void
+    public function test_delete_forbids_non_elevated_caller(): void
     {
+        // Fixed: delete() is now instructor/admin-only.
         $attacker = User::factory()->create();
         $answer = ExamAnswer::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->deleteJson("/api/exam-answers/{$answer->id}");
 
-        $response->assertStatus(200);
-        $this->assertSoftDeleted('exam_answers', ['id' => $answer->id]);
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('exam_answers', ['id' => $answer->id, 'deleted_at' => null]);
     }
 }

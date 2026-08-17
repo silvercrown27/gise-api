@@ -68,6 +68,7 @@ class InstructorPayoutController extends Controller
         try {
             $data = $request->all();
             $instructorPayout = InstructorPayout::create($data);
+            $instructorPayout->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -97,7 +98,7 @@ class InstructorPayoutController extends Controller
             }
 
             $isAdmin = $user && $user->role === 'admin';
-            $isSelf = $instructorPayout->instructor_id === $request->user()->id;
+            $isSelf = (string) $instructorPayout->instructor_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
                 return response()->json([

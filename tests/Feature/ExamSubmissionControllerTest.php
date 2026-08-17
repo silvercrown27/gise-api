@@ -47,10 +47,11 @@ class ExamSubmissionControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_lets_any_authenticated_user_submit_for_any_learner(): void
+    public function test_store_forces_learner_id_to_caller_and_strips_score_and_status(): void
     {
-        // No ownership check: an attacker can create a submission with score/status
-        // set directly for another learner_id.
+        // Fixed: for a non-elevated caller, learner_id is forced to the caller's own
+        // id and score/status are stripped -- a learner cannot submit as someone else
+        // or self-grade on creation.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         $exam = Exam::factory()->create();
@@ -64,8 +65,9 @@ class ExamSubmissionControllerTest extends TestCase
         ]);
 
         $response->assertStatus(201);
-        $response->assertJsonPath('data.score', 100);
-        $response->assertJsonPath('data.status', 'graded');
+        $response->assertJsonPath('data.learner_id', (string) $attacker->id);
+        $response->assertJsonPath('data.score', null);
+        $response->assertJsonPath('data.status', 'in_progress');
     }
 
     public function test_store_validation_failure_returns_422(): void
@@ -97,21 +99,32 @@ class ExamSubmissionControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_lets_any_authenticated_user_view_any_submission(): void
+    public function test_show_forbids_viewing_another_learners_submission(): void
     {
+        // Fixed: show() now checks ownership.
         $attacker = User::factory()->create();
         $submission = ExamSubmission::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->getJson("/api/exam-submissions/{$submission->id}");
 
+        $response->assertStatus(403);
+    }
+
+    public function test_show_lets_owner_view_own_submission(): void
+    {
+        $learner = User::factory()->create();
+        $submission = ExamSubmission::factory()->create(['learner_id' => $learner->id]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->getJson("/api/exam-submissions/{$submission->id}");
+
         $response->assertStatus(200);
     }
 
-    public function test_update_lets_any_authenticated_user_change_score_on_any_submission(): void
+    public function test_update_forbids_modifying_another_learners_submission(): void
     {
-        // A learner can PATCH their own OR anyone else's submission and set score
-        // and status directly (e.g. self-grade to a passing score).
+        // Fixed: update() now checks ownership before allowing any change.
         $attacker = User::factory()->create();
         $submission = ExamSubmission::factory()->create(['score' => 10, 'status' => 'submitted']);
         Sanctum::actingAs($attacker);
@@ -123,8 +136,27 @@ class ExamSubmissionControllerTest extends TestCase
             'status' => 'graded',
         ]);
 
+        $response->assertStatus(403);
+    }
+
+    public function test_update_strips_score_and_status_for_owner(): void
+    {
+        // Fixed: even the submission's own learner cannot self-grade -- score/status
+        // are stripped for non-elevated callers.
+        $learner = User::factory()->create();
+        $submission = ExamSubmission::factory()->create(['learner_id' => $learner->id, 'score' => 10, 'status' => 'submitted']);
+        Sanctum::actingAs($learner);
+
+        $response = $this->patchJson("/api/exam-submissions/{$submission->id}", [
+            'exam_id' => $submission->exam_id,
+            'learner_id' => $submission->learner_id,
+            'score' => 100,
+            'status' => 'graded',
+        ]);
+
         $response->assertStatus(200);
-        $response->assertJsonPath('data.score', 100);
+        $response->assertJsonPath('data.score', 10);
+        $response->assertJsonPath('data.status', 'submitted');
     }
 
     public function test_update_requires_authentication(): void
@@ -148,15 +180,16 @@ class ExamSubmissionControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_lets_any_authenticated_user_delete_any_submission(): void
+    public function test_delete_forbids_non_elevated_caller(): void
     {
+        // Fixed: delete() is now instructor/admin-only.
         $attacker = User::factory()->create();
         $submission = ExamSubmission::factory()->create();
         Sanctum::actingAs($attacker);
 
         $response = $this->deleteJson("/api/exam-submissions/{$submission->id}");
 
-        $response->assertStatus(200);
-        $this->assertSoftDeleted('exam_submissions', ['id' => $submission->id]);
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('exam_submissions', ['id' => $submission->id, 'deleted_at' => null]);
     }
 }

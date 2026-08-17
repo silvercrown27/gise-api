@@ -64,6 +64,7 @@ class ScholarUserController extends Controller
         try {
             $data = $request->all();
             $scholarUser = ScholarUser::create($data);
+            $scholarUser->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -92,7 +93,7 @@ class ScholarUserController extends Controller
                 ], 404);
             }
 
-            if ((!$user || $user->role !== 'admin') && $scholarUser->user_id !== $request->user()->id) {
+            if ((!$user || $user->role !== 'admin') && (string) $scholarUser->user_id !== (string) $request->user()->id) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -136,7 +137,7 @@ class ScholarUserController extends Controller
             }
 
             $isAdmin = $user && $user->role === 'admin';
-            $isSelf = $scholarUser->user_id === $request->user()->id;
+            $isSelf = (string) $scholarUser->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
                 return response()->json([
@@ -145,7 +146,13 @@ class ScholarUserController extends Controller
                 ], 403);
             }
 
-            $scholarUser->update($request->all());
+            $data = $request->all();
+
+            if (!$isAdmin) {
+                unset($data['role']);
+            }
+
+            $scholarUser->update($data);
 
             return response()->json([
                 'status'  => 200,

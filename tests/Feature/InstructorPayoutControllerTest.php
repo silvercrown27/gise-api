@@ -85,19 +85,17 @@ class InstructorPayoutControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_own_payout_is_forbidden_due_to_type_mismatch(): void
+    public function test_show_own_payout_succeeds(): void
     {
-        // Like CourseMentorController@show, $isSelf compares instructor_id (a fresh
-        // string from the DB) to $request->user()->id (a Ramsey\Uuid object from
-        // Sanctum's resolved user), so the strict === never matches even for the
-        // instructor who owns the payout.
+        // Fixed: show() now casts both sides to string before comparing, so the
+        // instructor who owns the payout can view it.
         $instructor = User::factory()->create();
         $payout = InstructorPayout::factory()->create(['instructor_id' => $instructor->id]);
         Sanctum::actingAs($instructor);
 
         $response = $this->getJson("/api/instructor-payouts/{$payout->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
     }
 
     public function test_update_requires_authentication(): void

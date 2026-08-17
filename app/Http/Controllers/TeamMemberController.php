@@ -59,6 +59,7 @@ class TeamMemberController extends Controller
         try {
             $data = $request->all();
             $teamMember = TeamMember::create($data);
+            $teamMember->refresh();
 
             return response()->json([
                 'status'  => 201,

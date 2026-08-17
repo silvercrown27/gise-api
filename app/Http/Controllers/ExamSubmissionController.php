@@ -50,8 +50,19 @@ class ExamSubmissionController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+
             $data = $request->all();
+
+            if (!$isElevated) {
+                unset($data['score'], $data['status']);
+                $data['learner_id'] = $request->user()->id;
+            }
+
             $examSubmission = ExamSubmission::create($data);
+
+            $examSubmission->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -67,9 +78,10 @@ class ExamSubmissionController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
             $examSubmission = ExamSubmission::find($id);
 
             if (!$examSubmission) {
@@ -77,6 +89,16 @@ class ExamSubmissionController extends Controller
                     'status'  => 404,
                     'message' => 'Exam submission not found.',
                 ], 404);
+            }
+
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isOwner = (string) $examSubmission->learner_id === (string) $request->user()->id;
+
+            if (!$isElevated && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             return response()->json([
@@ -105,6 +127,7 @@ class ExamSubmissionController extends Controller
         }
 
         try {
+            $user = ScholarUser::find($request->user()->id);
             $examSubmission = ExamSubmission::find($id);
 
             if (!$examSubmission) {
@@ -114,7 +137,23 @@ class ExamSubmissionController extends Controller
                 ], 404);
             }
 
-            $examSubmission->update($request->all());
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isOwner = (string) $examSubmission->learner_id === (string) $request->user()->id;
+
+            if (!$isElevated && !$isOwner) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
+            $data = $request->all();
+
+            if (!$isElevated) {
+                unset($data['score'], $data['status'], $data['learner_id']);
+            }
+
+            $examSubmission->update($data);
 
             return response()->json([
                 'status'  => 200,
@@ -130,9 +169,18 @@ class ExamSubmissionController extends Controller
         }
     }
 
-    public function delete(string $id)
+    public function delete(Request $request, string $id)
     {
         try {
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $examSubmission = ExamSubmission::find($id);
 
             if (!$examSubmission) {

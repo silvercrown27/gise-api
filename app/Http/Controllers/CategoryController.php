@@ -59,6 +59,7 @@ class CategoryController extends Controller
         try {
             $data = $request->all();
             $category = Category::create($data);
+            $category->refresh();
 
             return response()->json([
                 'status'  => 201,

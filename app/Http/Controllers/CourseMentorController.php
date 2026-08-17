@@ -68,6 +68,7 @@ class CourseMentorController extends Controller
         try {
             $data = $request->all();
             $courseMentor = CourseMentor::create($data);
+            $courseMentor->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -97,7 +98,7 @@ class CourseMentorController extends Controller
             }
 
             $isAdmin = $user && $user->role === 'admin';
-            $isSelf = $courseMentor->mentor_id === $request->user()->id;
+            $isSelf = (string) $courseMentor->mentor_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
                 return response()->json([

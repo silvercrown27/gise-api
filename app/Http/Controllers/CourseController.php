@@ -47,8 +47,9 @@ class CourseController extends Controller
         }
 
         $data = $request->all();
+        $isAdmin = $user->role === 'admin';
 
-        if (empty($data['instructor_id'])) {
+        if (!$isAdmin || empty($data['instructor_id'])) {
             $data['instructor_id'] = $request->user()->id;
         }
 
@@ -64,6 +65,7 @@ class CourseController extends Controller
 
         try {
             $course = Course::create($data);
+            $course->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -119,7 +121,7 @@ class CourseController extends Controller
             $user = ScholarUser::find($request->user()->id);
 
             $isAdmin = $user && $user->role === 'admin';
-            $isOwningInstructor = $user && $user->role === 'instructor' && $course->instructor_id === $request->user()->id;
+            $isOwningInstructor = $user && $user->role === 'instructor' && (string) $course->instructor_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwningInstructor) {
                 return response()->json([
@@ -138,7 +140,13 @@ class CourseController extends Controller
                 ], 422);
             }
 
-            $course->update($request->all());
+            $data = $request->all();
+
+            if (!$isAdmin) {
+                unset($data['instructor_id']);
+            }
+
+            $course->update($data);
 
             return response()->json([
                 'status'  => 200,
@@ -169,7 +177,7 @@ class CourseController extends Controller
             $user = ScholarUser::find($request->user()->id);
 
             $isAdmin = $user && $user->role === 'admin';
-            $isOwningInstructor = $user && $user->role === 'instructor' && $course->instructor_id === $request->user()->id;
+            $isOwningInstructor = $user && $user->role === 'instructor' && (string) $course->instructor_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwningInstructor) {
                 return response()->json([

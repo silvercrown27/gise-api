@@ -26,9 +26,9 @@ class ExamQuestionController extends Controller
 
             $results = $query->orderBy('order_index', 'asc')->paginate(10);
 
-            if (!$user || $user->role === 'learner') {
+            if ($user && in_array($user->role, ['instructor', 'admin'])) {
                 $results->getCollection()->transform(function ($question) {
-                    return $question->makeHidden('correct_answer');
+                    return $question->makeVisible('correct_answer');
                 });
             }
 
@@ -69,6 +69,7 @@ class ExamQuestionController extends Controller
         try {
             $data = $request->all();
             $examQuestion = ExamQuestion::create($data);
+            $examQuestion->refresh();
 
             return response()->json([
                 'status'  => 201,
@@ -97,8 +98,8 @@ class ExamQuestionController extends Controller
                 ], 404);
             }
 
-            if (!$user || $user->role === 'learner') {
-                $examQuestion->makeHidden('correct_answer');
+            if ($user && in_array($user->role, ['instructor', 'admin'])) {
+                $examQuestion->makeVisible('correct_answer');
             }
 
             return response()->json([
