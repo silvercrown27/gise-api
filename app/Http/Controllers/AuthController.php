@@ -21,6 +21,8 @@ use App\Models\StoreUsers;
 use App\Models\User;
 use App\Models\UserSettings;
 use App\Helpers\Utilities;
+use App\Models\ScholarUser;
+use App\Models\SiteUpdate;
 use App\Notifications\OtpVerificationNotification;
 use App\Notifications\ResetPasswordNotification;
 use App\Notifications\WelcomeNotification;
@@ -57,7 +59,7 @@ class AuthController extends Controller
 
         try {
             $requestData['id'] = $user->id;
-            $userData = StoreUsers::create($requestData);
+            $userData = ScholarUser::create($requestData);
 
             $words = [$requestData['first_name'], $requestData['last_name']];
             $initials = strtoupper(substr($words[0] ?? '', 0, 1) . substr($words[1] ?? '', 0, 1));
@@ -82,7 +84,7 @@ class AuthController extends Controller
         $user->notify(new OtpVerificationNotification($user->email));
         $user->notify(new WelcomeNotification($user->name));
 
-        StoreUpdates::create([
+        SiteUpdate::create([
             "title" => "New user registered",
             "description" => $requestData['first_name'] . ' ' . $requestData['last_name'] . " created an account",
             'type' => 'customer'
@@ -107,7 +109,7 @@ class AuthController extends Controller
         if (Auth::check()) {
             $user = Auth::user();
             $token = $user->createToken('main')->plainTextToken;
-            $userData = StoreUsers::find($user->id);
+            $userData = ScholarUser::find($user->id);
 
             // if (!$remember) {
             //     config(['session.lifetime' => 0]);

@@ -145,4 +145,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(AdminAuditLog::class, 'admin_id');
     }
+
+    public function causedSiteUpdates()
+    {
+        return $this->hasMany(SiteUpdate::class, 'causer_id');
+    }
 }
