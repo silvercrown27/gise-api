@@ -51,7 +51,7 @@ class CourseControllerTest extends TestCase
         // can never find the row (it looks up by scholar_users.id, not user_id), so $user is
         // always null here and the request is rejected for every real caller.
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         Sanctum::actingAs($instructor);
 
         $response = $this->postJson('/api/courses', [
@@ -67,7 +67,7 @@ class CourseControllerTest extends TestCase
     public function test_update_own_course_as_instructor_is_forbidden_due_to_lookup_bug(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         Sanctum::actingAs($instructor);
 
@@ -103,7 +103,7 @@ class CourseControllerTest extends TestCase
     public function test_delete_own_course_as_instructor_is_forbidden_due_to_lookup_bug(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         Sanctum::actingAs($instructor);
 

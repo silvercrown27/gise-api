@@ -51,7 +51,7 @@ class TestimonialControllerTest extends TestCase
     public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         Sanctum::actingAs($instructor);
 
         $response = $this->postJson('/api/testimonials', [
@@ -74,7 +74,7 @@ class TestimonialControllerTest extends TestCase
     public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $testimonial = Testimonial::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -95,7 +95,7 @@ class TestimonialControllerTest extends TestCase
     public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $testimonial = Testimonial::factory()->create();
         Sanctum::actingAs($admin);
 

@@ -55,7 +55,7 @@ class CategoryControllerTest extends TestCase
         // the row, so $user is null and the request is rejected regardless of
         // the caller's real role.
         $user = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $user->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $user->id, 'role' => 'instructor']);
 
         Sanctum::actingAs($user);
 
@@ -70,7 +70,7 @@ class CategoryControllerTest extends TestCase
     public function test_store_validation_failure_returns_422(): void
     {
         $user = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $user->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $user->id, 'role' => 'admin']);
         Sanctum::actingAs($user);
 
         $response = $this->postJson('/api/categories', []);
@@ -83,7 +83,7 @@ class CategoryControllerTest extends TestCase
     {
         $category = Category::factory()->create();
         $user = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $user->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $user->id, 'role' => 'admin']);
         Sanctum::actingAs($user);
 
         $response = $this->patchJson("/api/categories/{$category->id}", [
@@ -106,7 +106,7 @@ class CategoryControllerTest extends TestCase
     {
         $category = Category::factory()->create();
         $user = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $user->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $user->id, 'role' => 'admin']);
         Sanctum::actingAs($user);
 
         $response = $this->deleteJson("/api/categories/{$category->id}");

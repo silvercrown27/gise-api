@@ -24,7 +24,7 @@ class RefundControllerTest extends TestCase
     public function test_index_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         Sanctum::actingAs($admin);
 
         $response = $this->getJson('/api/refunds');
@@ -47,7 +47,7 @@ class RefundControllerTest extends TestCase
     public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $payment = Payment::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -71,7 +71,7 @@ class RefundControllerTest extends TestCase
     public function test_show_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $refund = Refund::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -96,7 +96,7 @@ class RefundControllerTest extends TestCase
     public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $refund = Refund::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -121,7 +121,7 @@ class RefundControllerTest extends TestCase
     public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $refund = Refund::factory()->create();
         Sanctum::actingAs($admin);
 

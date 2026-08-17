@@ -60,7 +60,7 @@ class ExamQuestionControllerTest extends TestCase
     public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $exam = Exam::factory()->create();
         Sanctum::actingAs($instructor);
 
@@ -113,7 +113,7 @@ class ExamQuestionControllerTest extends TestCase
         // cannot resolve them, so they too never see correct_answer via this endpoint
         // right now -- a usability defect flagged in the security review, not a leak.
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $question = ExamQuestion::factory()->create(['correct_answer' => 'B']);
         Sanctum::actingAs($instructor);
 
@@ -140,7 +140,7 @@ class ExamQuestionControllerTest extends TestCase
     public function test_update_as_instructor_is_forbidden_due_to_lookup_bug(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $question = ExamQuestion::factory()->create();
         Sanctum::actingAs($instructor);
 
@@ -166,7 +166,7 @@ class ExamQuestionControllerTest extends TestCase
     public function test_delete_as_instructor_is_forbidden_due_to_lookup_bug(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $question = ExamQuestion::factory()->create();
         Sanctum::actingAs($instructor);
 

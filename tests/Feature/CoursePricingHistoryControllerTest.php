@@ -24,7 +24,7 @@ class CoursePricingHistoryControllerTest extends TestCase
     public function test_index_as_instructor_is_forbidden_due_to_lookup_bug(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         Sanctum::actingAs($instructor);
 
         $response = $this->getJson('/api/course-pricing-history');
@@ -50,7 +50,7 @@ class CoursePricingHistoryControllerTest extends TestCase
     public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $course = Course::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -89,7 +89,7 @@ class CoursePricingHistoryControllerTest extends TestCase
         // to be truthy AND role === 'instructor', so the lookup bug blocks this path
         // even for the actual course-owning instructor.
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         $history = CoursePricingHistory::factory()->create(['course_id' => $course->id]);
         Sanctum::actingAs($instructor);
@@ -116,7 +116,7 @@ class CoursePricingHistoryControllerTest extends TestCase
     public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $history = CoursePricingHistory::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -142,7 +142,7 @@ class CoursePricingHistoryControllerTest extends TestCase
     public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $history = CoursePricingHistory::factory()->create();
         Sanctum::actingAs($admin);
 

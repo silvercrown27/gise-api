@@ -16,7 +16,7 @@ class ScholarUserController extends Controller
             $user = ScholarUser::find($request->user()->id);
 
             if (!$user || $user->role !== 'admin') {
-                $query = ScholarUser::where('user_id', $request->user()->id);
+                $query = ScholarUser::where('id', $request->user()->id);
             } else {
                 $query = ScholarUser::query();
             }
@@ -93,7 +93,7 @@ class ScholarUserController extends Controller
                 ], 404);
             }
 
-            if ((!$user || $user->role !== 'admin') && (string) $scholarUser->user_id !== (string) $request->user()->id) {
+            if ((!$user || $user->role !== 'admin') && (string) $scholarUser->id !== (string) $request->user()->id) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -115,7 +115,7 @@ class ScholarUserController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $validator = Validations::validateScholarUser($request->all());
+        $validator = Validations::validateScholarUserUpdate($request->all());
 
         if ($validator->fails()) {
             return response()->json([
@@ -137,7 +137,7 @@ class ScholarUserController extends Controller
             }
 
             $isAdmin = $user && $user->role === 'admin';
-            $isSelf = (string) $scholarUser->user_id === (string) $request->user()->id;
+            $isSelf = (string) $scholarUser->id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
                 return response()->json([
@@ -149,7 +149,7 @@ class ScholarUserController extends Controller
             $data = $request->all();
 
             if (!$isAdmin) {
-                unset($data['role']);
+                unset($data['role'], $data['id']);
             }
 
             $scholarUser->update($data);

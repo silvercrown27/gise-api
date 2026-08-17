@@ -16,7 +16,10 @@ class ScholarUserFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
+            // scholar_users.id shares the owning User's id rather than being a
+            // separate FK column, so a fresh User is created up front and its
+            // id reused here instead of the usual `X::factory()` FK shorthand.
+            'id' => User::factory()->create()->id,
             'role' => fake()->randomElement(['learner', 'instructor', 'admin']),
             'phone' => fake()->optional()->phoneNumber(),
             'avatar_url' => fake()->optional()->imageUrl(),

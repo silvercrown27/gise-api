@@ -7,7 +7,6 @@ use App\Traits\UUID;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
 
 class ScholarUser extends Model
 {
@@ -17,7 +16,7 @@ class ScholarUser extends Model
     protected $table = 'scholar_users';
 
     protected $fillable = [
-        'user_id',
+        'id',
         'role',
         'phone',
         'avatar_url',
@@ -35,8 +34,15 @@ class ScholarUser extends Model
     {
         parent::boot();
 
+        // Unlike every other model, ScholarUser does NOT generate its own id —
+        // it shares the owning User's id (set explicitly by the caller, e.g.
+        // ScholarUser::create(['id' => $user->id, 'role' => 'learner', ...])).
+        // This enforces that id is always provided rather than silently falling
+        // back to a freshly generated UUID that wouldn't match any user.
         static::creating(function ($model) {
-            $model->id = Str::uuid('id');
+            if (!$model->id) {
+                throw new \RuntimeException('ScholarUser::id must be explicitly set to the owning User id.');
+            }
             $model->created_at = $model->getDateTime();
             $model->updated_at = $model->getDateTime();
         });
@@ -53,6 +59,6 @@ class ScholarUser extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'id', 'id');
     }
 }

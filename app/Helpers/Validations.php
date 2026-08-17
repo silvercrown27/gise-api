@@ -26,8 +26,19 @@ class Validations
     public static function validateScholarUser(array $data)
     {
         return Validator::make($data, [
-            'user_id'       => 'required|uuid|exists:users,id',
+            'id'            => 'required|uuid|exists:users,id|unique:scholar_users,id',
             'role'          => 'required|string|in:learner,instructor,admin',
+            'phone'         => 'nullable|string|max:50',
+            'avatar_url'    => 'nullable|string',
+            'status'        => 'nullable|string|in:active,suspended,pending_verification',
+            'last_login_at' => 'nullable|date',
+        ]);
+    }
+
+    public static function validateScholarUserUpdate(array $data)
+    {
+        return Validator::make($data, [
+            'role'          => 'sometimes|string|in:learner,instructor,admin',
             'phone'         => 'nullable|string|max:50',
             'avatar_url'    => 'nullable|string',
             'status'        => 'nullable|string|in:active,suspended,pending_verification',

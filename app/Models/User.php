@@ -83,7 +83,7 @@ class User extends Authenticatable
 
     public function scholarProfile()
     {
-        return $this->hasOne(ScholarUser::class, 'user_id');
+        return $this->hasOne(ScholarUser::class, 'id', 'id');
     }
 
     public function instructorProfile()

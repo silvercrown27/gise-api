@@ -56,7 +56,7 @@ class CohortControllerTest extends TestCase
     public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         Sanctum::actingAs($instructor);
 
@@ -73,7 +73,7 @@ class CohortControllerTest extends TestCase
     public function test_store_validation_failure_is_masked_by_403(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'admin']);
         Sanctum::actingAs($instructor);
 
         $response = $this->postJson('/api/cohorts', []);
@@ -94,7 +94,7 @@ class CohortControllerTest extends TestCase
     public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $cohort = Cohort::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -115,7 +115,7 @@ class CohortControllerTest extends TestCase
     public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $cohort = Cohort::factory()->create();
         Sanctum::actingAs($admin);
 

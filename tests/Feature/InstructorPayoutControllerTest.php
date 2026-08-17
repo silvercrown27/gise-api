@@ -23,7 +23,7 @@ class InstructorPayoutControllerTest extends TestCase
     public function test_index_as_instructor_is_forbidden_due_to_lookup_bug(): void
     {
         $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $instructor->id, 'role' => 'instructor']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         Sanctum::actingAs($instructor);
 
         $response = $this->getJson('/api/instructor-payouts');
@@ -50,7 +50,7 @@ class InstructorPayoutControllerTest extends TestCase
     public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $instructor = User::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -117,7 +117,7 @@ class InstructorPayoutControllerTest extends TestCase
     public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $payout = InstructorPayout::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -147,7 +147,7 @@ class InstructorPayoutControllerTest extends TestCase
         // Note: delete() requires role === 'admin' strictly (not the broader
         // "not learner" check used in index/store/update).
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $payout = InstructorPayout::factory()->create();
         Sanctum::actingAs($admin);
 

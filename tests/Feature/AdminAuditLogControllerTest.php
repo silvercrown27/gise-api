@@ -20,15 +20,17 @@ class AdminAuditLogControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_index_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_index_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        AdminAuditLog::factory()->count(2)->create();
         Sanctum::actingAs($admin);
 
         $response = $this->getJson('/api/admin-audit-logs');
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertCount(2, $response->json('data.data'));
     }
 
     public function test_store_requires_authentication(): void
@@ -43,10 +45,10 @@ class AdminAuditLogControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         Sanctum::actingAs($admin);
 
         $response = $this->postJson('/api/admin-audit-logs', [
@@ -54,7 +56,8 @@ class AdminAuditLogControllerTest extends TestCase
             'action' => 'suspended_user',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('admin_audit_logs', ['admin_id' => $admin->id, 'action' => 'suspended_user']);
     }
 
     public function test_show_requires_authentication(): void
@@ -66,16 +69,17 @@ class AdminAuditLogControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_show_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_show_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $log = AdminAuditLog::factory()->create();
         Sanctum::actingAs($admin);
 
         $response = $this->getJson("/api/admin-audit-logs/{$log->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.id', (string) $log->id);
     }
 
     public function test_update_requires_authentication(): void
@@ -93,7 +97,7 @@ class AdminAuditLogControllerTest extends TestCase
     public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $log = AdminAuditLog::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -117,7 +121,7 @@ class AdminAuditLogControllerTest extends TestCase
     public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['user_id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $log = AdminAuditLog::factory()->create();
         Sanctum::actingAs($admin);
 
