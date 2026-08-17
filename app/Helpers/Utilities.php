@@ -3,10 +3,7 @@
 namespace App\Helpers;
 
 use Carbon\Carbon;
-use App\Models\PinnUsers;
 use App\Models\ScholarUser;
-use App\Models\VideoMetadata;
-use App\Models\UserSubscriptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 

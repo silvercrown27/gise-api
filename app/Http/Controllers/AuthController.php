@@ -16,8 +16,6 @@ use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Http\Requests\Auth\SignupRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Controllers\Controller;
-use App\Models\StoreUpdates;
-use App\Models\StoreUsers;
 use App\Models\User;
 use App\Models\UserSettings;
 use App\Helpers\Utilities;
@@ -33,9 +31,15 @@ class AuthController extends Controller
 {
     public function signup(SignupRequest $request)
     {
-        $requestData = $request->only(['first_name', 'last_name', 'email', 'phone',]);
-        $requestData['role'] = 'user';
-        $validator = Validations::validateUser($requestData);
+        $fullName = trim($request->first_name . ' ' . $request->last_name);
+
+        $userData = [
+            'name' => $fullName,
+            'email' => $request->email,
+            'password' => $request->password,
+        ];
+
+        $validator = Validations::validateUser($userData);
 
         if ($validator->fails()) {
             Log::error("User creation failed" . $validator->messages());
@@ -47,26 +51,25 @@ class AuthController extends Controller
         }
 
         try {
-            $user = User::create([
-                'name' => strtolower($request->first_name . ' ' . $request->last_name),
-                'email' => $request->email,
-                'password' => $request->password,
-            ]);
+            $user = User::create($userData);
         } catch (\Exception $e) {
             Log::error("User creation failed" . $e);
             return response(['message' => 'User creation failed'], 500);
         }
 
         try {
-            $requestData['id'] = $user->id;
-            $userData = ScholarUser::create($requestData);
+            $scholarUser = ScholarUser::create([
+                'user_id' => $user->id,
+                'role' => 'learner',
+                'phone' => $request->phone,
+            ]);
 
-            $words = [$requestData['first_name'], $requestData['last_name']];
+            $words = [$request->first_name, $request->last_name];
             $initials = strtoupper(substr($words[0] ?? '', 0, 1) . substr($words[1] ?? '', 0, 1));
 
-            $imagePath = Utilities::generateInitialsImage($initials, $userData);
+            $imagePath = Utilities::generateInitialsImage($initials, $scholarUser);
             if (strpos($imagePath, 'Error:') !== 0) {
-                $userData->update(['image' => $imagePath]);
+                $scholarUser->update(['avatar_url' => $imagePath]);
             } else {
                 Log::error("Failed to generate image for User: {$imagePath}");
             }
@@ -85,15 +88,18 @@ class AuthController extends Controller
         $user->notify(new WelcomeNotification($user->name));
 
         SiteUpdate::create([
-            "title" => "New user registered",
-            "description" => $requestData['first_name'] . ' ' . $requestData['last_name'] . " created an account",
-            'type' => 'customer'
+            'type' => 'signup',
+            'subject_type' => User::class,
+            'subject_id' => $user->id,
+            'causer_id' => $user->id,
+            'title' => 'New user registered',
+            'description' => "{$fullName} created an account",
         ]);
 
         return response()->json([
             'user' => $user,
             'token' => $token,
-            'userData' => $userData
+            'userData' => $scholarUser
         ], 200);
     }
 

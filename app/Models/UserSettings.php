@@ -50,4 +50,20 @@ class UserSettings extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    public static function initializeDefaultSettings(string $userId): void
+    {
+        $defaults = [
+            'email_notifications' => 'true',
+            'sms_notifications' => 'false',
+            'theme' => 'light',
+        ];
+
+        foreach ($defaults as $key => $value) {
+            static::firstOrCreate(
+                ['user_id' => $userId, 'key' => $key],
+                ['value' => $value]
+            );
+        }
+    }
 }
