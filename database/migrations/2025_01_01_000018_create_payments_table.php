@@ -19,8 +19,8 @@ return new class extends Migration
             $table->string('gateway_transaction_id')->nullable();
             $table->enum('status', ['pending', 'completed', 'failed', 'refunded'])->default('pending');
             $table->timestamp('paid_at')->nullable();
-            $table->timestamps();
             $table->softDeletes();
+            $table->timestamps();
 
             $table->foreign('learner_id')->references('id')->on('users')->cascadeOnDelete();
             $table->foreign('course_id')->references('id')->on('courses')->cascadeOnDelete();

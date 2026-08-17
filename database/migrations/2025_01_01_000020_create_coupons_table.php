@@ -18,6 +18,7 @@ return new class extends Migration
             $table->integer('usage_limit')->nullable();
             $table->integer('times_used')->default(0);
             $table->uuid('applicable_course_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('applicable_course_id')->references('id')->on('courses')->nullOnDelete();

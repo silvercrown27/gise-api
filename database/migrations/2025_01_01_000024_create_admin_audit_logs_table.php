@@ -15,7 +15,8 @@ return new class extends Migration
             $table->enum('target_type', ['user', 'course', 'payment'])->nullable();
             $table->uuid('target_id')->nullable();
             $table->text('notes')->nullable();
-            $table->timestamp('created_at')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
 
             $table->foreign('admin_id')->references('id')->on('users')->cascadeOnDelete();
         });

@@ -15,6 +15,7 @@ return new class extends Migration
             $table->bigInteger('new_price');
             $table->uuid('changed_by');
             $table->timestamp('changed_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('course_id')->references('id')->on('courses')->cascadeOnDelete();

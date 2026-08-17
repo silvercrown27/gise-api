@@ -17,6 +17,7 @@ return new class extends Migration
             $table->text('correct_answer')->nullable();
             $table->integer('marks')->default(0);
             $table->integer('order_index')->default(0);
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('exam_id')->references('id')->on('exams')->cascadeOnDelete();

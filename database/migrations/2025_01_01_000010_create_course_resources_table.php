@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('file_url');
             $table->string('file_type')->nullable();
             $table->boolean('is_downloadable')->default(true);
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('course_id')->references('id')->on('courses')->cascadeOnDelete();

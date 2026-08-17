@@ -14,6 +14,7 @@ return new class extends Migration
             $table->uuid('lesson_id');
             $table->enum('status', ['not_started', 'in_progress', 'completed'])->default('not_started');
             $table->timestamp('completed_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('enrollment_id')->references('id')->on('enrollments')->cascadeOnDelete();

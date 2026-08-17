@@ -18,6 +18,7 @@ return new class extends Migration
             $table->integer('capacity')->default(0);
             $table->integer('seats_taken')->default(0);
             $table->enum('status', ['upcoming', 'open', 'closed', 'completed'])->default('upcoming');
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('course_id')->references('id')->on('courses')->cascadeOnDelete();

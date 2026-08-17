@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('avatar_url')->nullable();
             $table->enum('status', ['active', 'suspended', 'pending_verification'])->default('pending_verification');
             $table->timestamp('last_login_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->unique('user_id');

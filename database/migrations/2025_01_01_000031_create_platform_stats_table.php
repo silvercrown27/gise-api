@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('value');
             $table->integer('order_index')->default(0);
             $table->boolean('is_published')->default(true);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

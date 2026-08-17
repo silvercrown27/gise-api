@@ -17,6 +17,7 @@ return new class extends Migration
             $table->enum('status', ['in_progress', 'submitted', 'graded'])->default('in_progress');
             $table->timestamp('started_at')->nullable();
             $table->timestamp('submitted_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('exam_id')->references('id')->on('exams')->cascadeOnDelete();

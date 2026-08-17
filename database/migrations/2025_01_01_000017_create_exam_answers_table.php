@@ -15,6 +15,7 @@ return new class extends Migration
             $table->text('answer_given')->nullable();
             $table->integer('marks_awarded')->nullable();
             $table->boolean('is_correct')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('submission_id')->references('id')->on('exam_submissions')->cascadeOnDelete();

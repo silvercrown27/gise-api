@@ -17,6 +17,7 @@ return new class extends Migration
             $table->integer('duration_minutes')->nullable();
             $table->integer('order_index')->default(0);
             $table->boolean('is_preview')->default(false);
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('module_id')->references('id')->on('course_modules')->cascadeOnDelete();

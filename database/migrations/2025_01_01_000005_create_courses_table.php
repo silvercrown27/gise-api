@@ -31,8 +31,8 @@ return new class extends Migration
             $table->integer('duration_weeks')->nullable();
             $table->string('language')->default('en');
             $table->timestamp('published_at')->nullable();
-            $table->timestamps();
             $table->softDeletes();
+            $table->timestamps();
 
             $table->foreign('instructor_id')->references('id')->on('users')->cascadeOnDelete();
             $table->foreign('category_id')->references('id')->on('categories')->nullOnDelete();

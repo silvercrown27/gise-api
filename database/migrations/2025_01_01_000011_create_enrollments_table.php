@@ -17,6 +17,7 @@ return new class extends Migration
             $table->unsignedTinyInteger('progress_percent')->default(0);
             $table->timestamp('enrolled_at')->nullable();
             $table->timestamp('completed_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('learner_id')->references('id')->on('users')->cascadeOnDelete();

@@ -17,6 +17,7 @@ return new class extends Migration
             $table->integer('total_enrollments')->default(0);
             $table->bigInteger('total_revenue')->default(0);
             $table->integer('active_courses_count')->default(0);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

@@ -13,6 +13,7 @@ return new class extends Migration
             $table->uuid('course_id');
             $table->uuid('mentor_id');
             $table->timestamp('assigned_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('course_id')->references('id')->on('courses')->cascadeOnDelete();

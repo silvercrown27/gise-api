@@ -15,6 +15,7 @@ return new class extends Migration
             $table->text('reason')->nullable();
             $table->enum('status', ['requested', 'approved', 'rejected', 'processed'])->default('requested');
             $table->timestamp('processed_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('payment_id')->references('id')->on('payments')->cascadeOnDelete();

@@ -13,6 +13,7 @@ return new class extends Migration
             $table->uuid('course_id');
             $table->string('title');
             $table->integer('order_index')->default(0);
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('course_id')->references('id')->on('courses')->cascadeOnDelete();

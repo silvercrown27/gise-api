@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('certificate_number')->unique();
             $table->string('certificate_url')->nullable();
             $table->timestamp('issued_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->unique('enrollment_id');

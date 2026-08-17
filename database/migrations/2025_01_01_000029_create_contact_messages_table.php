@@ -15,6 +15,7 @@ return new class extends Migration
             $table->string('subject');
             $table->text('message');
             $table->enum('status', ['new', 'read', 'replied'])->default('new');
+            $table->softDeletes();
             $table->timestamps();
         });
     }

@@ -14,6 +14,7 @@ return new class extends Migration
             $table->uuid('learner_id');
             $table->unsignedTinyInteger('rating');
             $table->text('review_text')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('course_id')->references('id')->on('courses')->cascadeOnDelete();

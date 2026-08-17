@@ -14,7 +14,8 @@ return new class extends Migration
             $table->enum('type', ['payment', 'enrollment', 'certificate', 'rating', 'system']);
             $table->text('message');
             $table->boolean('is_read')->default(false);
-            $table->timestamp('created_at')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
         });

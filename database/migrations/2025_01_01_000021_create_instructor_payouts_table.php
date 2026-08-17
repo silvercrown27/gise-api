@@ -18,6 +18,7 @@ return new class extends Migration
             $table->bigInteger('net_amount');
             $table->enum('status', ['pending', 'paid'])->default('pending');
             $table->timestamp('paid_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('instructor_id')->references('id')->on('users')->cascadeOnDelete();

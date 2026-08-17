@@ -13,6 +13,7 @@ return new class extends Migration
             $table->string('name');
             $table->text('description')->nullable();
             $table->uuid('parent_category_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('parent_category_id')->references('id')->on('categories')->nullOnDelete();

@@ -18,6 +18,7 @@ return new class extends Migration
             $table->integer('passing_marks')->default(0);
             $table->integer('duration_minutes')->nullable();
             $table->integer('attempts_allowed')->default(1);
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('course_id')->references('id')->on('courses')->cascadeOnDelete();

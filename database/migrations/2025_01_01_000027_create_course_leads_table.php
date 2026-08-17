@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('phone');
             $table->text('notes')->nullable();
             $table->enum('status', ['new', 'contacted', 'converted', 'waitlisted'])->default('new');
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->nullOnDelete();

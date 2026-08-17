@@ -17,6 +17,7 @@ return new class extends Migration
             $table->text('payout_details')->nullable();
             $table->decimal('average_rating', 3, 2)->default(0);
             $table->enum('verification_status', ['pending', 'verified'])->default('pending');
+            $table->softDeletes();
             $table->timestamps();
 
             $table->unique('user_id');

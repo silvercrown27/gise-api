@@ -80,4 +80,69 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserSettings::class, 'user_id');
     }
+
+    public function scholarProfile()
+    {
+        return $this->hasOne(ScholarUser::class, 'user_id');
+    }
+
+    public function instructorProfile()
+    {
+        return $this->hasOne(InstructorProfile::class, 'user_id');
+    }
+
+    public function adminProfile()
+    {
+        return $this->hasOne(AdminProfile::class, 'user_id');
+    }
+
+    public function coursesTaught()
+    {
+        return $this->hasMany(Course::class, 'instructor_id');
+    }
+
+    public function mentoredCourses()
+    {
+        return $this->hasMany(CourseMentor::class, 'mentor_id');
+    }
+
+    public function enrollments()
+    {
+        return $this->hasMany(Enrollment::class, 'learner_id');
+    }
+
+    public function examSubmissions()
+    {
+        return $this->hasMany(ExamSubmission::class, 'learner_id');
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class, 'learner_id');
+    }
+
+    public function instructorPayouts()
+    {
+        return $this->hasMany(InstructorPayout::class, 'instructor_id');
+    }
+
+    public function courseRatings()
+    {
+        return $this->hasMany(CourseRating::class, 'learner_id');
+    }
+
+    public function courseLeads()
+    {
+        return $this->hasMany(CourseLead::class, 'user_id');
+    }
+
+    public function platformNotifications()
+    {
+        return $this->hasMany(Notification::class, 'user_id');
+    }
+
+    public function adminAuditLogs()
+    {
+        return $this->hasMany(AdminAuditLog::class, 'admin_id');
+    }
 }
