@@ -16,7 +16,7 @@ class EnrollmentController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            $query = Enrollment::query();
+            $query = Enrollment::with('course');
 
             if (!$user || $user->role === 'student') {
                 $query->where('learner_id', $request->user()->id);
