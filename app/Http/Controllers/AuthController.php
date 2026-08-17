@@ -60,7 +60,8 @@ class AuthController extends Controller
         try {
             $scholarUser = ScholarUser::create([
                 'id' => $user->id,
-                'role' => 'learner',
+                'email' => $user->email,
+                'role' => 'student',
                 'phone' => $request->phone,
             ]);
 

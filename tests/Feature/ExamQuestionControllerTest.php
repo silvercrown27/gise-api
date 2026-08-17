@@ -57,12 +57,31 @@ class ExamQuestionControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $exam = Exam::factory()->create();
         Sanctum::actingAs($instructor);
+
+        $response = $this->postJson('/api/exam-questions', [
+            'exam_id' => $exam->id,
+            'question_text' => 'What is 2+2?',
+            'question_type' => 'mcq',
+            'marks' => 5,
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.question_text', 'What is 2+2?');
+        $this->assertDatabaseHas('exam_questions', ['exam_id' => $exam->id, 'question_text' => 'What is 2+2?']);
+    }
+
+    public function test_store_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $exam = Exam::factory()->create();
+        Sanctum::actingAs($student);
 
         $response = $this->postJson('/api/exam-questions', [
             'exam_id' => $exam->id,
@@ -107,15 +126,28 @@ class ExamQuestionControllerTest extends TestCase
         $this->assertArrayNotHasKey('correct_answer', $response->json('data'));
     }
 
-    public function test_show_never_exposes_correct_answer_to_an_unresolvable_instructor_either(): void
+    public function test_show_exposes_correct_answer_to_a_resolvable_instructor(): void
     {
-        // Even a real instructor is treated as "!$user" here because ScholarUser::find
-        // cannot resolve them, so they too never see correct_answer via this endpoint
-        // right now -- a usability defect flagged in the security review, not a leak.
+        // Now that ScholarUser::find correctly resolves the caller, a real instructor
+        // is recognized via "in_array($user->role, ['instructor', 'admin'])" and
+        // makeVisible('correct_answer') is applied, so they can see it.
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $question = ExamQuestion::factory()->create(['correct_answer' => 'B']);
         Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/exam-questions/{$question->id}");
+
+        $response->assertStatus(200);
+        $this->assertSame('B', $response->json('data.correct_answer'));
+    }
+
+    public function test_show_never_exposes_correct_answer_to_a_student(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $question = ExamQuestion::factory()->create(['correct_answer' => 'B']);
+        Sanctum::actingAs($student);
 
         $response = $this->getJson("/api/exam-questions/{$question->id}");
 
@@ -137,12 +169,31 @@ class ExamQuestionControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $question = ExamQuestion::factory()->create();
         Sanctum::actingAs($instructor);
+
+        $response = $this->patchJson("/api/exam-questions/{$question->id}", [
+            'exam_id' => $question->exam_id,
+            'question_text' => 'Updated?',
+            'question_type' => 'mcq',
+            'marks' => 5,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.question_text', 'Updated?');
+        $this->assertDatabaseHas('exam_questions', ['id' => $question->id, 'question_text' => 'Updated?']);
+    }
+
+    public function test_update_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $question = ExamQuestion::factory()->create();
+        Sanctum::actingAs($student);
 
         $response = $this->patchJson("/api/exam-questions/{$question->id}", [
             'exam_id' => $question->exam_id,
@@ -163,12 +214,25 @@ class ExamQuestionControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $question = ExamQuestion::factory()->create();
         Sanctum::actingAs($instructor);
+
+        $response = $this->deleteJson("/api/exam-questions/{$question->id}");
+
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('exam_questions', ['id' => $question->id]);
+    }
+
+    public function test_delete_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $question = ExamQuestion::factory()->create();
+        Sanctum::actingAs($student);
 
         $response = $this->deleteJson("/api/exam-questions/{$question->id}");
 

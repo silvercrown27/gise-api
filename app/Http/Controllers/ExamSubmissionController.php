@@ -18,7 +18,7 @@ class ExamSubmissionController extends Controller
 
             $query = ExamSubmission::query();
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 $query->where('learner_id', $request->user()->id);
             }
 

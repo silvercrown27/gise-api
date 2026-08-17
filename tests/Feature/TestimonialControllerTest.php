@@ -48,11 +48,25 @@ class TestimonialControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         Sanctum::actingAs($instructor);
+
+        $response = $this->postJson('/api/testimonials', [
+            'name' => 'Jane Doe',
+            'quote' => 'Great course!',
+        ]);
+
+        $response->assertStatus(201);
+    }
+
+    public function test_store_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        Sanctum::actingAs($student);
 
         $response = $this->postJson('/api/testimonials', [
             'name' => 'Jane Doe',
@@ -71,14 +85,33 @@ class TestimonialControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $testimonial = Testimonial::factory()->create();
         Sanctum::actingAs($admin);
 
-        $response = $this->patchJson("/api/testimonials/{$testimonial->id}", ['quote' => 'Updated']);
+        $response = $this->patchJson("/api/testimonials/{$testimonial->id}", [
+            'name' => $testimonial->name,
+            'quote' => 'Updated',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.quote', 'Updated');
+    }
+
+    public function test_update_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $testimonial = Testimonial::factory()->create();
+        Sanctum::actingAs($student);
+
+        $response = $this->patchJson("/api/testimonials/{$testimonial->id}", [
+            'name' => $testimonial->name,
+            'quote' => 'Updated',
+        ]);
 
         $response->assertStatus(403);
     }
@@ -92,12 +125,25 @@ class TestimonialControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $testimonial = Testimonial::factory()->create();
         Sanctum::actingAs($admin);
+
+        $response = $this->deleteJson("/api/testimonials/{$testimonial->id}");
+
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('testimonials', ['id' => $testimonial->id]);
+    }
+
+    public function test_delete_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $testimonial = Testimonial::factory()->create();
+        Sanctum::actingAs($student);
 
         $response = $this->deleteJson("/api/testimonials/{$testimonial->id}");
 

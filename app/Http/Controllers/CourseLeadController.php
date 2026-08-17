@@ -18,7 +18,7 @@ class CourseLeadController extends Controller
 
             $query = CourseLead::query();
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 $query->where('user_id', $request->user()->id);
             }
 
@@ -77,7 +77,7 @@ class CourseLeadController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -121,7 +121,7 @@ class CourseLeadController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -158,7 +158,7 @@ class CourseLeadController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',

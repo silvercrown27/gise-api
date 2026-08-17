@@ -61,7 +61,7 @@ class User extends Authenticatable
         parent::boot();
 
         static::creating(function ($model) {
-            $model->id = Str::uuid('id');
+            $model->id = (string) Str::uuid();
             $model->created_at = $model->getDateTime();
             $model->updated_at = $model->getDateTime();
         });

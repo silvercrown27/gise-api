@@ -49,7 +49,7 @@ class ExamController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role === 'learner') {
+        if (!$user || $user->role === 'student') {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -103,7 +103,7 @@ class ExamController extends Controller
                 && $exam->course
                 && $exam->course->instructor_id === $request->user()->id;
 
-            if (!$isAdmin && !$isOwningInstructor && (!$user || $user->role !== 'learner')) {
+            if (!$isAdmin && !$isOwningInstructor && (!$user || $user->role !== 'student')) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',

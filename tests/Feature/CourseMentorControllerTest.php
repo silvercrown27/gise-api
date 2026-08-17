@@ -21,14 +21,29 @@ class CourseMentorControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_index_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_index_as_instructor_succeeds_scoped_to_own_mentorships(): void
     {
-        // Instructors and admins should be able to list (learners are explicitly blocked),
-        // but ScholarUser::find($request->user()->id) always returns null for real users,
-        // so the "!$user" branch triggers Forbidden for everyone, including instructors.
+        // Instructors and admins can list (students are explicitly blocked); index()
+        // scopes instructors to their own mentor_id rows.
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        CourseMentor::factory()->create(['mentor_id' => $instructor->id]);
+        CourseMentor::factory()->create(); // someone else's mentorship
         Sanctum::actingAs($instructor);
+
+        $response = $this->getJson('/api/course-mentors');
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('mentor_id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $instructor->id));
+    }
+
+    public function test_index_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        Sanctum::actingAs($student);
 
         $response = $this->getJson('/api/course-mentors');
 
@@ -48,13 +63,31 @@ class CourseMentorControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $course = Course::factory()->create();
         $mentor = User::factory()->create();
         Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/course-mentors', [
+            'course_id' => $course->id,
+            'mentor_id' => $mentor->id,
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.mentor_id', (string) $mentor->id);
+        $this->assertDatabaseHas('course_mentors', ['course_id' => $course->id, 'mentor_id' => $mentor->id]);
+    }
+
+    public function test_store_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        $mentor = User::factory()->create();
+        Sanctum::actingAs($student);
 
         $response = $this->postJson('/api/course-mentors', [
             'course_id' => $course->id,
@@ -121,19 +154,22 @@ class CourseMentorControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $courseMentor = CourseMentor::factory()->create();
+        $newMentor = User::factory()->create();
         Sanctum::actingAs($admin);
 
         $response = $this->patchJson("/api/course-mentors/{$courseMentor->id}", [
             'course_id' => $courseMentor->course_id,
-            'mentor_id' => $courseMentor->mentor_id,
+            'mentor_id' => $newMentor->id,
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.mentor_id', (string) $newMentor->id);
+        $this->assertDatabaseHas('course_mentors', ['id' => $courseMentor->id, 'mentor_id' => $newMentor->id]);
     }
 
     public function test_delete_requires_authentication(): void
@@ -145,7 +181,7 @@ class CourseMentorControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -154,6 +190,7 @@ class CourseMentorControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/course-mentors/{$courseMentor->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('course_mentors', ['id' => $courseMentor->id]);
     }
 }

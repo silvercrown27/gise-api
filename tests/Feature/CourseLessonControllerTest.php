@@ -52,7 +52,7 @@ class CourseLessonControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -65,10 +65,28 @@ class CourseLessonControllerTest extends TestCase
             'content_type' => 'video',
         ]);
 
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.title', 'Lesson 1');
+        $this->assertDatabaseHas('course_lessons', ['module_id' => $module->id, 'title' => 'Lesson 1']);
+    }
+
+    public function test_store_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $module = CourseModule::factory()->create();
+        Sanctum::actingAs($student);
+
+        $response = $this->postJson('/api/course-lessons', [
+            'module_id' => $module->id,
+            'title' => 'Lesson 1',
+            'content_type' => 'video',
+        ]);
+
         $response->assertStatus(403);
     }
 
-    public function test_store_validation_failure_is_masked_by_403(): void
+    public function test_store_validation_failure_returns_422(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -76,7 +94,7 @@ class CourseLessonControllerTest extends TestCase
 
         $response = $this->postJson('/api/course-lessons', []);
 
-        $response->assertStatus(403);
+        $response->assertStatus(422);
     }
 
     public function test_update_requires_authentication(): void
@@ -88,16 +106,22 @@ class CourseLessonControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $lesson = CourseLesson::factory()->create();
         Sanctum::actingAs($admin);
 
-        $response = $this->patchJson("/api/course-lessons/{$lesson->id}", ['title' => 'Updated']);
+        $response = $this->patchJson("/api/course-lessons/{$lesson->id}", [
+            'module_id' => $lesson->module_id,
+            'title' => 'Updated',
+            'content_type' => $lesson->content_type,
+        ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.title', 'Updated');
+        $this->assertDatabaseHas('course_lessons', ['id' => $lesson->id, 'title' => 'Updated']);
     }
 
     public function test_delete_requires_authentication(): void
@@ -109,7 +133,7 @@ class CourseLessonControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -118,6 +142,7 @@ class CourseLessonControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/course-lessons/{$lesson->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('course_lessons', ['id' => $lesson->id]);
     }
 }

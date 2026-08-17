@@ -48,11 +48,25 @@ class PlatformStatControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/platform-stats', [
+            'label' => 'Learners',
+            'value' => '10000',
+        ]);
+
+        $response->assertStatus(201);
+    }
+
+    public function test_store_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        Sanctum::actingAs($student);
 
         $response = $this->postJson('/api/platform-stats', [
             'label' => 'Learners',
@@ -71,14 +85,33 @@ class PlatformStatControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $stat = PlatformStat::factory()->create();
         Sanctum::actingAs($admin);
 
-        $response = $this->patchJson("/api/platform-stats/{$stat->id}", ['label' => 'Updated']);
+        $response = $this->patchJson("/api/platform-stats/{$stat->id}", [
+            'label' => 'Updated',
+            'value' => $stat->value,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.label', 'Updated');
+    }
+
+    public function test_update_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $stat = PlatformStat::factory()->create();
+        Sanctum::actingAs($student);
+
+        $response = $this->patchJson("/api/platform-stats/{$stat->id}", [
+            'label' => 'Updated',
+            'value' => $stat->value,
+        ]);
 
         $response->assertStatus(403);
     }
@@ -92,12 +125,25 @@ class PlatformStatControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $stat = PlatformStat::factory()->create();
         Sanctum::actingAs($admin);
+
+        $response = $this->deleteJson("/api/platform-stats/{$stat->id}");
+
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('platform_stats', ['id' => $stat->id]);
+    }
+
+    public function test_delete_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $stat = PlatformStat::factory()->create();
+        Sanctum::actingAs($student);
 
         $response = $this->deleteJson("/api/platform-stats/{$stat->id}");
 

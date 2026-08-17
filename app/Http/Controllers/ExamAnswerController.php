@@ -18,7 +18,7 @@ class ExamAnswerController extends Controller
 
             $query = ExamAnswer::query();
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 $query->whereHas('submission', function ($q) use ($request) {
                     $q->where('learner_id', $request->user()->id);
                 });

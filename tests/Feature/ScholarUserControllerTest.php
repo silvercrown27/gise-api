@@ -25,7 +25,7 @@ class ScholarUserControllerTest extends TestCase
         // Since scholar_users.id shares the same value as the caller's users.id, this
         // correctly returns only the caller's own row.
         $user = User::factory()->create();
-        $scholarUser = ScholarUser::factory()->create(['id' => $user->id, 'role' => 'learner']);
+        $scholarUser = ScholarUser::factory()->create(['id' => $user->id, 'role' => 'student']);
         ScholarUser::factory()->create(); // someone else's row
         Sanctum::actingAs($user);
 
@@ -43,7 +43,8 @@ class ScholarUserControllerTest extends TestCase
 
         $response = $this->postJson('/api/scholar-users', [
             'id' => $user->id,
-            'role' => 'learner',
+            'email' => $user->email,
+            'role' => 'student',
         ]);
 
         $response->assertStatus(401);
@@ -58,12 +59,13 @@ class ScholarUserControllerTest extends TestCase
 
         $response = $this->postJson('/api/scholar-users', [
             'id' => $newUser->id,
-            'role' => 'learner',
+            'email' => $newUser->email,
+            'role' => 'student',
         ]);
 
         $response->assertStatus(201);
         $response->assertJsonPath('data.id', (string) $newUser->id);
-        $this->assertDatabaseHas('scholar_users', ['id' => $newUser->id, 'role' => 'learner']);
+        $this->assertDatabaseHas('scholar_users', ['id' => $newUser->id, 'role' => 'student']);
     }
 
     public function test_store_as_non_admin_is_forbidden(): void
@@ -75,7 +77,8 @@ class ScholarUserControllerTest extends TestCase
 
         $response = $this->postJson('/api/scholar-users', [
             'id' => $newUser->id,
-            'role' => 'learner',
+            'email' => $newUser->email,
+            'role' => 'student',
         ]);
 
         $response->assertStatus(403);
@@ -89,7 +92,8 @@ class ScholarUserControllerTest extends TestCase
 
         $response = $this->postJson('/api/scholar-users', [
             'id' => (string) \Illuminate\Support\Str::uuid(),
-            'role' => 'learner',
+            'email' => fake()->unique()->safeEmail(),
+            'role' => 'student',
         ]);
 
         $response->assertStatus(422);
@@ -104,7 +108,8 @@ class ScholarUserControllerTest extends TestCase
 
         $response = $this->postJson('/api/scholar-users', [
             'id' => $existing->id,
-            'role' => 'learner',
+            'email' => fake()->unique()->safeEmail(),
+            'role' => 'student',
         ]);
 
         $response->assertStatus(422);
@@ -156,7 +161,7 @@ class ScholarUserControllerTest extends TestCase
         $scholarUser = ScholarUser::factory()->create();
 
         $response = $this->patchJson("/api/scholar-users/{$scholarUser->id}", [
-            'role' => 'learner',
+            'role' => 'student',
         ]);
 
         $response->assertStatus(401);
@@ -167,10 +172,10 @@ class ScholarUserControllerTest extends TestCase
         // $isSelf compares scholar_users.id directly against the caller's users.id
         // (the same value under the shared-identity design), so self-edit is
         // reachable -- but 'role' is explicitly stripped from the payload for
-        // non-admin callers, so a learner cannot self-promote to admin even though
+        // non-admin callers, so a student cannot self-promote to admin even though
         // they can successfully edit their own row (e.g. phone/avatar_url).
         $user = User::factory()->create();
-        $scholarUser = ScholarUser::factory()->create(['id' => $user->id, 'role' => 'learner']);
+        $scholarUser = ScholarUser::factory()->create(['id' => $user->id, 'role' => 'student']);
         Sanctum::actingAs($user);
 
         $response = $this->patchJson("/api/scholar-users/{$scholarUser->id}", [
@@ -178,15 +183,15 @@ class ScholarUserControllerTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $response->assertJsonPath('data.role', 'learner');
-        $this->assertDatabaseHas('scholar_users', ['id' => $scholarUser->id, 'role' => 'learner']);
+        $response->assertJsonPath('data.role', 'student');
+        $this->assertDatabaseHas('scholar_users', ['id' => $scholarUser->id, 'role' => 'student']);
     }
 
     public function test_update_as_admin_can_change_role(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
-        $target = ScholarUser::factory()->create(['role' => 'learner']);
+        $target = ScholarUser::factory()->create(['role' => 'student']);
         Sanctum::actingAs($admin);
 
         $response = $this->patchJson("/api/scholar-users/{$target->id}", [

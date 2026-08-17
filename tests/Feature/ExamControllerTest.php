@@ -52,7 +52,7 @@ class ExamControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -62,6 +62,26 @@ class ExamControllerTest extends TestCase
         $response = $this->postJson('/api/exams', [
             'course_id' => $course->id,
             'created_by' => $instructor->id,
+            'title' => 'Midterm',
+            'total_marks' => 100,
+            'passing_marks' => 50,
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.title', 'Midterm');
+        $this->assertDatabaseHas('exams', ['course_id' => $course->id, 'title' => 'Midterm']);
+    }
+
+    public function test_store_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        Sanctum::actingAs($student);
+
+        $response = $this->postJson('/api/exams', [
+            'course_id' => $course->id,
+            'created_by' => $student->id,
             'title' => 'Midterm',
             'total_marks' => 100,
             'passing_marks' => 50,
@@ -113,7 +133,7 @@ class ExamControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_owning_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_owning_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -123,6 +143,26 @@ class ExamControllerTest extends TestCase
 
         $response = $this->patchJson("/api/exams/{$exam->id}", [
             'course_id' => $course->id,
+            'created_by' => $instructor->id,
+            'title' => 'Updated Title',
+            'total_marks' => 100,
+            'passing_marks' => 50,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.title', 'Updated Title');
+        $this->assertDatabaseHas('exams', ['id' => $exam->id, 'title' => 'Updated Title']);
+    }
+
+    public function test_update_as_non_owning_instructor_is_forbidden(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $exam = Exam::factory()->create(); // belongs to a different course/instructor
+        Sanctum::actingAs($instructor);
+
+        $response = $this->patchJson("/api/exams/{$exam->id}", [
+            'course_id' => $exam->course_id,
             'created_by' => $instructor->id,
             'title' => 'Updated Title',
             'total_marks' => 100,
@@ -141,12 +181,25 @@ class ExamControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_owning_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_owning_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         $exam = Exam::factory()->create(['course_id' => $course->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->deleteJson("/api/exams/{$exam->id}");
+
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('exams', ['id' => $exam->id]);
+    }
+
+    public function test_delete_as_non_owning_instructor_is_forbidden(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $exam = Exam::factory()->create(); // belongs to a different course/instructor
         Sanctum::actingAs($instructor);
 
         $response = $this->deleteJson("/api/exams/{$exam->id}");

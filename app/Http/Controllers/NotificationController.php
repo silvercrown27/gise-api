@@ -18,7 +18,7 @@ class NotificationController extends Controller
 
             $query = Notification::query();
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 $query->where('user_id', $request->user()->id);
             }
 

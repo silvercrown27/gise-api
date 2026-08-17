@@ -18,7 +18,7 @@ class PaymentController extends Controller
 
             $query = Payment::query();
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 $query->where('learner_id', $request->user()->id);
             }
 

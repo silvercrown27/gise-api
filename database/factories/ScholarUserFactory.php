@@ -15,12 +15,15 @@ class ScholarUserFactory extends Factory
 
     public function definition(): array
     {
+        // scholar_users.id shares the owning User's id rather than being a
+        // separate FK column, so a fresh User is created up front and its
+        // id/email reused here instead of the usual `X::factory()` FK shorthand.
+        $user = User::factory()->create();
+
         return [
-            // scholar_users.id shares the owning User's id rather than being a
-            // separate FK column, so a fresh User is created up front and its
-            // id reused here instead of the usual `X::factory()` FK shorthand.
-            'id' => User::factory()->create()->id,
-            'role' => fake()->randomElement(['learner', 'instructor', 'admin']),
+            'id' => $user->id,
+            'email' => $user->email,
+            'role' => fake()->randomElement(['student', 'instructor', 'admin']),
             'phone' => fake()->optional()->phoneNumber(),
             'avatar_url' => fake()->optional()->imageUrl(),
             'status' => fake()->randomElement(['active', 'suspended', 'pending_verification']),
@@ -28,9 +31,9 @@ class ScholarUserFactory extends Factory
         ];
     }
 
-    public function learner(): static
+    public function student(): static
     {
-        return $this->state(fn (array $attributes) => ['role' => 'learner']);
+        return $this->state(fn (array $attributes) => ['role' => 'student']);
     }
 
     public function instructor(): static

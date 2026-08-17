@@ -17,6 +17,7 @@ class ScholarUser extends Model
 
     protected $fillable = [
         'id',
+        'email',
         'role',
         'phone',
         'avatar_url',
@@ -36,7 +37,7 @@ class ScholarUser extends Model
 
         // Unlike every other model, ScholarUser does NOT generate its own id —
         // it shares the owning User's id (set explicitly by the caller, e.g.
-        // ScholarUser::create(['id' => $user->id, 'role' => 'learner', ...])).
+        // ScholarUser::create(['id' => $user->id, 'role' => 'student', ...])).
         // This enforces that id is always provided rather than silently falling
         // back to a freshly generated UUID that wouldn't match any user.
         static::creating(function ($model) {

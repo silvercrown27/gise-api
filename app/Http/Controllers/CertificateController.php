@@ -18,7 +18,7 @@ class CertificateController extends Controller
 
             $query = Certificate::query();
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 $query->whereHas('enrollment', function ($q) use ($request) {
                     $q->where('learner_id', $request->user()->id);
                 });

@@ -148,8 +148,13 @@ class ScholarUserController extends Controller
 
             $data = $request->all();
 
+            // email is denormalized from users.email and only ever synced by
+            // the backend itself (signup, or a future profile-email-change
+            // flow) — never writable directly through this endpoint.
+            unset($data['email'], $data['id']);
+
             if (!$isAdmin) {
-                unset($data['role'], $data['id']);
+                unset($data['role']);
             }
 
             $scholarUser->update($data);

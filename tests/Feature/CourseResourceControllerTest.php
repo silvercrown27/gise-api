@@ -52,12 +52,30 @@ class CourseResourceControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         Sanctum::actingAs($instructor);
+
+        $response = $this->postJson('/api/course-resources', [
+            'course_id' => $course->id,
+            'title' => 'Slides',
+            'file_url' => 'https://example.com/slides.pdf',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.title', 'Slides');
+        $this->assertDatabaseHas('course_resources', ['course_id' => $course->id, 'title' => 'Slides']);
+    }
+
+    public function test_store_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        Sanctum::actingAs($student);
 
         $response = $this->postJson('/api/course-resources', [
             'course_id' => $course->id,
@@ -77,16 +95,22 @@ class CourseResourceControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $resource = CourseResource::factory()->create();
         Sanctum::actingAs($admin);
 
-        $response = $this->patchJson("/api/course-resources/{$resource->id}", ['title' => 'Updated']);
+        $response = $this->patchJson("/api/course-resources/{$resource->id}", [
+            'course_id' => $resource->course_id,
+            'title' => 'Updated',
+            'file_url' => $resource->file_url,
+        ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.title', 'Updated');
+        $this->assertDatabaseHas('course_resources', ['id' => $resource->id, 'title' => 'Updated']);
     }
 
     public function test_delete_requires_authentication(): void
@@ -98,7 +122,7 @@ class CourseResourceControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -107,6 +131,7 @@ class CourseResourceControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/course-resources/{$resource->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('course_resources', ['id' => $resource->id]);
     }
 }

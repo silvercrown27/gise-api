@@ -19,7 +19,7 @@ class LessonProgressController extends Controller
 
             $query = LessonProgress::query();
 
-            if (!$user || $user->role === 'learner') {
+            if (!$user || $user->role === 'student') {
                 $query->whereHas('enrollment', function ($q) use ($request) {
                     $q->where('learner_id', $request->user()->id);
                 });

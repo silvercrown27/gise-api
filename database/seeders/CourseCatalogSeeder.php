@@ -556,6 +556,7 @@ class CourseCatalogSeeder extends Seeder
         ScholarUser::updateOrCreate(
             ['id' => $user->id],
             [
+                'email' => $user->email,
                 'role' => 'instructor',
                 'status' => 'active',
             ]

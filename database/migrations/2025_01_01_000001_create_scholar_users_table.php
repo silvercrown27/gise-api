@@ -16,7 +16,12 @@ return new class extends Migration
             // row (account deletion) cleanly cascades here with no separate
             // user_id column to keep in sync.
             $table->uuid('id')->primary();
-            $table->enum('role', ['learner', 'instructor', 'admin']);
+            // Denormalized copy of users.email — kept in sync at write time so
+            // this table can be queried/joined on without hitting users, which
+            // is treated as the account-lifecycle table (deleted on account
+            // deletion; scholar_users cascades off it, not the other way round).
+            $table->string('email');
+            $table->enum('role', ['student', 'instructor', 'admin']);
             $table->string('phone')->nullable();
             $table->string('avatar_url')->nullable();
             $table->enum('status', ['active', 'suspended', 'pending_verification'])->default('pending_verification');
@@ -25,6 +30,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('id')->references('id')->on('users')->cascadeOnDelete();
+            $table->unique('email');
         });
     }
 

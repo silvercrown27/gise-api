@@ -20,11 +20,27 @@ class InstructorProfileControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_index_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_index_as_instructor_is_scoped_to_own_profile(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        InstructorProfile::factory()->create(['user_id' => $instructor->id]);
+        InstructorProfile::factory()->create(); // someone else's profile
         Sanctum::actingAs($instructor);
+
+        $response = $this->getJson('/api/instructor-profiles');
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('user_id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $instructor->id));
+    }
+
+    public function test_index_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        Sanctum::actingAs($student);
 
         $response = $this->getJson('/api/instructor-profiles');
 
@@ -43,7 +59,7 @@ class InstructorProfileControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -51,6 +67,20 @@ class InstructorProfileControllerTest extends TestCase
 
         $response = $this->postJson('/api/instructor-profiles', [
             'user_id' => $instructor->id,
+            'bio' => 'Experienced developer',
+        ]);
+
+        $response->assertStatus(201);
+    }
+
+    public function test_store_as_student_is_forbidden(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        Sanctum::actingAs($student);
+
+        $response = $this->postJson('/api/instructor-profiles', [
+            'user_id' => $student->id,
             'bio' => 'Experienced developer',
         ]);
 
@@ -114,11 +144,8 @@ class InstructorProfileControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_own_profile_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_own_profile_as_instructor_succeeds(): void
     {
-        // update() gates $isSelf behind $user (ScholarUser::find) being truthy AND
-        // role === 'instructor', so unlike show(), this path needs the ScholarUser
-        // lookup to succeed at all -- which it never does for a real caller.
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $profile = InstructorProfile::factory()->create(['user_id' => $instructor->id]);
@@ -126,6 +153,22 @@ class InstructorProfileControllerTest extends TestCase
 
         $response = $this->patchJson("/api/instructor-profiles/{$profile->id}", [
             'user_id' => $instructor->id,
+            'bio' => 'Updated bio',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.bio', 'Updated bio');
+    }
+
+    public function test_update_another_instructors_profile_is_forbidden(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $profile = InstructorProfile::factory()->create();
+        Sanctum::actingAs($instructor);
+
+        $response = $this->patchJson("/api/instructor-profiles/{$profile->id}", [
+            'user_id' => $profile->user_id,
             'bio' => 'Updated bio',
         ]);
 
@@ -141,12 +184,25 @@ class InstructorProfileControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $profile = InstructorProfile::factory()->create();
         Sanctum::actingAs($admin);
+
+        $response = $this->deleteJson("/api/instructor-profiles/{$profile->id}");
+
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('instructor_profiles', ['id' => $profile->id]);
+    }
+
+    public function test_delete_as_instructor_is_forbidden(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $profile = InstructorProfile::factory()->create();
+        Sanctum::actingAs($instructor);
 
         $response = $this->deleteJson("/api/instructor-profiles/{$profile->id}");
 
