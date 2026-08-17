@@ -16,7 +16,7 @@ class PaymentController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            $query = Payment::query();
+            $query = Payment::with('course');
 
             if (!$user || $user->role === 'student') {
                 $query->where('learner_id', $request->user()->id);

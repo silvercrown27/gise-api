@@ -37,6 +37,21 @@ class ExamSubmissionControllerTest extends TestCase
         $this->assertCount(1, $ids);
     }
 
+    public function test_index_eager_loads_exam_and_course(): void
+    {
+        $learner = User::factory()->create();
+        $course = Course::factory()->create(['title' => 'Cybersecurity Fundamentals']);
+        $exam = Exam::factory()->create(['course_id' => $course->id, 'title' => 'Final Exam']);
+        ExamSubmission::factory()->create(['learner_id' => $learner->id, 'exam_id' => $exam->id]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->getJson('/api/exam-submissions');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.data.0.exam.title', 'Final Exam');
+        $response->assertJsonPath('data.data.0.exam.course.title', 'Cybersecurity Fundamentals');
+    }
+
     public function test_index_as_owning_instructor_scopes_to_exam_id(): void
     {
         $instructor = User::factory()->create();

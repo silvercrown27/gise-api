@@ -16,7 +16,7 @@ class CertificateController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            $query = Certificate::query();
+            $query = Certificate::with('enrollment.course');
 
             if (!$user || $user->role === 'student') {
                 $query->whereHas('enrollment', function ($q) use ($request) {

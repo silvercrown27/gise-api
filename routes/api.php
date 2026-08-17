@@ -68,6 +68,7 @@ Route::prefix('courses')->group(function () {
     Route::get('/popular', [CourseController::class, 'popular']);
     Route::middleware('auth:sanctum')->get('/mine', [CourseController::class, 'mine']);
     Route::middleware('auth:sanctum')->get('/summary', [CourseController::class, 'summary']);
+    Route::middleware('auth:sanctum')->get('/{id}/curriculum', [CourseController::class, 'curriculum']);
     Route::get('/{id}',    [CourseController::class, 'show']);
 });
 

@@ -106,6 +106,82 @@ class CourseControllerTest extends TestCase
         $response->assertJsonPath('data.pending_earnings', 1500);
     }
 
+    public function test_curriculum_requires_authentication(): void
+    {
+        $course = Course::factory()->create();
+
+        $response = $this->getJson("/api/courses/{$course->id}/curriculum");
+
+        $response->assertStatus(401);
+    }
+
+    public function test_curriculum_returns_404_for_missing_course(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        Sanctum::actingAs($student);
+
+        $response = $this->getJson('/api/courses/' . fake()->uuid() . '/curriculum');
+
+        $response->assertStatus(404);
+    }
+
+    public function test_curriculum_forbids_non_enrolled_student(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        Sanctum::actingAs($student);
+
+        $response = $this->getJson("/api/courses/{$course->id}/curriculum");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_curriculum_returns_modules_lessons_and_resources_for_enrolled_student(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        $enrollment = \App\Models\Enrollment::factory()->create([
+            'learner_id' => $student->id,
+            'course_id' => $course->id,
+        ]);
+
+        $module = \App\Models\CourseModule::factory()->create(['course_id' => $course->id, 'order_index' => 0]);
+        $lesson = \App\Models\CourseLesson::factory()->create(['module_id' => $module->id, 'order_index' => 0]);
+        \App\Models\CourseResource::factory()->create(['course_id' => $course->id, 'lesson_id' => $lesson->id]);
+
+        \App\Models\LessonProgress::factory()->create([
+            'enrollment_id' => $enrollment->id,
+            'lesson_id' => $lesson->id,
+            'status' => 'completed',
+        ]);
+
+        Sanctum::actingAs($student);
+
+        $response = $this->getJson("/api/courses/{$course->id}/curriculum");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.course.id', (string) $course->id);
+        $response->assertJsonPath('data.modules.0.id', (string) $module->id);
+        $response->assertJsonPath('data.modules.0.lessons.0.id', (string) $lesson->id);
+        $response->assertJsonPath('data.modules.0.lessons.0.progress_status', 'completed');
+        $response->assertJsonCount(1, 'data.modules.0.lessons.0.resources');
+    }
+
+    public function test_curriculum_is_accessible_to_owning_instructor_without_enrollment(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/courses/{$course->id}/curriculum");
+
+        $response->assertStatus(200);
+    }
+
     public function test_show_includes_category_and_instructor(): void
     {
         $instructor = User::factory()->create(['name' => 'Jane Doe']);

@@ -11,6 +11,7 @@ use App\Helpers\Validations;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\InstructorPayout;
+use App\Models\LessonProgress;
 use App\Models\ScholarUser;
 
 class CourseController extends Controller
@@ -84,6 +85,75 @@ class CourseController extends Controller
             return response()->json([
                 'status'  => 500,
                 'message' => 'An error occurred while retrieving the summary.',
+            ], 500);
+        }
+    }
+
+    public function curriculum(Request $request, string $id)
+    {
+        try {
+            $course = Course::find($id);
+
+            if (!$course) {
+                return response()->json([
+                    'status'  => 404,
+                    'message' => 'Course not found.',
+                ], 404);
+            }
+
+            $userId = $request->user()->id;
+            $user = ScholarUser::find($userId);
+
+            $isAdmin = $user && $user->role === 'admin';
+            $isOwningInstructor = $user && $user->role === 'instructor'
+                && (string) $course->instructor_id === (string) $userId;
+
+            $enrollment = Enrollment::where('course_id', $course->id)
+                ->where('learner_id', $userId)
+                ->first();
+
+            if (!$isAdmin && !$isOwningInstructor && !$enrollment) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'You must be enrolled in this course to view its curriculum.',
+                ], 403);
+            }
+
+            $progressByLessonId = [];
+            if ($enrollment) {
+                $progressByLessonId = LessonProgress::where('enrollment_id', $enrollment->id)
+                    ->get()
+                    ->keyBy('lesson_id');
+            }
+
+            $modules = $course->modules()
+                ->with(['lessons' => function ($query) {
+                    $query->orderBy('order_index', 'asc')->with('resources');
+                }])
+                ->orderBy('order_index', 'asc')
+                ->get();
+
+            $modules->each(function ($module) use ($progressByLessonId) {
+                $module->lessons->each(function ($lesson) use ($progressByLessonId) {
+                    $progress = $progressByLessonId[$lesson->id] ?? null;
+                    $lesson->progress_status = $progress->status ?? 'not_started';
+                    $lesson->progress_id = $progress->id ?? null;
+                });
+            });
+
+            return response()->json([
+                'status' => 200,
+                'data' => [
+                    'course' => $course,
+                    'enrollment' => $enrollment,
+                    'modules' => $modules,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@curriculum: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while retrieving the curriculum.',
             ], 500);
         }
     }

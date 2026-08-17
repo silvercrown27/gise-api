@@ -36,6 +36,20 @@ class CertificateControllerTest extends TestCase
         $this->assertCount(1, $ids);
     }
 
+    public function test_index_eager_loads_enrollment_course(): void
+    {
+        $learner = User::factory()->create();
+        $course = \App\Models\Course::factory()->create(['title' => 'Full-Stack Web Development']);
+        $enrollment = Enrollment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id]);
+        Certificate::factory()->create(['enrollment_id' => $enrollment->id]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->getJson('/api/certificates');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.data.0.enrollment.course.title', 'Full-Stack Web Development');
+    }
+
     public function test_store_requires_authentication(): void
     {
         $enrollment = Enrollment::factory()->create();

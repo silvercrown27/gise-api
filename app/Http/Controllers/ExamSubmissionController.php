@@ -16,7 +16,7 @@ class ExamSubmissionController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            $query = ExamSubmission::query();
+            $query = ExamSubmission::with('exam.course');
 
             if (!$user || $user->role === 'student') {
                 $query->where('learner_id', $request->user()->id);

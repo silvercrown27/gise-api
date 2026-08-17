@@ -35,6 +35,19 @@ class PaymentControllerTest extends TestCase
         $this->assertCount(1, $ids);
     }
 
+    public function test_index_eager_loads_course(): void
+    {
+        $learner = User::factory()->create();
+        $course = Course::factory()->create(['title' => 'Data Structures & Algorithms']);
+        Payment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->getJson('/api/payments');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.data.0.course.title', 'Data Structures & Algorithms');
+    }
+
     public function test_store_requires_authentication(): void
     {
         $course = Course::factory()->create();
