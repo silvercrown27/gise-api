@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
+use App\Helpers\Utilities;
 use App\Helpers\Validations;
 use App\Models\CourseResource;
 use App\Models\ScholarUser;
@@ -18,6 +20,10 @@ class CourseResourceController extends Controller
 
             if ($q = trim($request->input('q', ''))) {
                 $query->where('title', 'like', '%' . $q . '%');
+            }
+
+            if ($lessonId = trim($request->input('lesson_id', ''))) {
+                $query->where('lesson_id', $lessonId);
             }
 
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
@@ -46,7 +52,24 @@ class CourseResourceController extends Controller
             ], 403);
         }
 
-        $validator = Validations::validateCourseResource($request->all());
+        $data = $request->all();
+
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $upload = Utilities::uploadFile($file, 'course-resources/' . ($data['course_id'] ?? 'general'));
+
+            if ($upload['status'] !== 200) {
+                return response()->json([
+                    'status'  => 500,
+                    'message' => $upload['message'],
+                ], 500);
+            }
+
+            $data['file_url'] = Storage::url($upload['path']);
+            $data['file_type'] = $file->getClientOriginalExtension();
+        }
+
+        $validator = Validations::validateCourseResource($data);
 
         if ($validator->fails()) {
             return response()->json([
@@ -57,7 +80,6 @@ class CourseResourceController extends Controller
         }
 
         try {
-            $data = $request->all();
             $courseResource = CourseResource::create($data);
             $courseResource->refresh();
 

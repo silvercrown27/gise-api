@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Course;
 use App\Models\Exam;
 use App\Models\ExamSubmission;
+use App\Models\ScholarUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -33,6 +35,38 @@ class ExamSubmissionControllerTest extends TestCase
         $ids = collect($response->json('data.data'))->pluck('id');
         $this->assertTrue($ids->contains((string) $ownSubmission->id));
         $this->assertCount(1, $ids);
+    }
+
+    public function test_index_as_owning_instructor_scopes_to_exam_id(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $exam = Exam::factory()->create(['course_id' => $course->id]);
+        $matching = ExamSubmission::factory()->create(['exam_id' => $exam->id]);
+        ExamSubmission::factory()->create(); // different exam entirely
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/exam-submissions?exam_id={$exam->id}");
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $matching->id));
+    }
+
+    public function test_index_as_non_owning_instructor_returns_empty_for_exam_id(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $exam = Exam::factory()->create(); // belongs to someone else's course
+        ExamSubmission::factory()->create(['exam_id' => $exam->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/exam-submissions?exam_id={$exam->id}");
+
+        $response->assertStatus(200);
+        $this->assertCount(0, $response->json('data.data'));
     }
 
     public function test_store_requires_authentication(): void

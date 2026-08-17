@@ -36,6 +36,7 @@ class SignupRequest extends FormRequest
                 Rule::unique('users')->where(fn($q) => $q->whereNull('deleted_at')),
             ],
             'password' => ['required', Password::min(8)],
+            'role' => ['nullable', 'string', Rule::in(['student', 'instructor'])],
         ];
     }
 }

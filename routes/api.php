@@ -66,6 +66,8 @@ Route::prefix('categories')->group(function () {
 Route::prefix('courses')->group(function () {
     Route::get('/',        [CourseController::class, 'index']);
     Route::get('/popular', [CourseController::class, 'popular']);
+    Route::middleware('auth:sanctum')->get('/mine', [CourseController::class, 'mine']);
+    Route::middleware('auth:sanctum')->get('/summary', [CourseController::class, 'summary']);
     Route::get('/{id}',    [CourseController::class, 'show']);
 });
 
@@ -153,7 +155,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [CategoryController::class, 'delete']);
     });
 
-    // Courses — write actions only (index/show are public above)
+    // Courses — write actions only (index/show/mine are above)
     Route::prefix('courses')->group(function () {
         Route::post('/',      [CourseController::class, 'store']);
         Route::patch('/{id}', [CourseController::class, 'update']);

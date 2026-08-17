@@ -22,6 +22,16 @@ class ExamSubmissionController extends Controller
                 $query->where('learner_id', $request->user()->id);
             }
 
+            if ($examId = trim($request->input('exam_id', ''))) {
+                $query->where('exam_id', $examId);
+
+                if ($user && $user->role === 'instructor') {
+                    $query->whereHas('exam.course', function ($q) use ($request) {
+                        $q->where('instructor_id', $request->user()->id);
+                    });
+                }
+            }
+
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
 
             return response()->json([

@@ -4,9 +4,13 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
+use App\Helpers\Utilities;
 use App\Helpers\Validations;
 use App\Models\Course;
+use App\Models\Enrollment;
+use App\Models\InstructorPayout;
 use App\Models\ScholarUser;
 
 class CourseController extends Controller
@@ -39,6 +43,77 @@ class CourseController extends Controller
             return response()->json([
                 'status'  => 500,
                 'message' => 'An error occurred while retrieving courses.',
+            ], 500);
+        }
+    }
+
+    public function summary(Request $request)
+    {
+        try {
+            $instructorId = $request->user()->id;
+
+            $courseIds = Course::where('instructor_id', $instructorId)->pluck('id');
+
+            $totalCourses = $courseIds->count();
+            $publishedCourses = Course::where('instructor_id', $instructorId)
+                ->where('status', 'published')
+                ->count();
+
+            $totalRegistrations = Enrollment::whereIn('course_id', $courseIds)->count();
+
+            $totalEarnings = InstructorPayout::where('instructor_id', $instructorId)
+                ->where('status', 'paid')
+                ->sum('net_amount');
+
+            $pendingEarnings = InstructorPayout::where('instructor_id', $instructorId)
+                ->where('status', 'pending')
+                ->sum('net_amount');
+
+            return response()->json([
+                'status' => 200,
+                'data' => [
+                    'total_courses' => $totalCourses,
+                    'published_courses' => $publishedCourses,
+                    'total_registrations' => $totalRegistrations,
+                    'total_earnings' => (int) $totalEarnings,
+                    'pending_earnings' => (int) $pendingEarnings,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@summary: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while retrieving the summary.',
+            ], 500);
+        }
+    }
+
+    public function mine(Request $request)
+    {
+        try {
+            $query = Course::with('category')
+                ->withCount(['enrollments', 'ratings'])
+                ->where('instructor_id', $request->user()->id);
+
+            if ($q = trim($request->input('q', ''))) {
+                $query->where('title', 'like', '%' . $q . '%');
+            }
+
+            if ($status = trim($request->input('status', ''))) {
+                $query->where('status', $status);
+            }
+
+            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+
+            return response()->json([
+                'status' => 200,
+                'data'   => $results,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@mine: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while retrieving your courses.',
             ], 500);
         }
     }
@@ -86,6 +161,17 @@ class CourseController extends Controller
 
         if (!$isAdmin || empty($data['instructor_id'])) {
             $data['instructor_id'] = $request->user()->id;
+        }
+
+        if ($request->hasFile('thumbnail')) {
+            $upload = $this->uploadThumbnail($request);
+            if (!$upload['success']) {
+                return response()->json([
+                    'status'  => 500,
+                    'message' => $upload['message'],
+                ], 500);
+            }
+            $data['thumbnail_url'] = $upload['url'];
         }
 
         $validator = Validations::validateCourse($data);
@@ -167,7 +253,20 @@ class CourseController extends Controller
                 ], 403);
             }
 
-            $validator = Validations::validateCourse($request->all(), $id);
+            $data = $request->all();
+
+            if ($request->hasFile('thumbnail')) {
+                $upload = $this->uploadThumbnail($request);
+                if (!$upload['success']) {
+                    return response()->json([
+                        'status'  => 500,
+                        'message' => $upload['message'],
+                    ], 500);
+                }
+                $data['thumbnail_url'] = $upload['url'];
+            }
+
+            $validator = Validations::validateCourse($data, $id);
 
             if ($validator->fails()) {
                 return response()->json([
@@ -176,8 +275,6 @@ class CourseController extends Controller
                     'errors'  => $validator->messages(),
                 ], 422);
             }
-
-            $data = $request->all();
 
             if (!$isAdmin) {
                 unset($data['instructor_id']);
@@ -236,5 +333,16 @@ class CourseController extends Controller
                 'message' => 'An error occurred while deleting the course.',
             ], 500);
         }
+    }
+
+    private function uploadThumbnail(Request $request): array
+    {
+        $upload = Utilities::uploadFile($request->file('thumbnail'), 'course-thumbnails');
+
+        if ($upload['status'] !== 200) {
+            return ['success' => false, 'message' => $upload['message']];
+        }
+
+        return ['success' => true, 'url' => Storage::url($upload['path'])];
     }
 }

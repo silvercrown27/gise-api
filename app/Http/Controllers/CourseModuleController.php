@@ -20,6 +20,10 @@ class CourseModuleController extends Controller
                 $query->where('title', 'like', '%' . $q . '%');
             }
 
+            if ($courseId = trim($request->input('course_id', ''))) {
+                $query->where('course_id', $courseId);
+            }
+
             $results = $query->orderBy('order_index', 'asc')->paginate(10);
 
             return response()->json([

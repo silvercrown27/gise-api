@@ -7,6 +7,8 @@ use App\Models\CourseResource;
 use App\Models\ScholarUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -68,6 +70,28 @@ class CourseResourceControllerTest extends TestCase
         $response->assertStatus(201);
         $response->assertJsonPath('data.title', 'Slides');
         $this->assertDatabaseHas('course_resources', ['course_id' => $course->id, 'title' => 'Slides']);
+    }
+
+    public function test_store_with_uploaded_file_sets_file_url_and_type(): void
+    {
+        Storage::fake('public');
+
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->post('/api/course-resources', [
+            'course_id' => (string) $course->id,
+            'title' => 'Lecture slides',
+            'file' => UploadedFile::fake()->create('slides.pdf', 100, 'application/pdf'),
+        ], ['Accept' => 'application/json']);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.file_type', 'pdf');
+        $fileUrl = $response->json('data.file_url');
+        $this->assertNotEmpty($fileUrl);
+        $this->assertStringContainsString('course-resources', $fileUrl);
     }
 
     public function test_store_as_student_is_forbidden(): void

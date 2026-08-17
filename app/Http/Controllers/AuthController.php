@@ -19,6 +19,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserSettings;
 use App\Helpers\Utilities;
+use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
 use App\Models\SiteUpdate;
 use App\Notifications\OtpVerificationNotification;
@@ -58,12 +59,18 @@ class AuthController extends Controller
         }
 
         try {
+            $role = in_array($request->role, ['student', 'instructor']) ? $request->role : 'student';
+
             $scholarUser = ScholarUser::create([
                 'id' => $user->id,
                 'email' => $user->email,
-                'role' => 'student',
+                'role' => $role,
                 'phone' => $request->phone,
             ]);
+
+            if ($role === 'instructor') {
+                InstructorProfile::create(['user_id' => $user->id]);
+            }
 
             $words = [$request->first_name, $request->last_name];
             $initials = strtoupper(substr($words[0] ?? '', 0, 1) . substr($words[1] ?? '', 0, 1));
