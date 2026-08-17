@@ -20,15 +20,17 @@ class SiteUpdateControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_index_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_index_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        SiteUpdate::factory()->count(2)->create();
         Sanctum::actingAs($admin);
 
         $response = $this->getJson('/api/site-updates');
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertCount(2, $response->json('data.data'));
     }
 
     public function test_store_requires_authentication(): void
@@ -41,7 +43,7 @@ class SiteUpdateControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -52,7 +54,8 @@ class SiteUpdateControllerTest extends TestCase
             'title' => 'New signup',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('site_updates', ['type' => 'signup', 'title' => 'New signup']);
     }
 
     public function test_show_requires_authentication(): void
@@ -64,7 +67,7 @@ class SiteUpdateControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_show_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_show_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -73,7 +76,8 @@ class SiteUpdateControllerTest extends TestCase
 
         $response = $this->getJson("/api/site-updates/{$update->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.id', (string) $update->id);
     }
 
     public function test_update_requires_authentication(): void
@@ -88,7 +92,7 @@ class SiteUpdateControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -100,7 +104,9 @@ class SiteUpdateControllerTest extends TestCase
             'title' => 'Updated title',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.title', 'Updated title');
+        $this->assertDatabaseHas('site_updates', ['id' => $update->id, 'title' => 'Updated title']);
     }
 
     public function test_delete_requires_authentication(): void
@@ -112,7 +118,7 @@ class SiteUpdateControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -121,6 +127,7 @@ class SiteUpdateControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/site-updates/{$update->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('site_updates', ['id' => $update->id]);
     }
 }

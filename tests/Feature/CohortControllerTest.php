@@ -53,7 +53,7 @@ class CohortControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -67,10 +67,11 @@ class CohortControllerTest extends TestCase
             'capacity' => 30,
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('cohorts', ['course_id' => $course->id, 'label' => 'Fall 2026']);
     }
 
-    public function test_store_validation_failure_is_masked_by_403(): void
+    public function test_store_validation_failure_returns_422(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'admin']);
@@ -78,8 +79,9 @@ class CohortControllerTest extends TestCase
 
         $response = $this->postJson('/api/cohorts', []);
 
-        // Role check runs before validation, and always rejects due to the lookup bug.
-        $response->assertStatus(403);
+        // Role check now passes (admin correctly recognized), so this hits
+        // validation, which fails on the required course_id/label/start_date/capacity.
+        $response->assertStatus(422);
     }
 
     public function test_update_requires_authentication(): void
@@ -91,16 +93,23 @@ class CohortControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $cohort = Cohort::factory()->create();
         Sanctum::actingAs($admin);
 
-        $response = $this->patchJson("/api/cohorts/{$cohort->id}", ['label' => 'Updated']);
+        $response = $this->patchJson("/api/cohorts/{$cohort->id}", [
+            'course_id' => $cohort->course_id,
+            'label' => 'Updated',
+            'start_date' => $cohort->start_date->format('Y-m-d'),
+            'capacity' => $cohort->capacity,
+        ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.label', 'Updated');
+        $this->assertDatabaseHas('cohorts', ['id' => $cohort->id, 'label' => 'Updated']);
     }
 
     public function test_delete_requires_authentication(): void
@@ -112,7 +121,7 @@ class CohortControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -121,6 +130,7 @@ class CohortControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/cohorts/{$cohort->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('cohorts', ['id' => $cohort->id]);
     }
 }

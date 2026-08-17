@@ -20,15 +20,17 @@ class CouponControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_index_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_index_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        Coupon::factory()->count(2)->create();
         Sanctum::actingAs($admin);
 
         $response = $this->getJson('/api/coupons');
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertCount(2, $response->json('data.data'));
     }
 
     public function test_store_requires_authentication(): void
@@ -42,7 +44,7 @@ class CouponControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -54,7 +56,8 @@ class CouponControllerTest extends TestCase
             'discount_value' => 10,
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('coupons', ['code' => 'SAVE10', 'discount_value' => 10]);
     }
 
     public function test_show_requires_authentication(): void
@@ -66,7 +69,7 @@ class CouponControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_show_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_show_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -75,7 +78,8 @@ class CouponControllerTest extends TestCase
 
         $response = $this->getJson("/api/coupons/{$coupon->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.id', (string) $coupon->id);
     }
 
     public function test_update_requires_authentication(): void
@@ -91,7 +95,7 @@ class CouponControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -104,7 +108,9 @@ class CouponControllerTest extends TestCase
             'discount_value' => 500,
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.discount_value', 500);
+        $this->assertDatabaseHas('coupons', ['id' => $coupon->id, 'discount_type' => 'fixed', 'discount_value' => 500]);
     }
 
     public function test_delete_requires_authentication(): void
@@ -116,7 +122,7 @@ class CouponControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -125,6 +131,7 @@ class CouponControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/coupons/{$coupon->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('coupons', ['id' => $coupon->id]);
     }
 }

@@ -47,13 +47,11 @@ class CategoryControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_is_forbidden_due_to_scholaruser_lookup_bug(): void
+    public function test_store_as_instructor_succeeds(): void
     {
-        // Even though CategoryController allows role in [instructor, admin], the
-        // ScholarUser::find($request->user()->id) lookup uses users.id against
-        // scholar_users.id (the PK), not scholar_users.user_id. It will not find
-        // the row, so $user is null and the request is rejected regardless of
-        // the caller's real role.
+        // CategoryController allows role in [instructor, admin], and now that
+        // ScholarUser::find($request->user()->id) correctly finds the caller's
+        // row (scholar_users.id shares users.id), instructors can create categories.
         $user = User::factory()->create();
         ScholarUser::factory()->create(['id' => $user->id, 'role' => 'instructor']);
 
@@ -61,10 +59,12 @@ class CategoryControllerTest extends TestCase
 
         $response = $this->postJson('/api/categories', [
             'name' => 'New Category',
+            'slug' => 'new-category',
             'description' => 'A category',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('categories', ['name' => 'New Category', 'slug' => 'new-category']);
     }
 
     public function test_store_validation_failure_returns_422(): void
@@ -75,11 +75,12 @@ class CategoryControllerTest extends TestCase
 
         $response = $this->postJson('/api/categories', []);
 
-        // Blocked by the role check first since the lookup bug always returns null.
-        $response->assertStatus(403);
+        // Role check now passes (admin is correctly recognized), so the request
+        // reaches validation, which fails on the required name/slug fields.
+        $response->assertStatus(422);
     }
 
-    public function test_update_as_authenticated_user_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_authenticated_admin_succeeds(): void
     {
         $category = Category::factory()->create();
         $user = User::factory()->create();
@@ -88,9 +89,12 @@ class CategoryControllerTest extends TestCase
 
         $response = $this->patchJson("/api/categories/{$category->id}", [
             'name' => 'Updated Name',
+            'slug' => $category->slug,
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.name', 'Updated Name');
+        $this->assertDatabaseHas('categories', ['id' => $category->id, 'name' => 'Updated Name']);
     }
 
     public function test_update_requires_authentication(): void
@@ -102,7 +106,7 @@ class CategoryControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_authenticated_user_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_authenticated_admin_succeeds(): void
     {
         $category = Category::factory()->create();
         $user = User::factory()->create();
@@ -111,7 +115,8 @@ class CategoryControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/categories/{$category->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('categories', ['id' => $category->id]);
     }
 
     public function test_delete_requires_authentication(): void

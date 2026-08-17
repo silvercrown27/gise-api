@@ -20,15 +20,17 @@ class AdminProfileControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_index_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_index_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        AdminProfile::factory()->count(2)->create();
         Sanctum::actingAs($admin);
 
         $response = $this->getJson('/api/admin-profiles');
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertCount(2, $response->json('data.data'));
     }
 
     public function test_store_requires_authentication(): void
@@ -43,7 +45,7 @@ class AdminProfileControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -55,7 +57,8 @@ class AdminProfileControllerTest extends TestCase
             'permission_level' => 'support_admin',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('admin_profiles', ['user_id' => $newUser->id, 'permission_level' => 'support_admin']);
     }
 
     public function test_show_requires_authentication(): void
@@ -67,7 +70,7 @@ class AdminProfileControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_show_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_show_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -76,7 +79,8 @@ class AdminProfileControllerTest extends TestCase
 
         $response = $this->getJson("/api/admin-profiles/{$profile->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.id', (string) $profile->id);
     }
 
     public function test_update_requires_authentication(): void
@@ -91,7 +95,7 @@ class AdminProfileControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -103,7 +107,9 @@ class AdminProfileControllerTest extends TestCase
             'permission_level' => 'super_admin',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.permission_level', 'super_admin');
+        $this->assertDatabaseHas('admin_profiles', ['id' => $profile->id, 'permission_level' => 'super_admin']);
     }
 
     public function test_delete_requires_authentication(): void
@@ -115,7 +121,7 @@ class AdminProfileControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -124,6 +130,7 @@ class AdminProfileControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/admin-profiles/{$profile->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('admin_profiles', ['id' => $profile->id]);
     }
 }

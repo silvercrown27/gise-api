@@ -20,15 +20,17 @@ class PlatformAnalyticsSnapshotControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_index_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_index_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        PlatformAnalyticsSnapshot::factory()->count(2)->create();
         Sanctum::actingAs($admin);
 
         $response = $this->getJson('/api/platform-analytics-snapshots');
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertCount(2, $response->json('data.data'));
     }
 
     public function test_store_requires_authentication(): void
@@ -40,7 +42,7 @@ class PlatformAnalyticsSnapshotControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -50,7 +52,8 @@ class PlatformAnalyticsSnapshotControllerTest extends TestCase
             'snapshot_date' => now()->format('Y-m-d'),
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.snapshot_date', fn ($value) => str_starts_with($value, now()->format('Y-m-d')));
     }
 
     public function test_show_requires_authentication(): void
@@ -62,7 +65,7 @@ class PlatformAnalyticsSnapshotControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_show_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_show_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -71,7 +74,8 @@ class PlatformAnalyticsSnapshotControllerTest extends TestCase
 
         $response = $this->getJson("/api/platform-analytics-snapshots/{$snapshot->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.id', (string) $snapshot->id);
     }
 
     public function test_update_requires_authentication(): void
@@ -86,7 +90,7 @@ class PlatformAnalyticsSnapshotControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -98,7 +102,9 @@ class PlatformAnalyticsSnapshotControllerTest extends TestCase
             'total_learners' => 500,
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.total_learners', 500);
+        $this->assertDatabaseHas('platform_analytics_snapshots', ['id' => $snapshot->id, 'total_learners' => 500]);
     }
 
     public function test_delete_requires_authentication(): void
@@ -110,7 +116,7 @@ class PlatformAnalyticsSnapshotControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -119,6 +125,7 @@ class PlatformAnalyticsSnapshotControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/platform-analytics-snapshots/{$snapshot->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('platform_analytics_snapshots', ['id' => $snapshot->id]);
     }
 }

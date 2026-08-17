@@ -45,11 +45,10 @@ class CourseControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_instructor_succeeds(): void
     {
-        // Instructors should be able to create courses, but ScholarUser::find($request->user()->id)
-        // can never find the row (it looks up by scholar_users.id, not user_id), so $user is
-        // always null here and the request is rejected for every real caller.
+        // Instructors can create courses. store() forces instructor_id to the caller's
+        // own id for non-admins, so the created course is attributed to them.
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         Sanctum::actingAs($instructor);
@@ -61,24 +60,31 @@ class CourseControllerTest extends TestCase
             'price' => 1000,
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.instructor_id', (string) $instructor->id);
+        $this->assertDatabaseHas('courses', ['code' => 'ABC123', 'instructor_id' => $instructor->id]);
     }
 
-    public function test_update_own_course_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_own_course_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         Sanctum::actingAs($instructor);
 
+        // update()'s ownership check ($course->instructor_id === $request->user()->id) is
+        // now reachable since the ScholarUser lookup correctly resolves the caller's role.
         $response = $this->patchJson("/api/courses/{$course->id}", [
+            'instructor_id' => $course->instructor_id,
+            'code' => $course->code,
             'title' => 'Updated Title',
+            'slug' => $course->slug,
+            'price' => $course->price,
         ]);
 
-        // The controller's own logic checks $course->instructor_id === $request->user()->id
-        // (a correct ownership check!) but it is gated behind $user = ScholarUser::find(...)
-        // being non-null first, which the lookup bug prevents.
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.title', 'Updated Title');
+        $this->assertDatabaseHas('courses', ['id' => $course->id, 'title' => 'Updated Title']);
     }
 
     public function test_update_returns_404_for_missing_course_before_auth_check(): void
@@ -100,7 +106,7 @@ class CourseControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_own_course_as_instructor_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_own_course_as_instructor_succeeds(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -109,7 +115,8 @@ class CourseControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/courses/{$course->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('courses', ['id' => $course->id]);
     }
 
     public function test_delete_requires_authentication(): void

@@ -94,7 +94,7 @@ class AdminAuditLogControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -106,7 +106,9 @@ class AdminAuditLogControllerTest extends TestCase
             'action' => 'updated_action',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.action', 'updated_action');
+        $this->assertDatabaseHas('admin_audit_logs', ['id' => $log->id, 'action' => 'updated_action']);
     }
 
     public function test_delete_requires_authentication(): void
@@ -118,7 +120,7 @@ class AdminAuditLogControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -127,6 +129,7 @@ class AdminAuditLogControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/admin-audit-logs/{$log->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('admin_audit_logs', ['id' => $log->id]);
     }
 }

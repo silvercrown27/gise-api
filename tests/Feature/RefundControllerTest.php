@@ -21,15 +21,17 @@ class RefundControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_index_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_index_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        Refund::factory()->count(2)->create();
         Sanctum::actingAs($admin);
 
         $response = $this->getJson('/api/refunds');
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertCount(2, $response->json('data.data'));
     }
 
     public function test_store_requires_authentication(): void
@@ -44,7 +46,7 @@ class RefundControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_store_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -56,7 +58,8 @@ class RefundControllerTest extends TestCase
             'amount' => 1000,
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('refunds', ['payment_id' => $payment->id, 'amount' => 1000]);
     }
 
     public function test_show_requires_authentication(): void
@@ -68,7 +71,7 @@ class RefundControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_show_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_show_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -77,7 +80,8 @@ class RefundControllerTest extends TestCase
 
         $response = $this->getJson("/api/refunds/{$refund->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.id', (string) $refund->id);
     }
 
     public function test_update_requires_authentication(): void
@@ -93,7 +97,7 @@ class RefundControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_update_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_update_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -106,7 +110,9 @@ class RefundControllerTest extends TestCase
             'status' => 'approved',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.status', 'approved');
+        $this->assertDatabaseHas('refunds', ['id' => $refund->id, 'amount' => 500, 'status' => 'approved']);
     }
 
     public function test_delete_requires_authentication(): void
@@ -118,7 +124,7 @@ class RefundControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_as_admin_is_forbidden_due_to_lookup_bug(): void
+    public function test_delete_as_admin_succeeds(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -127,6 +133,7 @@ class RefundControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/refunds/{$refund->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('refunds', ['id' => $refund->id]);
     }
 }
