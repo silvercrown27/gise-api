@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Category;
 use App\Models\Course;
 use App\Models\ScholarUser;
 use App\Models\User;
@@ -31,25 +32,25 @@ class CourseControllerTest extends TestCase
         $response->assertStatus(200)->assertJsonPath('data.id', (string) $course->id);
     }
 
+    public function test_show_includes_category_and_instructor(): void
+    {
+        $instructor = User::factory()->create(['name' => 'Jane Doe']);
+        $category = Category::factory()->create(['name' => 'Software Engineering']);
+        $course = Course::factory()->create([
+            'instructor_id' => $instructor->id,
+            'category_id' => $category->id,
+        ]);
+
+        $response = $this->getJson("/api/courses/{$course->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.instructor.name', 'Jane Doe');
+        $response->assertJsonPath('data.category.name', 'Software Engineering');
+    }
+
     public function test_show_returns_404_for_missing_course(): void
     {
         $response = $this->getJson('/api/courses/' . fake()->uuid());
-
-        $response->assertStatus(404);
-    }
-
-    public function test_show_by_slug_is_public(): void
-    {
-        $course = Course::factory()->create(['slug' => 'my-test-course']);
-
-        $response = $this->getJson('/api/courses/my-test-course');
-
-        $response->assertStatus(200)->assertJsonPath('data.id', (string) $course->id);
-    }
-
-    public function test_show_returns_404_for_missing_slug(): void
-    {
-        $response = $this->getJson('/api/courses/not-a-real-slug');
 
         $response->assertStatus(404);
     }

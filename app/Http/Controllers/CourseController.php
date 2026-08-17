@@ -119,11 +119,9 @@ class CourseController extends Controller
     public function show(string $id)
     {
         try {
-            $query = Course::withCount(['enrollments', 'ratings']);
-
-            $course = \Illuminate\Support\Str::isUuid($id)
-                ? $query->find($id)
-                : $query->where('slug', $id)->first();
+            $course = Course::with(['category', 'instructor'])
+                ->withCount(['enrollments', 'ratings'])
+                ->find($id);
 
             if (!$course) {
                 return response()->json([
