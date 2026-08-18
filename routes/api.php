@@ -8,6 +8,9 @@ use App\Http\Controllers\ScholarUserController;
 use App\Http\Controllers\InstructorProfileController;
 use App\Http\Controllers\AdminProfileController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CertificationTypeController;
+use App\Http\Controllers\CertificationLevelController;
+use App\Http\Controllers\CertificationPaceController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CohortController;
 use App\Http\Controllers\CourseMentorController;
@@ -61,6 +64,21 @@ Route::prefix('auth')->group(function () {
 Route::prefix('categories')->group(function () {
     Route::get('/',     [CategoryController::class, 'index']);
     Route::get('/{id}', [CategoryController::class, 'show']);
+});
+
+Route::prefix('certification-types')->group(function () {
+    Route::get('/',     [CertificationTypeController::class, 'index']);
+    Route::get('/{id}', [CertificationTypeController::class, 'show']);
+});
+
+Route::prefix('certification-levels')->group(function () {
+    Route::get('/',     [CertificationLevelController::class, 'index']);
+    Route::get('/{id}', [CertificationLevelController::class, 'show']);
+});
+
+Route::prefix('certification-paces')->group(function () {
+    Route::get('/',     [CertificationPaceController::class, 'index']);
+    Route::get('/{id}', [CertificationPaceController::class, 'show']);
 });
 
 Route::prefix('courses')->group(function () {
@@ -154,6 +172,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/',      [CategoryController::class, 'store']);
         Route::patch('/{id}', [CategoryController::class, 'update']);
         Route::delete('/{id}', [CategoryController::class, 'delete']);
+    });
+
+    // Certification types/levels/paces — write actions only (index/show are public above)
+    Route::prefix('certification-types')->group(function () {
+        Route::post('/',      [CertificationTypeController::class, 'store']);
+        Route::patch('/{id}', [CertificationTypeController::class, 'update']);
+        Route::delete('/{id}', [CertificationTypeController::class, 'delete']);
+    });
+
+    Route::prefix('certification-levels')->group(function () {
+        Route::post('/',      [CertificationLevelController::class, 'store']);
+        Route::patch('/{id}', [CertificationLevelController::class, 'update']);
+        Route::delete('/{id}', [CertificationLevelController::class, 'delete']);
+    });
+
+    Route::prefix('certification-paces')->group(function () {
+        Route::post('/',      [CertificationPaceController::class, 'store']);
+        Route::patch('/{id}', [CertificationPaceController::class, 'update']);
+        Route::delete('/{id}', [CertificationPaceController::class, 'delete']);
     });
 
     // Courses — write actions only (index/show/mine are above)

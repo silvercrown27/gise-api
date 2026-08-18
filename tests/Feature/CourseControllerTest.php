@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Models\CertificationLevel;
+use App\Models\CertificationPace;
+use App\Models\CertificationType;
 use App\Models\Course;
 use App\Models\ScholarUser;
 use App\Models\User;
@@ -23,6 +26,53 @@ class CourseControllerTest extends TestCase
         $response = $this->getJson('/api/courses');
 
         $response->assertStatus(200)->assertJsonStructure(['status', 'data']);
+    }
+
+    public function test_index_filters_by_certification_level(): void
+    {
+        $type = CertificationType::factory()->create(['slug' => 'igcse']);
+        $level = CertificationLevel::factory()->create(['certification_type_id' => $type->id, 'slug' => 'o-level']);
+        $pace = CertificationPace::factory()->create(['certification_level_id' => $level->id]);
+        $matching = Course::factory()->create(['pace_id' => $pace->id, 'status' => 'published']);
+        Course::factory()->create(['status' => 'published']); // no certification
+
+        $response = $this->getJson('/api/courses?certification_level=o-level');
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $matching->id));
+    }
+
+    public function test_index_filters_by_certification_type(): void
+    {
+        $type = CertificationType::factory()->create(['slug' => 'igcse']);
+        $level = CertificationLevel::factory()->create(['certification_type_id' => $type->id]);
+        $pace = CertificationPace::factory()->create(['certification_level_id' => $level->id]);
+        $matching = Course::factory()->create(['pace_id' => $pace->id, 'status' => 'published']);
+        Course::factory()->create(['status' => 'published']); // no certification
+
+        $response = $this->getJson('/api/courses?certification_type=igcse');
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $matching->id));
+    }
+
+    public function test_show_includes_certification_pace_level_and_type(): void
+    {
+        $type = CertificationType::factory()->create(['name' => 'IGCSE']);
+        $level = CertificationLevel::factory()->create(['certification_type_id' => $type->id, 'name' => 'O Level']);
+        $pace = CertificationPace::factory()->create(['certification_level_id' => $level->id, 'name' => 'Full certification']);
+        $course = Course::factory()->create(['pace_id' => $pace->id]);
+
+        $response = $this->getJson("/api/courses/{$course->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.pace.name', 'Full certification');
+        $response->assertJsonPath('data.pace.certification_level.name', 'O Level');
+        $response->assertJsonPath('data.pace.certification_level.certification_type.name', 'IGCSE');
     }
 
     public function test_show_is_public(): void

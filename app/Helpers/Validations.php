@@ -82,11 +82,54 @@ class Validations
         ]);
     }
 
+    public static function validateCertificationType(array $data, $certificationTypeId = null)
+    {
+        return Validator::make($data, [
+            'name'          => 'required|string|max:255',
+            'slug'          => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('certification_types', 'slug')->ignore($certificationTypeId)->where(fn($q) => $q->whereNull('deleted_at')),
+            ],
+            'description'   => 'nullable|string',
+        ]);
+    }
+
+    public static function validateCertificationLevel(array $data, $certificationLevelId = null)
+    {
+        return Validator::make($data, [
+            'certification_type_id' => 'required|uuid|exists:certification_types,id',
+            'name'                  => 'required|string|max:255',
+            'slug'                  => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('certification_levels', 'slug')
+                    ->ignore($certificationLevelId)
+                    ->where(fn($q) => $q->whereNull('deleted_at')->where('certification_type_id', $data['certification_type_id'] ?? null)),
+            ],
+            'description'           => 'nullable|string',
+            'order_index'           => 'nullable|integer|min:0',
+        ]);
+    }
+
+    public static function validateCertificationPace(array $data)
+    {
+        return Validator::make($data, [
+            'certification_level_id' => 'required|uuid|exists:certification_levels,id',
+            'name'                   => 'required|string|max:255',
+            'certification_track'    => 'required|string|in:full,partial',
+            'duration_weeks'         => 'required|integer|min:1',
+        ]);
+    }
+
     public static function validateCourse(array $data, $courseId = null)
     {
         return Validator::make($data, [
             'instructor_id'      => 'required|uuid|exists:users,id',
             'category_id'        => 'nullable|uuid|exists:categories,id',
+            'pace_id'             => 'nullable|uuid|exists:certification_paces,id',
             'code'                => [
                 'required',
                 'string',

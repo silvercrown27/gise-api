@@ -19,6 +19,7 @@ class Course extends Model
     protected $fillable = [
         'instructor_id',
         'category_id',
+        'pace_id',
         'code',
         'title',
         'slug',
@@ -78,6 +79,11 @@ class Course extends Model
     public function category()
     {
         return $this->belongsTo(Category::class, 'category_id');
+    }
+
+    public function pace()
+    {
+        return $this->belongsTo(CertificationPace::class, 'pace_id');
     }
 
     public function mentors()

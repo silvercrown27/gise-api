@@ -19,7 +19,8 @@ class CourseController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Course::with('category')->withCount(['enrollments', 'ratings']);
+            $query = Course::with(['category', 'pace.certificationLevel.certificationType'])
+                ->withCount(['enrollments', 'ratings']);
 
             if ($q = trim($request->input('q', ''))) {
                 $query->where('title', 'like', '%' . $q . '%');
@@ -28,6 +29,18 @@ class CourseController extends Controller
             if ($category = trim($request->input('category', ''))) {
                 $query->whereHas('category', function ($q) use ($category) {
                     $q->where('slug', $category);
+                });
+            }
+
+            if ($certificationLevel = trim($request->input('certification_level', ''))) {
+                $query->whereHas('pace.certificationLevel', function ($q) use ($certificationLevel) {
+                    $q->where('slug', $certificationLevel);
+                });
+            }
+
+            if ($certificationType = trim($request->input('certification_type', ''))) {
+                $query->whereHas('pace.certificationLevel.certificationType', function ($q) use ($certificationType) {
+                    $q->where('slug', $certificationType);
                 });
             }
 
@@ -161,7 +174,7 @@ class CourseController extends Controller
     public function mine(Request $request)
     {
         try {
-            $query = Course::with('category')
+            $query = Course::with(['category', 'pace.certificationLevel.certificationType'])
                 ->withCount(['enrollments', 'ratings'])
                 ->where('instructor_id', $request->user()->id);
 
@@ -194,7 +207,7 @@ class CourseController extends Controller
             $limit = (int) $request->input('limit', 6);
             $limit = $limit > 0 && $limit <= 24 ? $limit : 6;
 
-            $results = Course::with('category')
+            $results = Course::with(['category', 'pace.certificationLevel.certificationType'])
                 ->withCount(['enrollments', 'ratings'])
                 ->where('status', 'published')
                 ->orderByDesc('enrollments_count')
@@ -275,7 +288,7 @@ class CourseController extends Controller
     public function show(string $id)
     {
         try {
-            $course = Course::with(['category', 'instructor'])
+            $course = Course::with(['category', 'instructor', 'pace.certificationLevel.certificationType'])
                 ->withCount(['enrollments', 'ratings'])
                 ->find($id);
 
