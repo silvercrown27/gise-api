@@ -35,6 +35,39 @@ class CohortController extends Controller
         }
     }
 
+    public function next(Request $request)
+    {
+        try {
+            $cohort = Cohort::with('course')
+                ->whereIn('status', ['upcoming', 'open'])
+                ->whereDate('start_date', '>=', now()->toDateString())
+                ->whereHas('course', function ($q) {
+                    $q->where('status', 'published');
+                })
+                ->whereColumn('seats_taken', '<', 'capacity')
+                ->orderBy('start_date', 'asc')
+                ->first();
+
+            if (!$cohort) {
+                return response()->json([
+                    'status'  => 404,
+                    'message' => 'No upcoming cohort found.',
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 200,
+                'data'   => $cohort,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CohortController@next: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while retrieving the next cohort.',
+            ], 500);
+        }
+    }
+
     public function store(Request $request)
     {
         $user = ScholarUser::find($request->user()->id);

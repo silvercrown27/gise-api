@@ -92,6 +92,7 @@ Route::prefix('courses')->group(function () {
 
 Route::prefix('cohorts')->group(function () {
     Route::get('/',     [CohortController::class, 'index']);
+    Route::get('/next', [CohortController::class, 'next']);
     Route::get('/{id}', [CohortController::class, 'show']);
 });
 

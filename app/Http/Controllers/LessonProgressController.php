@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
+use App\Models\CourseLesson;
 use App\Models\Enrollment;
 use App\Models\LessonProgress;
 use App\Models\ScholarUser;
@@ -70,6 +71,8 @@ class LessonProgressController extends Controller
             $data = $request->all();
             $lessonProgress = LessonProgress::create($data);
             $lessonProgress->refresh();
+
+            $this->recalculateEnrollmentProgress($lessonProgress->enrollment_id);
 
             return response()->json([
                 'status'  => 201,
@@ -156,6 +159,8 @@ class LessonProgressController extends Controller
 
             $lessonProgress->update($request->all());
 
+            $this->recalculateEnrollmentProgress($lessonProgress->enrollment_id);
+
             return response()->json([
                 'status'  => 200,
                 'message' => 'Lesson progress updated successfully.',
@@ -191,7 +196,10 @@ class LessonProgressController extends Controller
                 ], 404);
             }
 
+            $enrollmentId = $lessonProgress->enrollment_id;
             $lessonProgress->delete();
+
+            $this->recalculateEnrollmentProgress($enrollmentId);
 
             return response()->json([
                 'status'  => 200,
@@ -204,5 +212,38 @@ class LessonProgressController extends Controller
                 'message' => 'An error occurred while deleting the lesson progress.',
             ], 500);
         }
+    }
+
+    private function recalculateEnrollmentProgress(string $enrollmentId): void
+    {
+        $enrollment = Enrollment::find($enrollmentId);
+
+        if (!$enrollment) {
+            return;
+        }
+
+        $totalLessons = CourseLesson::whereHas('module', function ($q) use ($enrollment) {
+            $q->where('course_id', $enrollment->course_id);
+        })->count();
+
+        $completedLessons = LessonProgress::where('enrollment_id', $enrollment->id)
+            ->where('status', 'completed')
+            ->count();
+
+        $progressPercent = $totalLessons > 0
+            ? (int) round(($completedLessons / $totalLessons) * 100)
+            : 0;
+
+        $update = ['progress_percent' => $progressPercent];
+
+        if ($totalLessons > 0 && $completedLessons >= $totalLessons) {
+            $update['enrollment_status'] = 'completed';
+            $update['completed_at'] = $enrollment->completed_at ?? now();
+        } elseif ($enrollment->enrollment_status === 'completed' && $completedLessons < $totalLessons) {
+            $update['enrollment_status'] = 'active';
+            $update['completed_at'] = null;
+        }
+
+        $enrollment->update($update);
     }
 }

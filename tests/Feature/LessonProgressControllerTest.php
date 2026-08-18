@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CourseLesson;
+use App\Models\CourseModule;
 use App\Models\Enrollment;
 use App\Models\LessonProgress;
 use App\Models\User;
@@ -84,6 +85,85 @@ class LessonProgressControllerTest extends TestCase
 
         $response->assertStatus(201);
         $response->assertJsonPath('data.status', 'completed');
+    }
+
+    public function test_store_recalculates_enrollment_progress_percent(): void
+    {
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create([
+            'learner_id' => $learner->id,
+            'progress_percent' => 0,
+            'enrollment_status' => 'active',
+        ]);
+        $module = CourseModule::factory()->create(['course_id' => $enrollment->course_id]);
+        $lessonOne = CourseLesson::factory()->create(['module_id' => $module->id]);
+        CourseLesson::factory()->create(['module_id' => $module->id]); // second lesson, not completed
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/lesson-progress', [
+            'enrollment_id' => $enrollment->id,
+            'lesson_id' => $lessonOne->id,
+            'status' => 'completed',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertEquals(50, $enrollment->fresh()->progress_percent);
+        $this->assertEquals('active', $enrollment->fresh()->enrollment_status);
+    }
+
+    public function test_store_marks_enrollment_completed_when_all_lessons_done(): void
+    {
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create([
+            'learner_id' => $learner->id,
+            'progress_percent' => 0,
+            'enrollment_status' => 'active',
+        ]);
+        $module = CourseModule::factory()->create(['course_id' => $enrollment->course_id]);
+        $lesson = CourseLesson::factory()->create(['module_id' => $module->id]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/lesson-progress', [
+            'enrollment_id' => $enrollment->id,
+            'lesson_id' => $lesson->id,
+            'status' => 'completed',
+        ]);
+
+        $response->assertStatus(201);
+        $fresh = $enrollment->fresh();
+        $this->assertEquals(100, $fresh->progress_percent);
+        $this->assertEquals('completed', $fresh->enrollment_status);
+        $this->assertNotNull($fresh->completed_at);
+    }
+
+    public function test_update_recalculates_enrollment_progress_when_unmarking_complete(): void
+    {
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create([
+            'learner_id' => $learner->id,
+            'progress_percent' => 100,
+            'enrollment_status' => 'completed',
+        ]);
+        $module = CourseModule::factory()->create(['course_id' => $enrollment->course_id]);
+        $lesson = CourseLesson::factory()->create(['module_id' => $module->id]);
+        $progress = LessonProgress::factory()->create([
+            'enrollment_id' => $enrollment->id,
+            'lesson_id' => $lesson->id,
+            'status' => 'completed',
+        ]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->patchJson("/api/lesson-progress/{$progress->id}", [
+            'enrollment_id' => $enrollment->id,
+            'lesson_id' => $lesson->id,
+            'status' => 'in_progress',
+        ]);
+
+        $response->assertStatus(200);
+        $fresh = $enrollment->fresh();
+        $this->assertEquals(0, $fresh->progress_percent);
+        $this->assertEquals('active', $fresh->enrollment_status);
+        $this->assertNull($fresh->completed_at);
     }
 
     public function test_store_validation_failure_returns_422(): void

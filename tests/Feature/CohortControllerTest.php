@@ -23,6 +23,111 @@ class CohortControllerTest extends TestCase
         $response->assertStatus(200)->assertJsonStructure(['status', 'data']);
     }
 
+    public function test_next_is_public(): void
+    {
+        $course = Course::factory()->create(['status' => 'published']);
+        Cohort::factory()->create([
+            'course_id' => $course->id,
+            'status' => 'open',
+            'start_date' => now()->addWeek()->format('Y-m-d'),
+            'capacity' => 30,
+            'seats_taken' => 5,
+        ]);
+
+        $response = $this->getJson('/api/cohorts/next');
+
+        $response->assertStatus(200)->assertJsonStructure(['status', 'data']);
+    }
+
+    public function test_next_returns_the_soonest_upcoming_cohort(): void
+    {
+        $course = Course::factory()->create(['status' => 'published']);
+        $later = Cohort::factory()->create([
+            'course_id' => $course->id,
+            'status' => 'upcoming',
+            'start_date' => now()->addMonths(2)->format('Y-m-d'),
+            'capacity' => 30,
+            'seats_taken' => 5,
+        ]);
+        $soonest = Cohort::factory()->create([
+            'course_id' => $course->id,
+            'status' => 'open',
+            'start_date' => now()->addWeek()->format('Y-m-d'),
+            'capacity' => 30,
+            'seats_taken' => 5,
+        ]);
+
+        $response = $this->getJson('/api/cohorts/next');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.id', (string) $soonest->id);
+    }
+
+    public function test_next_includes_course(): void
+    {
+        $course = Course::factory()->create(['status' => 'published', 'title' => 'Applied Mathematics']);
+        Cohort::factory()->create([
+            'course_id' => $course->id,
+            'status' => 'open',
+            'start_date' => now()->addWeek()->format('Y-m-d'),
+            'capacity' => 30,
+            'seats_taken' => 5,
+        ]);
+
+        $response = $this->getJson('/api/cohorts/next');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.course.title', 'Applied Mathematics');
+    }
+
+    public function test_next_excludes_past_cohorts(): void
+    {
+        $course = Course::factory()->create(['status' => 'published']);
+        Cohort::factory()->create([
+            'course_id' => $course->id,
+            'status' => 'closed',
+            'start_date' => now()->subMonth()->format('Y-m-d'),
+            'capacity' => 30,
+            'seats_taken' => 5,
+        ]);
+
+        $response = $this->getJson('/api/cohorts/next');
+
+        $response->assertStatus(404);
+    }
+
+    public function test_next_excludes_full_cohorts(): void
+    {
+        $course = Course::factory()->create(['status' => 'published']);
+        Cohort::factory()->create([
+            'course_id' => $course->id,
+            'status' => 'open',
+            'start_date' => now()->addWeek()->format('Y-m-d'),
+            'capacity' => 20,
+            'seats_taken' => 20,
+        ]);
+
+        $response = $this->getJson('/api/cohorts/next');
+
+        $response->assertStatus(404);
+    }
+
+    public function test_next_excludes_cohorts_for_unpublished_courses(): void
+    {
+        $course = Course::factory()->create(['status' => 'draft']);
+        Cohort::factory()->create([
+            'course_id' => $course->id,
+            'status' => 'open',
+            'start_date' => now()->addWeek()->format('Y-m-d'),
+            'capacity' => 30,
+            'seats_taken' => 5,
+        ]);
+
+        $response = $this->getJson('/api/cohorts/next');
+
+        $response->assertStatus(404);
+    }
+
     public function test_show_is_public(): void
     {
         $cohort = Cohort::factory()->create();
