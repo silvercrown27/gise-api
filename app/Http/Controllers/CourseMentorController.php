@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
+use App\Models\Course;
 use App\Models\CourseMentor;
 use App\Models\ScholarUser;
 
@@ -14,19 +15,10 @@ class CourseMentorController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
-
-            if (!$user || $user->role === 'student') {
-                return response()->json([
-                    'status'  => 403,
-                    'message' => 'Forbidden.',
-                ], 403);
-            }
-
             $query = CourseMentor::query();
 
-            if ($user->role === 'instructor') {
-                $query->where('mentor_id', $request->user()->id);
+            if ($courseId = trim($request->input('course_id', ''))) {
+                $query->where('course_id', $courseId);
             }
 
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
@@ -46,15 +38,6 @@ class CourseMentorController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
-
-        if (!$user || $user->role === 'student') {
-            return response()->json([
-                'status'  => 403,
-                'message' => 'Forbidden.',
-            ], 403);
-        }
-
         $validator = Validations::validateCourseMentor($request->all());
 
         if ($validator->fails()) {
@@ -66,6 +49,15 @@ class CourseMentorController extends Controller
         }
 
         try {
+            $course = Course::find($request->input('course_id'));
+
+            if (!$this->canManage($request, $course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $data = $request->all();
             $courseMentor = CourseMentor::create($data);
             $courseMentor->refresh();
@@ -84,10 +76,9 @@ class CourseMentorController extends Controller
         }
     }
 
-    public function show(Request $request, string $id)
+    public function show(string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
             $courseMentor = CourseMentor::find($id);
 
             if (!$courseMentor) {
@@ -95,16 +86,6 @@ class CourseMentorController extends Controller
                     'status'  => 404,
                     'message' => 'Course mentor not found.',
                 ], 404);
-            }
-
-            $isAdmin = $user && $user->role === 'admin';
-            $isSelf = (string) $courseMentor->mentor_id === (string) $request->user()->id;
-
-            if (!$isAdmin && !$isSelf) {
-                return response()->json([
-                    'status'  => 403,
-                    'message' => 'Forbidden.',
-                ], 403);
             }
 
             return response()->json([
@@ -122,16 +103,7 @@ class CourseMentorController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
-
-        if (!$user || $user->role === 'student') {
-            return response()->json([
-                'status'  => 403,
-                'message' => 'Forbidden.',
-            ], 403);
-        }
-
-        $validator = Validations::validateCourseMentor($request->all());
+        $validator = Validations::validateCourseMentor($request->all(), $id);
 
         if ($validator->fails()) {
             return response()->json([
@@ -149,6 +121,13 @@ class CourseMentorController extends Controller
                     'status'  => 404,
                     'message' => 'Course mentor not found.',
                 ], 404);
+            }
+
+            if (!$this->canManage($request, $courseMentor->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             $courseMentor->update($request->all());
@@ -169,15 +148,6 @@ class CourseMentorController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
-
-        if (!$user || $user->role === 'student') {
-            return response()->json([
-                'status'  => 403,
-                'message' => 'Forbidden.',
-            ], 403);
-        }
-
         try {
             $courseMentor = CourseMentor::find($id);
 
@@ -186,6 +156,13 @@ class CourseMentorController extends Controller
                     'status'  => 404,
                     'message' => 'Course mentor not found.',
                 ], 404);
+            }
+
+            if (!$this->canManage($request, $courseMentor->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             $courseMentor->delete();
@@ -201,5 +178,24 @@ class CourseMentorController extends Controller
                 'message' => 'An error occurred while deleting the course mentor.',
             ], 500);
         }
+    }
+
+    private function canManage(Request $request, ?Course $course): bool
+    {
+        if (!$course) {
+            return false;
+        }
+
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        return $user->role === 'instructor' && (string) $course->instructor_id === (string) $request->user()->id;
     }
 }

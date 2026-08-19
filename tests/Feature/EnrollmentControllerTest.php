@@ -74,6 +74,108 @@ class EnrollmentControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_rejects_enrollment_when_course_is_full(): void
+    {
+        $course = Course::factory()->create(['max_students' => 1]);
+        $existingLearner = User::factory()->create();
+        Enrollment::factory()->create([
+            'course_id' => $course->id,
+            'learner_id' => $existingLearner->id,
+            'enrollment_status' => 'active',
+        ]);
+
+        $newLearner = User::factory()->create();
+        Sanctum::actingAs($newLearner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $newLearner->id,
+            'course_id' => $course->id,
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_store_allows_enrollment_when_dropped_seats_free_up_capacity(): void
+    {
+        $course = Course::factory()->create(['max_students' => 1]);
+        $droppedLearner = User::factory()->create();
+        Enrollment::factory()->create([
+            'course_id' => $course->id,
+            'learner_id' => $droppedLearner->id,
+            'enrollment_status' => 'dropped',
+        ]);
+
+        $newLearner = User::factory()->create();
+        Sanctum::actingAs($newLearner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $newLearner->id,
+            'course_id' => $course->id,
+        ]);
+
+        $response->assertStatus(201);
+    }
+
+    public function test_store_allows_enrollment_when_course_has_no_max_students(): void
+    {
+        $course = Course::factory()->create(['max_students' => null]);
+        Enrollment::factory()->count(5)->create(['course_id' => $course->id, 'enrollment_status' => 'active']);
+
+        $newLearner = User::factory()->create();
+        Sanctum::actingAs($newLearner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $newLearner->id,
+            'course_id' => $course->id,
+        ]);
+
+        $response->assertStatus(201);
+    }
+
+    public function test_index_filters_by_course_id_for_owning_instructor(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $matching = Enrollment::factory()->create(['course_id' => $course->id]);
+        Enrollment::factory()->create(); // different course
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/enrollments?course_id={$course->id}");
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $matching->id));
+    }
+
+    public function test_index_filters_by_course_id_include_learner(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $learner = User::factory()->create(['name' => 'Jane Student']);
+        Enrollment::factory()->create(['course_id' => $course->id, 'learner_id' => $learner->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/enrollments?course_id={$course->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.data.0.learner.name', 'Jane Student');
+    }
+
+    public function test_index_filters_by_course_id_forbids_non_owning_instructor(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(); // owned by someone else
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/enrollments?course_id={$course->id}");
+
+        $response->assertStatus(403);
+    }
+
     public function test_store_strips_enrollment_status_and_progress_for_non_elevated_callers(): void
     {
         // Fixed: enrollment_status/progress_percent/completed_at are stripped from

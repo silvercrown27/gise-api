@@ -23,6 +23,27 @@ class InstructorProfileFactory extends Factory
             'payout_details' => fake()->bankAccountNumber(),
             'average_rating' => fake()->randomFloat(2, 0, 5),
             'verification_status' => fake()->randomElement(['pending', 'verified']),
+            'approval_status' => 'approved',
+            'specialization_one' => fake()->words(2, true),
+            'specialization_two' => fake()->optional()->words(2, true),
         ];
+    }
+
+    public function pending(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'approval_status' => 'pending',
+            'approved_at' => null,
+            'approved_by' => null,
+        ]);
+    }
+
+    public function banned(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'approval_status' => 'banned',
+            'approved_at' => null,
+            'approved_by' => null,
+        ]);
     }
 }

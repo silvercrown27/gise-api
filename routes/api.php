@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ScholarUserController;
 use App\Http\Controllers\InstructorProfileController;
+use App\Http\Controllers\InstructorDocumentController;
 use App\Http\Controllers\AdminProfileController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CertificationTypeController;
@@ -86,7 +87,9 @@ Route::prefix('courses')->group(function () {
     Route::get('/popular', [CourseController::class, 'popular']);
     Route::middleware('auth:sanctum')->get('/mine', [CourseController::class, 'mine']);
     Route::middleware('auth:sanctum')->get('/summary', [CourseController::class, 'summary']);
+    Route::middleware('auth:sanctum')->get('/for-review', [CourseController::class, 'forReview']);
     Route::middleware('auth:sanctum')->get('/{id}/curriculum', [CourseController::class, 'curriculum']);
+    Route::middleware('auth:sanctum')->patch('/{id}/approval-status', [CourseController::class, 'setApprovalStatus']);
     Route::get('/{id}',    [CourseController::class, 'show']);
 });
 
@@ -109,6 +112,11 @@ Route::prefix('course-lessons')->group(function () {
 Route::prefix('course-resources')->group(function () {
     Route::get('/',     [CourseResourceController::class, 'index']);
     Route::get('/{id}', [CourseResourceController::class, 'show']);
+});
+
+Route::prefix('course-mentors')->group(function () {
+    Route::get('/',     [CourseMentorController::class, 'index']);
+    Route::get('/{id}', [CourseMentorController::class, 'show']);
 });
 
 Route::prefix('testimonials')->group(function () {
@@ -156,7 +164,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/',      [InstructorProfileController::class, 'store']);
         Route::get('/{id}',   [InstructorProfileController::class, 'show']);
         Route::patch('/{id}', [InstructorProfileController::class, 'update']);
+        Route::patch('/{id}/approval-status', [InstructorProfileController::class, 'setApprovalStatus']);
         Route::delete('/{id}', [InstructorProfileController::class, 'delete']);
+    });
+
+    // Instructor documents
+    Route::prefix('instructor-documents')->group(function () {
+        Route::get('/',       [InstructorDocumentController::class, 'index']);
+        Route::post('/',      [InstructorDocumentController::class, 'store']);
+        Route::get('/{id}',   [InstructorDocumentController::class, 'show']);
+        Route::delete('/{id}', [InstructorDocumentController::class, 'delete']);
     });
 
     // Admin profiles
@@ -208,11 +225,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [CohortController::class, 'delete']);
     });
 
-    // Course mentors
+    // Course mentors — write actions only (index/show are public above)
     Route::prefix('course-mentors')->group(function () {
-        Route::get('/',       [CourseMentorController::class, 'index']);
         Route::post('/',      [CourseMentorController::class, 'store']);
-        Route::get('/{id}',   [CourseMentorController::class, 'show']);
         Route::patch('/{id}', [CourseMentorController::class, 'update']);
         Route::delete('/{id}', [CourseMentorController::class, 'delete']);
     });

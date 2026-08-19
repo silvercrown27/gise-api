@@ -11,6 +11,7 @@ use App\Helpers\Validations;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\InstructorPayout;
+use App\Models\InstructorProfile;
 use App\Models\LessonProgress;
 use App\Models\ScholarUser;
 
@@ -19,7 +20,7 @@ class CourseController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Course::with(['category', 'pace.certificationLevel.certificationType'])
+            $query = Course::with(['category', 'pace.certificationLevel.certificationType', 'mentor'])
                 ->withCount(['enrollments', 'ratings']);
 
             if ($q = trim($request->input('q', ''))) {
@@ -44,7 +45,7 @@ class CourseController extends Controller
                 });
             }
 
-            $query->where('status', 'published');
+            $query->where('status', 'published')->where('admin_approval_status', 'approved');
 
             $results = $query->orderBy('title', 'asc')->paginate(9);
 
@@ -174,7 +175,7 @@ class CourseController extends Controller
     public function mine(Request $request)
     {
         try {
-            $query = Course::with(['category', 'pace.certificationLevel.certificationType'])
+            $query = Course::with(['category', 'pace.certificationLevel.certificationType', 'mentor'])
                 ->withCount(['enrollments', 'ratings'])
                 ->where('instructor_id', $request->user()->id);
 
@@ -201,15 +202,54 @@ class CourseController extends Controller
         }
     }
 
+    public function forReview(Request $request)
+    {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
+        try {
+            $query = Course::with(['category', 'instructor'])
+                ->withCount(['enrollments', 'ratings']);
+
+            if ($q = trim($request->input('q', ''))) {
+                $query->where('title', 'like', '%' . $q . '%');
+            }
+
+            if ($status = trim($request->input('admin_approval_status', ''))) {
+                $query->where('admin_approval_status', $status);
+            }
+
+            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+
+            return response()->json([
+                'status' => 200,
+                'data'   => $results,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@forReview: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while retrieving courses for review.',
+            ], 500);
+        }
+    }
+
     public function popular(Request $request)
     {
         try {
             $limit = (int) $request->input('limit', 6);
             $limit = $limit > 0 && $limit <= 24 ? $limit : 6;
 
-            $results = Course::with(['category', 'pace.certificationLevel.certificationType'])
+            $results = Course::with(['category', 'pace.certificationLevel.certificationType', 'mentor'])
                 ->withCount(['enrollments', 'ratings'])
                 ->where('status', 'published')
+                ->where('admin_approval_status', 'approved')
                 ->orderByDesc('enrollments_count')
                 ->orderByDesc('published_at')
                 ->limit($limit)
@@ -244,6 +284,17 @@ class CourseController extends Controller
 
         if (!$isAdmin || empty($data['instructor_id'])) {
             $data['instructor_id'] = $request->user()->id;
+        }
+
+        if (!$isAdmin) {
+            $instructorProfile = InstructorProfile::where('user_id', $request->user()->id)->first();
+
+            if (!$instructorProfile || $instructorProfile->approval_status !== 'approved') {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Your instructor account must be approved by an admin before you can create courses.',
+                ], 403);
+            }
         }
 
         if ($request->hasFile('thumbnail')) {
@@ -288,7 +339,7 @@ class CourseController extends Controller
     public function show(string $id)
     {
         try {
-            $course = Course::with(['category', 'instructor', 'pace.certificationLevel.certificationType'])
+            $course = Course::with(['category', 'instructor', 'pace.certificationLevel.certificationType', 'mentor'])
                 ->withCount(['enrollments', 'ratings'])
                 ->find($id);
 
@@ -375,6 +426,56 @@ class CourseController extends Controller
             return response()->json([
                 'status'  => 500,
                 'message' => 'An error occurred while updating the course.',
+            ], 500);
+        }
+    }
+
+    public function setApprovalStatus(Request $request, string $id)
+    {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
+        $status = $request->input('admin_approval_status');
+
+        if (!in_array($status, ['pending', 'approved', 'rejected'], true)) {
+            return response()->json([
+                'status'  => 422,
+                'message' => 'Validation failed.',
+                'errors'  => ['admin_approval_status' => ['Must be one of: pending, approved, rejected.']],
+            ], 422);
+        }
+
+        try {
+            $course = Course::find($id);
+
+            if (!$course) {
+                return response()->json([
+                    'status'  => 404,
+                    'message' => 'Course not found.',
+                ], 404);
+            }
+
+            $course->forceFill([
+                'admin_approval_status' => $status,
+                'admin_rejection_reason' => $status === 'rejected' ? $request->input('admin_rejection_reason') : null,
+            ])->save();
+
+            return response()->json([
+                'status'  => 200,
+                'message' => 'Course approval status updated successfully.',
+                'data'    => $course,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@setApprovalStatus: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while updating the approval status.',
             ], 500);
         }
     }

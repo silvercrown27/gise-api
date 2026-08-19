@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\Enrollment;
 use App\Models\ScholarUser;
+use App\Models\Course;
 
 class EnrollmentController extends Controller
 {
@@ -16,10 +17,24 @@ class EnrollmentController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            $query = Enrollment::with('course');
+            $query = Enrollment::with(['course', 'learner']);
 
             if (!$user || $user->role === 'student') {
                 $query->where('learner_id', $request->user()->id);
+            }
+
+            if ($courseId = trim($request->input('course_id', ''))) {
+                if ($user && $user->role === 'instructor') {
+                    $course = Course::find($courseId);
+                    if (!$course || (string) $course->instructor_id !== (string) $request->user()->id) {
+                        return response()->json([
+                            'status'  => 403,
+                            'message' => 'Forbidden.',
+                        ], 403);
+                    }
+                }
+
+                $query->where('course_id', $courseId);
             }
 
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
@@ -57,6 +72,21 @@ class EnrollmentController extends Controller
 
             if (!$isElevated) {
                 unset($data['enrollment_status'], $data['progress_percent'], $data['completed_at']);
+            }
+
+            $course = Course::find($data['course_id'] ?? null);
+
+            if ($course && $course->max_students !== null) {
+                $activeEnrollments = Enrollment::where('course_id', $course->id)
+                    ->where('enrollment_status', '!=', 'dropped')
+                    ->count();
+
+                if ($activeEnrollments >= $course->max_students) {
+                    return response()->json([
+                        'status'  => 422,
+                        'message' => 'This course has reached its maximum number of students.',
+                    ], 422);
+                }
             }
 
             $enrollment = Enrollment::create($data);

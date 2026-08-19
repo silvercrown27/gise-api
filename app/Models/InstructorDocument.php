@@ -9,19 +9,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
-class CourseMentor extends Model
+class InstructorDocument extends Model
 {
     use HasFactory, UUID, HasTimezone, SoftDeletes;
 
     protected $primaryKey = 'id';
-    protected $table = 'course_mentors';
+    protected $table = 'instructor_documents';
 
     protected $fillable = [
-        'course_id',
-        'name',
+        'instructor_id',
         'title',
-        'bio',
-        'photo_url',
+        'file_url',
+        'file_type',
     ];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
@@ -46,8 +45,8 @@ class CourseMentor extends Model
         return $date->format('Y-m-d H:i:s');
     }
 
-    public function course()
+    public function instructor()
     {
-        return $this->belongsTo(Course::class, 'course_id');
+        return $this->belongsTo(User::class, 'instructor_id');
     }
 }

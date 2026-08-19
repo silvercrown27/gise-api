@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Models\Course;
 use App\Models\CourseMentor;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,8 +17,10 @@ class CourseMentorFactory extends Factory
     {
         return [
             'course_id' => Course::factory(),
-            'mentor_id' => User::factory(),
-            'assigned_at' => fake()->dateTimeThisYear(),
+            'name' => fake()->name(),
+            'title' => fake()->optional()->jobTitle(),
+            'bio' => fake()->optional()->paragraph(),
+            'photo_url' => fake()->optional()->imageUrl(),
         ];
     }
 }

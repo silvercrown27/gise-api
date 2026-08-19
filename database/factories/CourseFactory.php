@@ -44,11 +44,37 @@ class CourseFactory extends Factory
         ];
     }
 
+    public function configure(): static
+    {
+        return $this->afterMaking(function (Course $course) {
+            $course->forceFill(['admin_approval_status' => 'approved']);
+        })->afterCreating(function (Course $course) {
+            $course->forceFill(['admin_approval_status' => 'approved'])->save();
+        });
+    }
+
     public function published(): static
     {
         return $this->state(fn (array $attributes) => [
             'status' => 'published',
             'published_at' => now(),
         ]);
+    }
+
+    public function pendingApproval(): static
+    {
+        return $this->afterCreating(function (Course $course) {
+            $course->forceFill(['admin_approval_status' => 'pending'])->save();
+        });
+    }
+
+    public function rejected(): static
+    {
+        return $this->afterCreating(function (Course $course) {
+            $course->forceFill([
+                'admin_approval_status' => 'rejected',
+                'admin_rejection_reason' => fake()->sentence(),
+            ])->save();
+        });
     }
 }

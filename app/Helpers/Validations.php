@@ -53,9 +53,22 @@ class Validations
             'user_id'              => 'required|uuid|exists:users,id',
             'bio'                  => 'nullable|string',
             'expertise_tags'       => 'nullable|string|max:255',
+            'specialization_one'   => 'nullable|string|max:255',
+            'specialization_two'   => 'nullable|string|max:255',
             'payout_method'        => 'nullable|string|in:bank,mobile_money,paypal',
             'payout_details'       => 'nullable|string',
             'verification_status'  => 'nullable|string|in:pending,verified',
+            'approval_status'      => 'nullable|string|in:pending,approved,banned',
+        ]);
+    }
+
+    public static function validateInstructorDocument(array $data)
+    {
+        return Validator::make($data, [
+            'instructor_id'  => 'required|uuid|exists:users,id',
+            'title'          => 'required|string|max:255',
+            'file_url'       => 'required|string',
+            'file_type'      => 'nullable|string|max:50',
         ]);
     }
 
@@ -130,6 +143,7 @@ class Validations
             'instructor_id'      => 'required|uuid|exists:users,id',
             'category_id'        => 'nullable|uuid|exists:categories,id',
             'pace_id'             => 'nullable|uuid|exists:certification_paces,id',
+            'max_students'        => 'nullable|integer|min:1',
             'code'                => [
                 'required',
                 'string',
@@ -176,12 +190,19 @@ class Validations
         ]);
     }
 
-    public static function validateCourseMentor(array $data)
+    public static function validateCourseMentor(array $data, $courseMentorId = null)
     {
         return Validator::make($data, [
-            'course_id'    => 'required|uuid|exists:courses,id',
-            'mentor_id'    => 'required|uuid|exists:users,id',
-            'assigned_at'  => 'nullable|date',
+            'course_id'  => [
+                'required',
+                'uuid',
+                'exists:courses,id',
+                Rule::unique('course_mentors', 'course_id')->ignore($courseMentorId)->where(fn($q) => $q->whereNull('deleted_at')),
+            ],
+            'name'       => 'required|string|max:255',
+            'title'      => 'nullable|string|max:255',
+            'bio'        => 'nullable|string',
+            'photo_url'  => 'nullable|string',
         ]);
     }
 

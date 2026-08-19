@@ -20,6 +20,7 @@ class Course extends Model
         'instructor_id',
         'category_id',
         'pace_id',
+        'max_students',
         'code',
         'title',
         'slug',
@@ -46,6 +47,7 @@ class Course extends Model
         'price' => 'integer',
         'original_price' => 'integer',
         'duration_weeks' => 'integer',
+        'max_students' => 'integer',
         'published_at' => 'datetime',
     ];
 
@@ -86,9 +88,9 @@ class Course extends Model
         return $this->belongsTo(CertificationPace::class, 'pace_id');
     }
 
-    public function mentors()
+    public function mentor()
     {
-        return $this->hasMany(CourseMentor::class, 'course_id');
+        return $this->hasOne(CourseMentor::class, 'course_id');
     }
 
     public function cohorts()

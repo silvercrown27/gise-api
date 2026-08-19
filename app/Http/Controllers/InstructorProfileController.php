@@ -23,10 +23,14 @@ class InstructorProfileController extends Controller
                 ], 403);
             }
 
-            $query = InstructorProfile::query();
+            $query = InstructorProfile::with('user');
 
             if ($user->role === 'instructor') {
                 $query->where('user_id', $request->user()->id);
+            }
+
+            if ($status = trim($request->input('approval_status', ''))) {
+                $query->where('approval_status', $status);
             }
 
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
@@ -160,7 +164,13 @@ class InstructorProfileController extends Controller
             $data = $request->all();
 
             if (!$isAdmin) {
-                unset($data['average_rating'], $data['verification_status']);
+                unset(
+                    $data['average_rating'],
+                    $data['verification_status'],
+                    $data['approval_status'],
+                    $data['approved_at'],
+                    $data['approved_by']
+                );
             }
 
             $instructorProfile->update($data);
@@ -175,6 +185,57 @@ class InstructorProfileController extends Controller
             return response()->json([
                 'status'  => 500,
                 'message' => 'An error occurred while updating the instructor profile.',
+            ], 500);
+        }
+    }
+
+    public function setApprovalStatus(Request $request, string $id)
+    {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
+        $status = $request->input('approval_status');
+
+        if (!in_array($status, ['pending', 'approved', 'banned'], true)) {
+            return response()->json([
+                'status'  => 422,
+                'message' => 'Validation failed.',
+                'errors'  => ['approval_status' => ['Must be one of: pending, approved, banned.']],
+            ], 422);
+        }
+
+        try {
+            $instructorProfile = InstructorProfile::find($id);
+
+            if (!$instructorProfile) {
+                return response()->json([
+                    'status'  => 404,
+                    'message' => 'Instructor profile not found.',
+                ], 404);
+            }
+
+            $instructorProfile->update([
+                'approval_status' => $status,
+                'approved_at' => $status === 'approved' ? now() : null,
+                'approved_by' => $status === 'approved' ? $request->user()->id : null,
+            ]);
+
+            return response()->json([
+                'status'  => 200,
+                'message' => 'Instructor approval status updated successfully.',
+                'data'    => $instructorProfile,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('InstructorProfileController@setApprovalStatus: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while updating the approval status.',
             ], 500);
         }
     }

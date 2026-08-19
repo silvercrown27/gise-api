@@ -20,14 +20,20 @@ class InstructorProfile extends Model
         'user_id',
         'bio',
         'expertise_tags',
+        'specialization_one',
+        'specialization_two',
         'payout_method',
         'payout_details',
         'average_rating',
         'verification_status',
+        'approval_status',
+        'approved_at',
+        'approved_by',
     ];
 
     protected $casts = [
         'average_rating' => 'float',
+        'approved_at' => 'datetime',
     ];
 
     protected $hidden = [
@@ -59,5 +65,15 @@ class InstructorProfile extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function approvedByAdmin()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(InstructorDocument::class, 'instructor_id', 'user_id');
     }
 }
