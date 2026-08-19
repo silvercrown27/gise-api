@@ -139,6 +139,19 @@ class InstructorProfileControllerTest extends TestCase
         $response->assertJsonPath('data.payout_details', 'ACC-12345');
     }
 
+    public function test_show_as_admin_includes_user_relation(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $profile = InstructorProfile::factory()->create();
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson("/api/instructor-profiles/{$profile->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.user.id', (string) $profile->user_id);
+    }
+
     public function test_show_hides_payout_details_from_non_owner(): void
     {
         $profile = InstructorProfile::factory()->create(['payout_details' => 'ACC-SECRET']);

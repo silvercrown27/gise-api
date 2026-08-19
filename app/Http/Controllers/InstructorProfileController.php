@@ -92,7 +92,7 @@ class InstructorProfileController extends Controller
     {
         try {
             $user = ScholarUser::find($request->user()->id);
-            $instructorProfile = InstructorProfile::find($id);
+            $instructorProfile = InstructorProfile::with('user')->find($id);
 
             if (!$instructorProfile) {
                 return response()->json([
