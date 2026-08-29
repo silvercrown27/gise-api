@@ -150,7 +150,7 @@ class ScholarUserController extends Controller
 
             // email is denormalized from users.email and only ever synced by
             // the backend itself (signup, or a future profile-email-change
-            // flow) — never writable directly through this endpoint.
+            // flow) - never writable directly through this endpoint.
             unset($data['email'], $data['id']);
 
             if (!$isAdmin) {

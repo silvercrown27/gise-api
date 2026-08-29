@@ -77,4 +77,31 @@ class CourseFactory extends Factory
             ])->save();
         });
     }
+
+    public function oLevel(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'classification' => 'o_level',
+            'certificate_kind' => 'recognized',
+            'recognized_body' => 'IGCSE',
+        ]);
+    }
+
+    public function aLevel(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'classification' => 'a_level',
+            'certificate_kind' => 'recognized',
+            'recognized_body' => 'IGCSE',
+        ]);
+    }
+
+    public function skillsProfessional(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'classification' => 'skills_professional',
+            'certificate_kind' => 'completion',
+            'recognized_body' => null,
+        ]);
+    }
 }

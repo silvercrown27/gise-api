@@ -31,7 +31,7 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Reset Your Password — 21Billions Electronics')
+            ->subject('Reset Your Password - ScholarCompass')
             ->view('emails.reset-password', [
                 'email'          => $this->email,
                 'otp'            => $this->otp,

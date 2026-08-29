@@ -61,6 +61,19 @@ class CourseControllerTest extends TestCase
         $this->assertTrue($ids->contains((string) $matching->id));
     }
 
+    public function test_index_filters_by_classification(): void
+    {
+        $oLevel = Course::factory()->oLevel()->create(['status' => 'published']);
+        Course::factory()->skillsProfessional()->create(['status' => 'published']);
+
+        $response = $this->getJson('/api/courses?classification=o_level');
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $oLevel->id));
+    }
+
     public function test_index_excludes_courses_pending_admin_approval(): void
     {
         $approved = Course::factory()->create(['status' => 'published']);

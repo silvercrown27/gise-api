@@ -34,7 +34,7 @@ class Utilities
 
     /**
      * Upload a file to a given storage subdirectory and return the stored path.
-     * The path is relative (e.g. "products/images/abc.jpg") — prepend APP_URL
+     * The path is relative (e.g. "products/images/abc.jpg") - prepend APP_URL
      * or the CDN domain when serving to the client.
      *
      * @param  \Illuminate\Http\UploadedFile  $file
@@ -50,7 +50,7 @@ class Utilities
             return [
                 'status'  => 200,
                 'message' => 'File uploaded successfully.',
-                'path'    => $path,   // storage-relative path — resolve URL with asset(Storage::url($path))
+                'path'    => $path,   // storage-relative path - resolve URL with asset(Storage::url($path))
             ];
         } catch (\Exception $e) {
             Log::error('File upload failed', ['directory' => $directory, 'error' => $e->getMessage()]);

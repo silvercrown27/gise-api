@@ -31,7 +31,7 @@ class OtpVerificationNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Verify Your Email — 21Billions Electronics')
+            ->subject('Verify Your Email - ScholarCompass')
             ->view('emails.otp-verification', [
                 'email'          => $this->email,
                 'otp'            => $this->otp,

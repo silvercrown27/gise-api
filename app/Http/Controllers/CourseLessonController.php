@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
+use App\Helpers\Utilities;
 use App\Helpers\Validations;
 use App\Models\CourseLesson;
 use App\Models\ScholarUser;
@@ -50,7 +52,23 @@ class CourseLessonController extends Controller
             ], 403);
         }
 
-        $validator = Validations::validateCourseLesson($request->all());
+        $data = $request->all();
+
+        if ($request->hasFile('content_file')) {
+            $file = $request->file('content_file');
+            $upload = Utilities::uploadFile($file, 'course-lessons/' . ($data['module_id'] ?? 'general'));
+
+            if ($upload['status'] !== 200) {
+                return response()->json([
+                    'status'  => 500,
+                    'message' => $upload['message'],
+                ], 500);
+            }
+
+            $data['content_url_or_body'] = Storage::url($upload['path']);
+        }
+
+        $validator = Validations::validateCourseLesson($data);
 
         if ($validator->fails()) {
             return response()->json([
@@ -61,7 +79,6 @@ class CourseLessonController extends Controller
         }
 
         try {
-            $data = $request->all();
             $courseLesson = CourseLesson::create($data);
             $courseLesson->refresh();
 
@@ -115,7 +132,23 @@ class CourseLessonController extends Controller
             ], 403);
         }
 
-        $validator = Validations::validateCourseLesson($request->all());
+        $data = $request->all();
+
+        if ($request->hasFile('content_file')) {
+            $file = $request->file('content_file');
+            $upload = Utilities::uploadFile($file, 'course-lessons/' . ($data['module_id'] ?? 'general'));
+
+            if ($upload['status'] !== 200) {
+                return response()->json([
+                    'status'  => 500,
+                    'message' => $upload['message'],
+                ], 500);
+            }
+
+            $data['content_url_or_body'] = Storage::url($upload['path']);
+        }
+
+        $validator = Validations::validateCourseLesson($data);
 
         if ($validator->fails()) {
             return response()->json([
@@ -135,7 +168,7 @@ class CourseLessonController extends Controller
                 ], 404);
             }
 
-            $courseLesson->update($request->all());
+            $courseLesson->update($data);
 
             return response()->json([
                 'status'  => 200,

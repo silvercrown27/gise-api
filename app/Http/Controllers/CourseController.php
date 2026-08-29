@@ -45,6 +45,10 @@ class CourseController extends Controller
                 });
             }
 
+            if ($classification = trim($request->input('classification', ''))) {
+                $query->where('classification', $classification);
+            }
+
             $query->where('status', 'published')->where('admin_approval_status', 'approved');
 
             $results = $query->orderBy('title', 'asc')->paginate(9);

@@ -143,6 +143,9 @@ class Validations
             'instructor_id'      => 'required|uuid|exists:users,id',
             'category_id'        => 'nullable|uuid|exists:categories,id',
             'pace_id'             => 'nullable|uuid|exists:certification_paces,id',
+            'classification'      => 'nullable|string|in:o_level,a_level,skills_professional',
+            'certificate_kind'    => 'nullable|string|in:recognized,completion',
+            'recognized_body'     => 'nullable|string|max:255',
             'max_students'        => 'nullable|integer|min:1',
             'code'                => [
                 'required',

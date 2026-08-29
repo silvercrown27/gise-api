@@ -61,7 +61,7 @@ Route::prefix('auth')->group(function () {
 });
 
 // ── Public content (no auth) ──────────────────────────────────────────────────
-// Course catalogue browsing — matches the frontend's public courses/course-detail pages.
+// Course catalogue browsing - matches the frontend's public courses/course-detail pages.
 Route::prefix('categories')->group(function () {
     Route::get('/',     [CategoryController::class, 'index']);
     Route::get('/{id}', [CategoryController::class, 'show']);
@@ -134,7 +134,7 @@ Route::prefix('platform-stats')->group(function () {
     Route::get('/{id}', [PlatformStatController::class, 'show']);
 });
 
-// Public contact form submission — no login required, matches the frontend /contact page.
+// Public contact form submission - no login required, matches the frontend /contact page.
 Route::post('/contact-messages', [ContactMessageController::class, 'store']);
 
 // ── Authenticated user routes ─────────────────────────────────────────────────
@@ -185,14 +185,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [AdminProfileController::class, 'delete']);
     });
 
-    // Categories — write actions only (index/show are public above)
+    // Categories - write actions only (index/show are public above)
     Route::prefix('categories')->group(function () {
         Route::post('/',      [CategoryController::class, 'store']);
         Route::patch('/{id}', [CategoryController::class, 'update']);
         Route::delete('/{id}', [CategoryController::class, 'delete']);
     });
 
-    // Certification types/levels/paces — write actions only (index/show are public above)
+    // Certification types/levels/paces - write actions only (index/show are public above)
     Route::prefix('certification-types')->group(function () {
         Route::post('/',      [CertificationTypeController::class, 'store']);
         Route::patch('/{id}', [CertificationTypeController::class, 'update']);
@@ -211,42 +211,42 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [CertificationPaceController::class, 'delete']);
     });
 
-    // Courses — write actions only (index/show/mine are above)
+    // Courses - write actions only (index/show/mine are above)
     Route::prefix('courses')->group(function () {
         Route::post('/',      [CourseController::class, 'store']);
         Route::patch('/{id}', [CourseController::class, 'update']);
         Route::delete('/{id}', [CourseController::class, 'delete']);
     });
 
-    // Cohorts — write actions only (index/show are public above)
+    // Cohorts - write actions only (index/show are public above)
     Route::prefix('cohorts')->group(function () {
         Route::post('/',      [CohortController::class, 'store']);
         Route::patch('/{id}', [CohortController::class, 'update']);
         Route::delete('/{id}', [CohortController::class, 'delete']);
     });
 
-    // Course mentors — write actions only (index/show are public above)
+    // Course mentors - write actions only (index/show are public above)
     Route::prefix('course-mentors')->group(function () {
         Route::post('/',      [CourseMentorController::class, 'store']);
         Route::patch('/{id}', [CourseMentorController::class, 'update']);
         Route::delete('/{id}', [CourseMentorController::class, 'delete']);
     });
 
-    // Course modules — write actions only (index/show are public above)
+    // Course modules - write actions only (index/show are public above)
     Route::prefix('course-modules')->group(function () {
         Route::post('/',      [CourseModuleController::class, 'store']);
         Route::patch('/{id}', [CourseModuleController::class, 'update']);
         Route::delete('/{id}', [CourseModuleController::class, 'delete']);
     });
 
-    // Course lessons — write actions only (index/show are public above)
+    // Course lessons - write actions only (index/show are public above)
     Route::prefix('course-lessons')->group(function () {
         Route::post('/',      [CourseLessonController::class, 'store']);
         Route::patch('/{id}', [CourseLessonController::class, 'update']);
         Route::delete('/{id}', [CourseLessonController::class, 'delete']);
     });
 
-    // Course resources — write actions only (index/show are public above)
+    // Course resources - write actions only (index/show are public above)
     Route::prefix('course-resources')->group(function () {
         Route::post('/',      [CourseResourceController::class, 'store']);
         Route::patch('/{id}', [CourseResourceController::class, 'update']);
@@ -406,14 +406,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [CourseLeadController::class, 'delete']);
     });
 
-    // Testimonials — write actions only (index/show are public above)
+    // Testimonials - write actions only (index/show are public above)
     Route::prefix('testimonials')->group(function () {
         Route::post('/',      [TestimonialController::class, 'store']);
         Route::patch('/{id}', [TestimonialController::class, 'update']);
         Route::delete('/{id}', [TestimonialController::class, 'delete']);
     });
 
-    // Contact messages — read/write actions for admins (store is public above)
+    // Contact messages - read/write actions for admins (store is public above)
     Route::prefix('contact-messages')->group(function () {
         Route::get('/',       [ContactMessageController::class, 'index']);
         Route::get('/{id}',   [ContactMessageController::class, 'show']);
@@ -421,14 +421,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [ContactMessageController::class, 'delete']);
     });
 
-    // Team members — write actions only (index/show are public above)
+    // Team members - write actions only (index/show are public above)
     Route::prefix('team-members')->group(function () {
         Route::post('/',      [TeamMemberController::class, 'store']);
         Route::patch('/{id}', [TeamMemberController::class, 'update']);
         Route::delete('/{id}', [TeamMemberController::class, 'delete']);
     });
 
-    // Platform stats — write actions only (index/show are public above)
+    // Platform stats - write actions only (index/show are public above)
     Route::prefix('platform-stats')->group(function () {
         Route::post('/',      [PlatformStatController::class, 'store']);
         Route::patch('/{id}', [PlatformStatController::class, 'update']);

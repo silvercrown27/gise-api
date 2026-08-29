@@ -35,7 +35,7 @@ class ScholarUser extends Model
     {
         parent::boot();
 
-        // Unlike every other model, ScholarUser does NOT generate its own id —
+        // Unlike every other model, ScholarUser does NOT generate its own id -
         // it shares the owning User's id (set explicitly by the caller, e.g.
         // ScholarUser::create(['id' => $user->id, 'role' => 'student', ...])).
         // This enforces that id is always provided rather than silently falling
