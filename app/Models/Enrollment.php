@@ -21,6 +21,7 @@ class Enrollment extends Model
         'course_id',
         'cohort_id',
         'enrollment_status',
+        'failed_module_id',
         'progress_percent',
         'enrolled_at',
         'completed_at',
@@ -77,5 +78,15 @@ class Enrollment extends Model
     public function certificate()
     {
         return $this->hasOne(Certificate::class, 'enrollment_id');
+    }
+
+    public function failedModule()
+    {
+        return $this->belongsTo(CourseModule::class, 'failed_module_id');
+    }
+
+    public function quizAttempts()
+    {
+        return $this->hasMany(ModuleQuizAttempt::class, 'enrollment_id');
     }
 }

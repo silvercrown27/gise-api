@@ -9,23 +9,22 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
-class CourseModule extends Model
+class ModuleQuizAnswer extends Model
 {
     use HasFactory, UUID, HasTimezone, SoftDeletes;
 
     protected $primaryKey = 'id';
-    protected $table = 'course_modules';
+    protected $table = 'module_quiz_answers';
 
     protected $fillable = [
-        'course_id',
-        'title',
-        'order_index',
-        'unlock_after_days',
+        'attempt_id',
+        'question_id',
+        'selected_option_key',
+        'is_correct',
     ];
 
     protected $casts = [
-        'order_index' => 'integer',
-        'unlock_after_days' => 'integer',
+        'is_correct' => 'boolean',
     ];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
@@ -35,7 +34,7 @@ class CourseModule extends Model
         parent::boot();
 
         static::creating(function ($model) {
-            $model->id = Str::uuid('id');
+            $model->id = (string) Str::uuid();
             $model->created_at = $model->getDateTime();
             $model->updated_at = $model->getDateTime();
         });
@@ -50,18 +49,13 @@ class CourseModule extends Model
         return $date->format('Y-m-d H:i:s');
     }
 
-    public function course()
+    public function attempt()
     {
-        return $this->belongsTo(Course::class, 'course_id');
+        return $this->belongsTo(ModuleQuizAttempt::class, 'attempt_id');
     }
 
-    public function lessons()
+    public function question()
     {
-        return $this->hasMany(CourseLesson::class, 'module_id');
-    }
-
-    public function quiz()
-    {
-        return $this->hasOne(ModuleQuiz::class, 'module_id');
+        return $this->belongsTo(ModuleQuizQuestion::class, 'question_id');
     }
 }

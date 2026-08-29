@@ -24,12 +24,14 @@ class CourseLesson extends Model
         'duration_minutes',
         'order_index',
         'is_preview',
+        'unlock_after_days',
     ];
 
     protected $casts = [
         'duration_minutes' => 'integer',
         'order_index' => 'integer',
         'is_preview' => 'boolean',
+        'unlock_after_days' => 'integer',
     ];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];

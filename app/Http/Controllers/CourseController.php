@@ -14,6 +14,7 @@ use App\Models\InstructorPayout;
 use App\Models\InstructorProfile;
 use App\Models\LessonProgress;
 use App\Models\ScholarUser;
+use App\Services\ModuleAccessService;
 
 class CourseController extends Controller
 {
@@ -151,11 +152,28 @@ class CourseController extends Controller
                 ->orderBy('order_index', 'asc')
                 ->get();
 
-            $modules->each(function ($module) use ($progressByLessonId) {
-                $module->lessons->each(function ($lesson) use ($progressByLessonId) {
+            $bypassesGating = $isAdmin || $isOwningInstructor || !$enrollment;
+
+            $modules->each(function ($module) use ($progressByLessonId, $enrollment, $bypassesGating) {
+                $access = $bypassesGating
+                    ? ['accessible' => true, 'reason' => null]
+                    : ModuleAccessService::checkModuleAccess($enrollment, $module);
+
+                $module->is_accessible = $access['accessible'];
+                $module->lock_reason = $access['reason'];
+                $module->unlock_date = $enrollment
+                    ? ModuleAccessService::unlockDateFor($enrollment, $module)?->toDateString()
+                    : null;
+                $module->is_passed = $enrollment ? ModuleAccessService::isModulePassed($enrollment, $module) : null;
+
+                $module->lessons->each(function ($lesson) use ($progressByLessonId, $access) {
                     $progress = $progressByLessonId[$lesson->id] ?? null;
                     $lesson->progress_status = $progress->status ?? 'not_started';
                     $lesson->progress_id = $progress->id ?? null;
+
+                    if (!$access['accessible']) {
+                        $lesson->content_url_or_body = null;
+                    }
                 });
             });
 

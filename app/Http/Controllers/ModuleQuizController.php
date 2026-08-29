@@ -6,42 +6,31 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
-use App\Models\CourseModule;
+use App\Models\ModuleQuiz;
 use App\Models\ScholarUser;
 
-class CourseModuleController extends Controller
+class ModuleQuizController extends Controller
 {
     public function index(Request $request)
     {
         try {
-            $query = CourseModule::withCount('lessons');
+            $query = ModuleQuiz::withCount('questions');
 
-            if ($request->boolean('with_lessons')) {
-                $query->with(['lessons' => function ($lessons) {
-                    $lessons->select(['id', 'module_id', 'title', 'duration_minutes', 'order_index'])
-                        ->orderBy('order_index', 'asc');
-                }]);
+            if ($moduleId = trim($request->input('module_id', ''))) {
+                $query->where('module_id', $moduleId);
             }
 
-            if ($q = trim($request->input('q', ''))) {
-                $query->where('title', 'like', '%' . $q . '%');
-            }
-
-            if ($courseId = trim($request->input('course_id', ''))) {
-                $query->where('course_id', $courseId);
-            }
-
-            $results = $query->orderBy('order_index', 'asc')->paginate(10);
+            $results = $query->orderBy('created_at', 'desc')->paginate(10);
 
             return response()->json([
                 'status' => 200,
                 'data'   => $results,
             ], 200);
         } catch (\Exception $e) {
-            Log::error('CourseModuleController@index: ' . $e->getMessage());
+            Log::error('ModuleQuizController@index: ' . $e->getMessage());
             return response()->json([
                 'status'  => 500,
-                'message' => 'An error occurred while retrieving course modules.',
+                'message' => 'An error occurred while retrieving module quizzes.',
             ], 500);
         }
     }
@@ -57,7 +46,7 @@ class CourseModuleController extends Controller
             ], 403);
         }
 
-        $validator = Validations::validateCourseModule($request->all());
+        $validator = Validations::validateModuleQuiz($request->all());
 
         if ($validator->fails()) {
             return response()->json([
@@ -68,20 +57,19 @@ class CourseModuleController extends Controller
         }
 
         try {
-            $data = $request->all();
-            $courseModule = CourseModule::create($data);
-            $courseModule->refresh();
+            $quiz = ModuleQuiz::create($request->all());
+            $quiz->refresh();
 
             return response()->json([
                 'status'  => 201,
-                'message' => 'Course module created successfully.',
-                'data'    => $courseModule,
+                'message' => 'Module quiz created successfully.',
+                'data'    => $quiz,
             ], 201);
         } catch (\Exception $e) {
-            Log::error('CourseModuleController@store: ' . $e->getMessage());
+            Log::error('ModuleQuizController@store: ' . $e->getMessage());
             return response()->json([
                 'status'  => 500,
-                'message' => 'An error occurred while creating the course module.',
+                'message' => 'An error occurred while creating the module quiz.',
             ], 500);
         }
     }
@@ -89,24 +77,26 @@ class CourseModuleController extends Controller
     public function show(string $id)
     {
         try {
-            $courseModule = CourseModule::withCount('lessons')->find($id);
+            $quiz = ModuleQuiz::with(['questions' => function ($q) {
+                $q->orderBy('order_index', 'asc');
+            }])->find($id);
 
-            if (!$courseModule) {
+            if (!$quiz) {
                 return response()->json([
                     'status'  => 404,
-                    'message' => 'Course module not found.',
+                    'message' => 'Module quiz not found.',
                 ], 404);
             }
 
             return response()->json([
                 'status' => 200,
-                'data'   => $courseModule,
+                'data'   => $quiz,
             ], 200);
         } catch (\Exception $e) {
-            Log::error('CourseModuleController@show: ' . $e->getMessage());
+            Log::error('ModuleQuizController@show: ' . $e->getMessage());
             return response()->json([
                 'status'  => 500,
-                'message' => 'An error occurred while retrieving the course module.',
+                'message' => 'An error occurred while retrieving the module quiz.',
             ], 500);
         }
     }
@@ -122,7 +112,7 @@ class CourseModuleController extends Controller
             ], 403);
         }
 
-        $validator = Validations::validateCourseModule($request->all());
+        $validator = Validations::validateModuleQuiz($request->all());
 
         if ($validator->fails()) {
             return response()->json([
@@ -133,27 +123,27 @@ class CourseModuleController extends Controller
         }
 
         try {
-            $courseModule = CourseModule::find($id);
+            $quiz = ModuleQuiz::find($id);
 
-            if (!$courseModule) {
+            if (!$quiz) {
                 return response()->json([
                     'status'  => 404,
-                    'message' => 'Course module not found.',
+                    'message' => 'Module quiz not found.',
                 ], 404);
             }
 
-            $courseModule->update($request->all());
+            $quiz->update($request->all());
 
             return response()->json([
                 'status'  => 200,
-                'message' => 'Course module updated successfully.',
-                'data'    => $courseModule,
+                'message' => 'Module quiz updated successfully.',
+                'data'    => $quiz,
             ], 200);
         } catch (\Exception $e) {
-            Log::error('CourseModuleController@update: ' . $e->getMessage());
+            Log::error('ModuleQuizController@update: ' . $e->getMessage());
             return response()->json([
                 'status'  => 500,
-                'message' => 'An error occurred while updating the course module.',
+                'message' => 'An error occurred while updating the module quiz.',
             ], 500);
         }
     }
@@ -170,26 +160,26 @@ class CourseModuleController extends Controller
         }
 
         try {
-            $courseModule = CourseModule::find($id);
+            $quiz = ModuleQuiz::find($id);
 
-            if (!$courseModule) {
+            if (!$quiz) {
                 return response()->json([
                     'status'  => 404,
-                    'message' => 'Course module not found.',
+                    'message' => 'Module quiz not found.',
                 ], 404);
             }
 
-            $courseModule->delete();
+            $quiz->delete();
 
             return response()->json([
                 'status'  => 200,
-                'message' => 'Course module deleted successfully.',
+                'message' => 'Module quiz deleted successfully.',
             ], 200);
         } catch (\Exception $e) {
-            Log::error('CourseModuleController@delete: ' . $e->getMessage());
+            Log::error('ModuleQuizController@delete: ' . $e->getMessage());
             return response()->json([
                 'status'  => 500,
-                'message' => 'An error occurred while deleting the course module.',
+                'message' => 'An error occurred while deleting the module quiz.',
             ], 500);
         }
     }

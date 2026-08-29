@@ -132,6 +132,46 @@ class EnrollmentControllerTest extends TestCase
         $response->assertStatus(201);
     }
 
+    public function test_store_rejects_enrollment_outside_cohort_registration_window(): void
+    {
+        $course = Course::factory()->create();
+        $cohort = Cohort::factory()->create([
+            'course_id' => $course->id,
+            'registration_opens_at' => now()->addDays(5)->toDateString(),
+            'registration_closes_at' => now()->addDays(10)->toDateString(),
+        ]);
+        $learner = User::factory()->create();
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $learner->id,
+            'course_id' => $course->id,
+            'cohort_id' => $cohort->id,
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_store_allows_enrollment_inside_cohort_registration_window(): void
+    {
+        $course = Course::factory()->create();
+        $cohort = Cohort::factory()->create([
+            'course_id' => $course->id,
+            'registration_opens_at' => now()->subDays(2)->toDateString(),
+            'registration_closes_at' => now()->addDays(5)->toDateString(),
+        ]);
+        $learner = User::factory()->create();
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $learner->id,
+            'course_id' => $course->id,
+            'cohort_id' => $cohort->id,
+        ]);
+
+        $response->assertStatus(201);
+    }
+
     public function test_index_filters_by_course_id_for_owning_instructor(): void
     {
         $instructor = User::factory()->create();

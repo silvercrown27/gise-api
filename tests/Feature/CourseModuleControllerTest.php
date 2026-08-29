@@ -23,6 +23,26 @@ class CourseModuleControllerTest extends TestCase
         $response->assertStatus(200)->assertJsonStructure(['status', 'data']);
     }
 
+    public function test_index_with_lessons_includes_titles_but_not_content(): void
+    {
+        $module = CourseModule::factory()->create();
+        \App\Models\CourseLesson::factory()->create([
+            'module_id' => $module->id,
+            'title' => 'Intro lesson',
+            'content_type' => 'text',
+            'content_url_or_body' => 'Secret full lesson content',
+        ]);
+
+        $response = $this->getJson("/api/course-modules?course_id={$module->course_id}&with_lessons=1");
+
+        $response->assertStatus(200);
+        $lessons = $response->json('data.data.0.lessons');
+        $this->assertCount(1, $lessons);
+        $this->assertSame('Intro lesson', $lessons[0]['title']);
+        $this->assertArrayNotHasKey('content_url_or_body', $lessons[0]);
+        $this->assertArrayNotHasKey('content_type', $lessons[0]);
+    }
+
     public function test_show_is_public(): void
     {
         $module = CourseModule::factory()->create();

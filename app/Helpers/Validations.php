@@ -161,7 +161,7 @@ class Validations
                 Rule::unique('courses', 'slug')->ignore($courseId)->where(fn($q) => $q->whereNull('deleted_at')),
             ],
             'tagline'             => 'nullable|string|max:255',
-            'short_description'   => 'nullable|string|max:500',
+            'short_description'   => 'nullable|string|max:255',
             'full_description'    => 'nullable|string',
             'outline'             => 'nullable|array',
             'thumbnail_url'       => 'nullable|string',
@@ -173,7 +173,7 @@ class Validations
             'tag'                 => 'nullable|string|in:beginner_friendly,high_demand,portfolio_track,career_switch,leadership,new',
             'spine'               => 'nullable|string|in:green,blue,black,bright',
             'mode'                => 'nullable|string|in:online,in_person,hybrid',
-            'duration_weeks'      => 'nullable|integer|min:1',
+            'duration_weeks'      => 'nullable|integer|min:2|max:13',
             'language'            => 'nullable|string|max:50',
             'published_at'        => 'nullable|date',
         ]);
@@ -182,14 +182,16 @@ class Validations
     public static function validateCohort(array $data)
     {
         return Validator::make($data, [
-            'course_id'    => 'required|uuid|exists:courses,id',
-            'label'        => 'required|string|max:255',
-            'start_date'   => 'required|date',
-            'end_date'     => 'nullable|date|after_or_equal:start_date',
-            'mode'         => 'nullable|string|in:online,in_person,hybrid',
-            'capacity'     => 'required|integer|min:0',
-            'seats_taken'  => 'nullable|integer|min:0',
-            'status'       => 'nullable|string|in:upcoming,open,closed,completed',
+            'course_id'                => 'required|uuid|exists:courses,id',
+            'label'                    => 'required|string|max:255',
+            'start_date'               => 'required|date',
+            'end_date'                 => 'nullable|date|after_or_equal:start_date',
+            'registration_opens_at'    => 'nullable|date',
+            'registration_closes_at'   => 'nullable|date|after_or_equal:registration_opens_at|before_or_equal:start_date',
+            'mode'                     => 'nullable|string|in:online,in_person,hybrid',
+            'capacity'                 => 'required|integer|min:0',
+            'seats_taken'              => 'nullable|integer|min:0',
+            'status'                   => 'nullable|string|in:upcoming,open,closed,completed',
         ]);
     }
 
@@ -212,9 +214,10 @@ class Validations
     public static function validateCourseModule(array $data)
     {
         return Validator::make($data, [
-            'course_id'    => 'required|uuid|exists:courses,id',
-            'title'        => 'required|string|max:255',
-            'order_index'  => 'nullable|integer|min:0',
+            'course_id'          => 'required|uuid|exists:courses,id',
+            'title'              => 'required|string|max:255',
+            'order_index'        => 'nullable|integer|min:0',
+            'unlock_after_days'  => 'nullable|integer|min:0',
         ]);
     }
 
@@ -228,6 +231,7 @@ class Validations
             'duration_minutes'      => 'nullable|integer|min:0',
             'order_index'           => 'nullable|integer|min:0',
             'is_preview'            => 'nullable|boolean',
+            'unlock_after_days'     => 'nullable|integer|min:0',
         ]);
     }
 
@@ -249,10 +253,35 @@ class Validations
             'learner_id'         => 'required|uuid|exists:users,id',
             'course_id'          => 'required|uuid|exists:courses,id',
             'cohort_id'          => 'nullable|uuid|exists:cohorts,id',
-            'enrollment_status'  => 'nullable|string|in:active,completed,dropped',
+            'enrollment_status'  => 'nullable|string|in:active,completed,dropped,failed',
+            'failed_module_id'   => 'nullable|uuid|exists:course_modules,id',
             'progress_percent'   => 'nullable|integer|min:0|max:100',
             'enrolled_at'        => 'nullable|date',
             'completed_at'       => 'nullable|date',
+        ]);
+    }
+
+    public static function validateModuleQuiz(array $data)
+    {
+        return Validator::make($data, [
+            'module_id'          => 'required|uuid|exists:course_modules,id',
+            'title'              => 'required|string|max:255',
+            'instructions'       => 'nullable|string',
+            'passing_percent'    => 'nullable|integer|min:1|max:100',
+            'max_attempts'       => 'nullable|integer|min:1|max:10',
+            'cooldown_hours'     => 'nullable|integer|min:0|max:168',
+        ]);
+    }
+
+    public static function validateModuleQuizQuestion(array $data)
+    {
+        return Validator::make($data, [
+            'quiz_id'              => 'required|uuid|exists:module_quizzes,id',
+            'question_text'        => 'required|string',
+            'options'              => 'required|array|min:2|max:6',
+            'options.*'            => 'required|string|max:500',
+            'correct_option_key'   => 'required|string',
+            'order_index'          => 'nullable|integer|min:0',
         ]);
     }
 

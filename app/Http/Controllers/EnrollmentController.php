@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
+use App\Models\Cohort;
 use App\Models\Enrollment;
 use App\Models\ScholarUser;
 use App\Models\Course;
@@ -72,6 +73,17 @@ class EnrollmentController extends Controller
 
             if (!$isElevated) {
                 unset($data['enrollment_status'], $data['progress_percent'], $data['completed_at']);
+            }
+
+            if (!empty($data['cohort_id'])) {
+                $cohort = Cohort::find($data['cohort_id']);
+
+                if ($cohort && !$cohort->isRegistrationOpen()) {
+                    return response()->json([
+                        'status'  => 422,
+                        'message' => 'Registration for this cohort is not currently open.',
+                    ], 422);
+                }
             }
 
             $course = Course::find($data['course_id'] ?? null);

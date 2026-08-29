@@ -18,6 +18,9 @@ use App\Http\Controllers\CourseMentorController;
 use App\Http\Controllers\CourseModuleController;
 use App\Http\Controllers\CourseLessonController;
 use App\Http\Controllers\CourseResourceController;
+use App\Http\Controllers\ModuleQuizController;
+use App\Http\Controllers\ModuleQuizQuestionController;
+use App\Http\Controllers\ModuleQuizAttemptController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\LessonProgressController;
 use App\Http\Controllers\CertificateController;
@@ -107,6 +110,15 @@ Route::prefix('course-modules')->group(function () {
 Route::prefix('course-lessons')->group(function () {
     Route::get('/',     [CourseLessonController::class, 'index']);
     Route::get('/{id}', [CourseLessonController::class, 'show']);
+});
+
+Route::prefix('module-quizzes')->group(function () {
+    Route::get('/',     [ModuleQuizController::class, 'index']);
+    Route::get('/{id}', [ModuleQuizController::class, 'show']);
+});
+
+Route::prefix('module-quiz-questions')->group(function () {
+    Route::get('/',     [ModuleQuizQuestionController::class, 'index']);
 });
 
 Route::prefix('course-resources')->group(function () {
@@ -251,6 +263,28 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/',      [CourseResourceController::class, 'store']);
         Route::patch('/{id}', [CourseResourceController::class, 'update']);
         Route::delete('/{id}', [CourseResourceController::class, 'delete']);
+    });
+
+    // Module quizzes - write actions only (index/show are public above)
+    Route::prefix('module-quizzes')->group(function () {
+        Route::post('/',      [ModuleQuizController::class, 'store']);
+        Route::patch('/{id}', [ModuleQuizController::class, 'update']);
+        Route::delete('/{id}', [ModuleQuizController::class, 'delete']);
+    });
+
+    // Module quiz questions - write actions only (index is public above)
+    Route::prefix('module-quiz-questions')->group(function () {
+        Route::post('/',      [ModuleQuizQuestionController::class, 'store']);
+        Route::patch('/{id}', [ModuleQuizQuestionController::class, 'update']);
+        Route::delete('/{id}', [ModuleQuizQuestionController::class, 'delete']);
+    });
+
+    // Module quiz attempts - fully authenticated, student-scoped
+    Route::prefix('module-quiz-attempts')->group(function () {
+        Route::get('/',        [ModuleQuizAttemptController::class, 'index']);
+        Route::post('/start',  [ModuleQuizAttemptController::class, 'start']);
+        Route::post('/{id}/submit', [ModuleQuizAttemptController::class, 'submit']);
+        Route::get('/{id}',    [ModuleQuizAttemptController::class, 'show']);
     });
 
     // Enrollments

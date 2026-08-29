@@ -261,6 +261,69 @@ class CourseControllerTest extends TestCase
         $response->assertJsonCount(1, 'data.modules.0.lessons.0.resources');
     }
 
+    public function test_curriculum_hides_content_for_locked_future_module(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        $cohort = \App\Models\Cohort::factory()->create([
+            'course_id' => $course->id,
+            'start_date' => now()->toDateString(),
+        ]);
+        $enrollment = \App\Models\Enrollment::factory()->create([
+            'learner_id' => $student->id,
+            'course_id' => $course->id,
+            'cohort_id' => $cohort->id,
+        ]);
+
+        $module = \App\Models\CourseModule::factory()->create([
+            'course_id' => $course->id,
+            'order_index' => 0,
+            'unlock_after_days' => 10,
+        ]);
+        \App\Models\CourseLesson::factory()->create([
+            'module_id' => $module->id,
+            'order_index' => 0,
+            'content_url_or_body' => 'secret lesson content',
+        ]);
+
+        Sanctum::actingAs($student);
+
+        $response = $this->getJson("/api/courses/{$course->id}/curriculum");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.modules.0.is_accessible', false);
+        $response->assertJsonPath('data.modules.0.lessons.0.content_url_or_body', null);
+    }
+
+    public function test_curriculum_blocks_second_module_until_first_is_passed(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        $cohort = \App\Models\Cohort::factory()->create([
+            'course_id' => $course->id,
+            'start_date' => now()->subDays(30)->toDateString(),
+        ]);
+        $enrollment = \App\Models\Enrollment::factory()->create([
+            'learner_id' => $student->id,
+            'course_id' => $course->id,
+            'cohort_id' => $cohort->id,
+        ]);
+
+        $firstModule = \App\Models\CourseModule::factory()->create(['course_id' => $course->id, 'order_index' => 0]);
+        \App\Models\ModuleQuiz::factory()->create(['module_id' => $firstModule->id]);
+        $secondModule = \App\Models\CourseModule::factory()->create(['course_id' => $course->id, 'order_index' => 1]);
+
+        Sanctum::actingAs($student);
+
+        $response = $this->getJson("/api/courses/{$course->id}/curriculum");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.modules.0.is_accessible', true);
+        $response->assertJsonPath('data.modules.1.is_accessible', false);
+    }
+
     public function test_curriculum_is_accessible_to_owning_instructor_without_enrollment(): void
     {
         $instructor = User::factory()->create();

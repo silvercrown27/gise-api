@@ -21,6 +21,8 @@ class Cohort extends Model
         'label',
         'start_date',
         'end_date',
+        'registration_opens_at',
+        'registration_closes_at',
         'mode',
         'capacity',
         'seats_taken',
@@ -30,6 +32,8 @@ class Cohort extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'registration_opens_at' => 'date',
+        'registration_closes_at' => 'date',
         'capacity' => 'integer',
         'seats_taken' => 'integer',
     ];
@@ -69,5 +73,20 @@ class Cohort extends Model
     public function leads()
     {
         return $this->hasMany(CourseLead::class, 'cohort_id');
+    }
+
+    public function isRegistrationOpen(): bool
+    {
+        $today = now()->startOfDay();
+
+        if ($this->registration_opens_at && $today->lt($this->registration_opens_at)) {
+            return false;
+        }
+
+        if ($this->registration_closes_at && $today->gt($this->registration_closes_at)) {
+            return false;
+        }
+
+        return true;
     }
 }
