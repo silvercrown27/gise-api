@@ -14,7 +14,7 @@ class ModuleQuizQuestionController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->user() ? ScholarUser::find($request->user()->id) : null;
             $isAdminOrInstructor = $user && in_array($user->role, ['instructor', 'admin']);
 
             $query = ModuleQuizQuestion::query();

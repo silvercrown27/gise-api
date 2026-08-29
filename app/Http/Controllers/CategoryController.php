@@ -14,7 +14,9 @@ class CategoryController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Category::withCount('courses');
+            $query = Category::withCount(['courses as available_courses_count' => function ($q) {
+                $q->where('status', 'published')->where('admin_approval_status', 'approved');
+            }]);
 
             if ($q = trim($request->input('q', ''))) {
                 $query->where('name', 'like', '%' . $q . '%');

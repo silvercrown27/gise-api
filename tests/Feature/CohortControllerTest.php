@@ -23,6 +23,20 @@ class CohortControllerTest extends TestCase
         $response->assertStatus(200)->assertJsonStructure(['status', 'data']);
     }
 
+    public function test_index_filters_by_course_id(): void
+    {
+        $course = Course::factory()->create();
+        $matching = Cohort::factory()->create(['course_id' => $course->id]);
+        Cohort::factory()->create(); // different course
+
+        $response = $this->getJson("/api/cohorts?course_id={$course->id}");
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $matching->id));
+    }
+
     public function test_next_is_public(): void
     {
         $course = Course::factory()->create(['status' => 'published']);
@@ -174,6 +188,33 @@ class CohortControllerTest extends TestCase
 
         $response->assertStatus(201);
         $this->assertDatabaseHas('cohorts', ['course_id' => $course->id, 'label' => 'Fall 2026']);
+    }
+
+    public function test_store_saves_location_fields_for_in_person_cohort(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->postJson('/api/cohorts', [
+            'course_id' => $course->id,
+            'label' => 'Nairobi In-Person Cohort',
+            'start_date' => now()->addMonth()->format('Y-m-d'),
+            'mode' => 'in_person',
+            'location_country' => 'Kenya',
+            'location_county' => 'Nairobi',
+            'capacity' => 20,
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.location_country', 'Kenya');
+        $response->assertJsonPath('data.location_county', 'Nairobi');
+        $this->assertDatabaseHas('cohorts', [
+            'course_id' => $course->id,
+            'location_country' => 'Kenya',
+            'location_county' => 'Nairobi',
+        ]);
     }
 
     public function test_store_validation_failure_returns_422(): void

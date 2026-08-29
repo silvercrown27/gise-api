@@ -23,6 +23,29 @@ class CategoryControllerTest extends TestCase
             ->assertJsonStructure(['status', 'data']);
     }
 
+    public function test_index_available_courses_count_excludes_unpublished_and_unapproved(): void
+    {
+        $category = Category::factory()->create();
+        \App\Models\Course::factory()->create([
+            'category_id' => $category->id,
+            'status' => 'published',
+        ]); // factory defaults to admin_approval_status=approved
+        \App\Models\Course::factory()->pendingApproval()->create([
+            'category_id' => $category->id,
+            'status' => 'published',
+        ]);
+        \App\Models\Course::factory()->create([
+            'category_id' => $category->id,
+            'status' => 'draft',
+        ]);
+
+        $response = $this->getJson('/api/categories');
+
+        $response->assertStatus(200);
+        $matching = collect($response->json('data.data'))->firstWhere('id', (string) $category->id);
+        $this->assertSame(1, $matching['available_courses_count']);
+    }
+
     public function test_show_is_public_and_returns_category(): void
     {
         $category = Category::factory()->create();

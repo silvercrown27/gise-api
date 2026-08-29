@@ -24,6 +24,8 @@ class Cohort extends Model
         'registration_opens_at',
         'registration_closes_at',
         'mode',
+        'location_country',
+        'location_county',
         'capacity',
         'seats_taken',
         'status',

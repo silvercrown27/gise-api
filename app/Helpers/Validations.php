@@ -189,6 +189,8 @@ class Validations
             'registration_opens_at'    => 'nullable|date',
             'registration_closes_at'   => 'nullable|date|after_or_equal:registration_opens_at|before_or_equal:start_date',
             'mode'                     => 'nullable|string|in:online,in_person,hybrid',
+            'location_country'         => 'nullable|string|max:255',
+            'location_county'          => 'nullable|string|max:255',
             'capacity'                 => 'required|integer|min:0',
             'seats_taken'              => 'nullable|integer|min:0',
             'status'                   => 'nullable|string|in:upcoming,open,closed,completed',

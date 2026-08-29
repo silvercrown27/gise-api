@@ -20,6 +20,10 @@ class CohortController extends Controller
                 $query->where('label', 'like', '%' . $q . '%');
             }
 
+            if ($courseId = trim($request->input('course_id', ''))) {
+                $query->where('course_id', $courseId);
+            }
+
             $results = $query->orderBy('start_date', 'asc')->paginate(10);
 
             return response()->json([
