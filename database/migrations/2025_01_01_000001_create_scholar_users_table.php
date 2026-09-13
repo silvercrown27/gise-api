@@ -9,17 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('scholar_users', function (Blueprint $table) {
-            // scholar_users.id is not a separately generated UUID - it is always
-            // set to the same value as the owning users.id (a shared-identity /
-            // "extends" relationship, not a foreign key column). This keeps a
-            // single authoritative id per person and means deleting the users
-            // row (account deletion) cleanly cascades here with no separate
-            // user_id column to keep in sync.
             $table->uuid('id')->primary();
-            // Denormalized copy of users.email - kept in sync at write time so
-            // this table can be queried/joined on without hitting users, which
-            // is treated as the account-lifecycle table (deleted on account
-            // deletion; scholar_users cascades off it, not the other way round).
             $table->string('email');
             $table->enum('role', ['student', 'instructor', 'admin']);
             $table->string('phone')->nullable();

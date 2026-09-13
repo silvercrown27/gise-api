@@ -20,7 +20,7 @@ class ModuleAccessService
     {
         $unlockDate = self::unlockDateFor($enrollment, $module);
 
-        if ($unlockDate && now()->startOfDay()->lt($unlockDate)) {
+        if (!$module->force_unlocked && $unlockDate && now()->startOfDay()->lt($unlockDate)) {
             return [
                 'accessible' => false,
                 'reason' => "This module unlocks on {$unlockDate->toDateString()}.",

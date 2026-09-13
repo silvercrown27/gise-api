@@ -129,6 +129,24 @@ class CourseModuleControllerTest extends TestCase
         $this->assertDatabaseHas('course_modules', ['id' => $module->id, 'title' => 'Updated']);
     }
 
+    public function test_update_as_admin_can_set_force_unlocked(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $module = CourseModule::factory()->create(['force_unlocked' => false]);
+        Sanctum::actingAs($admin);
+
+        $response = $this->patchJson("/api/course-modules/{$module->id}", [
+            'course_id' => $module->course_id,
+            'title' => $module->title,
+            'force_unlocked' => true,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.force_unlocked', true);
+        $this->assertDatabaseHas('course_modules', ['id' => $module->id, 'force_unlocked' => true]);
+    }
+
     public function test_delete_requires_authentication(): void
     {
         $module = CourseModule::factory()->create();

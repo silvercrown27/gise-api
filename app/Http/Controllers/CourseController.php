@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
 use App\Helpers\Utilities;
 use App\Helpers\Validations;
+use App\Models\Cohort;
 use App\Models\Course;
+use App\Models\CourseRating;
 use App\Models\Enrollment;
 use App\Models\InstructorPayout;
 use App\Models\InstructorProfile;
@@ -89,6 +91,21 @@ class CourseController extends Controller
                 ->where('status', 'pending')
                 ->sum('net_amount');
 
+            $averageRating = CourseRating::whereIn('course_id', $courseIds)->avg('rating');
+
+            $upcomingCohorts = Cohort::with('course:id,title')
+                ->whereIn('course_id', $courseIds)
+                ->where('start_date', '>=', now()->toDateString())
+                ->orderBy('start_date', 'asc')
+                ->limit(3)
+                ->get(['id', 'course_id', 'label', 'start_date', 'capacity', 'seats_taken']);
+
+            $topCourses = Course::where('instructor_id', $instructorId)
+                ->withCount('enrollments')
+                ->orderBy('enrollments_count', 'desc')
+                ->limit(3)
+                ->get(['id', 'title', 'slug']);
+
             return response()->json([
                 'status' => 200,
                 'data' => [
@@ -97,6 +114,9 @@ class CourseController extends Controller
                     'total_registrations' => $totalRegistrations,
                     'total_earnings' => (int) $totalEarnings,
                     'pending_earnings' => (int) $pendingEarnings,
+                    'average_rating' => $averageRating ? round($averageRating, 1) : null,
+                    'upcoming_cohorts' => $upcomingCohorts,
+                    'top_courses' => $topCourses,
                 ],
             ], 200);
         } catch (\Exception $e) {

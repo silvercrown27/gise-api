@@ -21,11 +21,13 @@ class CourseModule extends Model
         'title',
         'order_index',
         'unlock_after_days',
+        'force_unlocked',
     ];
 
     protected $casts = [
         'order_index' => 'integer',
         'unlock_after_days' => 'integer',
+        'force_unlocked' => 'boolean',
     ];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];

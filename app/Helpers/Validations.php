@@ -220,6 +220,7 @@ class Validations
             'title'              => 'required|string|max:255',
             'order_index'        => 'nullable|integer|min:0',
             'unlock_after_days'  => 'nullable|integer|min:0',
+            'force_unlocked'     => 'nullable|boolean',
         ]);
     }
 

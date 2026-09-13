@@ -7,6 +7,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ScholarUserController;
 use App\Http\Controllers\InstructorProfileController;
 use App\Http\Controllers\InstructorDocumentController;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminProfileController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CertificationTypeController;
@@ -187,6 +188,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}',   [InstructorDocumentController::class, 'show']);
         Route::delete('/{id}', [InstructorDocumentController::class, 'delete']);
     });
+
+    // Admin dashboard
+    Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
 
     // Admin profiles
     Route::prefix('admin-profiles')->group(function () {

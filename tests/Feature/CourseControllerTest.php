@@ -197,6 +197,80 @@ class CourseControllerTest extends TestCase
         $response->assertJsonPath('data.pending_earnings', 1500);
     }
 
+    public function test_summary_includes_average_rating_across_own_courses(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+
+        $courseA = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $courseB = Course::factory()->create(['instructor_id' => $instructor->id]);
+
+        \App\Models\CourseRating::factory()->create(['course_id' => $courseA->id, 'rating' => 5]);
+        \App\Models\CourseRating::factory()->create(['course_id' => $courseB->id, 'rating' => 3]);
+
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson('/api/courses/summary');
+
+        $response->assertStatus(200);
+        $this->assertEquals(4.0, $response->json('data.average_rating'));
+    }
+
+    public function test_summary_returns_next_three_upcoming_cohorts_sorted_by_start_date(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+
+        $course = Course::factory()->create(['instructor_id' => $instructor->id, 'title' => 'Applied Mathematics']);
+
+        $soonest = \App\Models\Cohort::factory()->create([
+            'course_id' => $course->id,
+            'start_date' => now()->addWeek()->format('Y-m-d'),
+        ]);
+        $middle = \App\Models\Cohort::factory()->create([
+            'course_id' => $course->id,
+            'start_date' => now()->addMonth()->format('Y-m-d'),
+        ]);
+        \App\Models\Cohort::factory()->create([
+            'course_id' => $course->id,
+            'start_date' => now()->subMonth()->format('Y-m-d'),
+        ]); // past cohort, should be excluded
+
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson('/api/courses/summary');
+
+        $response->assertStatus(200);
+        $cohorts = $response->json('data.upcoming_cohorts');
+        $this->assertCount(2, $cohorts);
+        $this->assertSame((string) $soonest->id, $cohorts[0]['id']);
+        $this->assertSame((string) $middle->id, $cohorts[1]['id']);
+        $this->assertSame('Applied Mathematics', $cohorts[0]['course']['title']);
+    }
+
+    public function test_summary_returns_top_three_courses_by_enrollment(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+
+        $topCourse = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $midCourse = Course::factory()->create(['instructor_id' => $instructor->id]);
+        Course::factory()->create(['instructor_id' => $instructor->id]); // no enrollments
+
+        \App\Models\Enrollment::factory()->count(5)->create(['course_id' => $topCourse->id]);
+        \App\Models\Enrollment::factory()->count(2)->create(['course_id' => $midCourse->id]);
+
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson('/api/courses/summary');
+
+        $response->assertStatus(200);
+        $topCourses = $response->json('data.top_courses');
+        $this->assertSame((string) $topCourse->id, $topCourses[0]['id']);
+        $this->assertSame(5, $topCourses[0]['enrollments_count']);
+        $this->assertSame((string) $midCourse->id, $topCourses[1]['id']);
+    }
+
     public function test_curriculum_requires_authentication(): void
     {
         $course = Course::factory()->create();
@@ -294,6 +368,42 @@ class CourseControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('data.modules.0.is_accessible', false);
         $response->assertJsonPath('data.modules.0.lessons.0.content_url_or_body', null);
+    }
+
+    public function test_curriculum_force_unlocked_module_is_accessible_before_its_unlock_date(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        $cohort = \App\Models\Cohort::factory()->create([
+            'course_id' => $course->id,
+            'start_date' => now()->toDateString(),
+        ]);
+        $enrollment = \App\Models\Enrollment::factory()->create([
+            'learner_id' => $student->id,
+            'course_id' => $course->id,
+            'cohort_id' => $cohort->id,
+        ]);
+
+        $module = \App\Models\CourseModule::factory()->create([
+            'course_id' => $course->id,
+            'order_index' => 0,
+            'unlock_after_days' => 10,
+            'force_unlocked' => true,
+        ]);
+        \App\Models\CourseLesson::factory()->create([
+            'module_id' => $module->id,
+            'order_index' => 0,
+            'content_url_or_body' => 'visible lesson content',
+        ]);
+
+        Sanctum::actingAs($student);
+
+        $response = $this->getJson("/api/courses/{$course->id}/curriculum");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.modules.0.is_accessible', true);
+        $response->assertJsonPath('data.modules.0.lessons.0.content_url_or_body', 'visible lesson content');
     }
 
     public function test_curriculum_blocks_second_module_until_first_is_passed(): void
