@@ -41,6 +41,11 @@ class CourseCatalogSeeder extends Seeder
             'name' => 'Finance & Operations',
             'description' => 'Grants management, financial auditing and supply chain operations.',
         ],
+        [
+            'slug' => 'cambridge-igcse',
+            'name' => 'Cambridge IGCSE',
+            'description' => 'Syllabus-aligned Cambridge IGCSE subject courses for secondary school learners.',
+        ],
     ];
 
     /**
@@ -1170,6 +1175,314 @@ class CourseCatalogSeeder extends Seeder
             ],
             'mentor' => ['name' => 'Samuel Mwangi', 'role' => 'Finance and Grants Management Consultant'],
         ],
+        [
+            'slug' => 'cambridge-igcse-mathematics',
+            'code' => 'IGCSE-01',
+            'category' => 'cambridge-igcse',
+            'title' => 'Cambridge IGCSE Mathematics (0580)',
+            'tagline' => 'Cover the full syllabus and walk in exam-ready.',
+            'shortDescription' => 'A syllabus-aligned course covering number, algebra, geometry, mensuration, trigonometry, statistics and probability for Cambridge IGCSE Mathematics (0580).',
+            'introduction' => 'Cambridge IGCSE Mathematics (0580) is assessed across number, algebra, geometry, mensuration, coordinate geometry, trigonometry, and statistics and probability. This course works through each of those syllabus areas in turn, building the fluency and exam technique learners need for both the Core and Extended tiers, with worked reasoning at every step rather than just final answers.',
+            'audience' => 'Secondary school learners preparing for the Cambridge IGCSE Mathematics (0580) examination, and independent learners revising the syllabus.',
+            'image' => 'full-stack-web-development.jpg',
+            'level' => 'beginner',
+            'tag' => 'new',
+            'spine' => 'blue',
+            'durationWeeks' => 12,
+            'price' => 320,
+            'originalPrice' => 380,
+            'seatsLeft' => 30,
+            'nextCohort' => '2026-10-05',
+            'mode' => 'online',
+            'classification' => 'o_level',
+            'certificateKind' => 'recognized',
+            'recognizedBody' => 'Cambridge Assessment International Education (CAIE)',
+            'objectives' => [
+                'Work confidently with number, ratio, percentages and standard form',
+                'Manipulate algebraic expressions and solve equations and inequalities',
+                'Apply geometric reasoning, mensuration and right-angled trigonometry',
+                'Interpret graphs, statistics and probability in exam-style questions',
+            ],
+            'curriculum' => [
+                [
+                    'title' => 'Number and Algebra Foundations',
+                    'lessons' => [
+                        [
+                            'title' => 'Number, ratio and percentages',
+                            'minutes' => 45,
+                            'content' => '<h2>The number toolkit the whole syllabus rests on</h2><p>Almost every Cambridge IGCSE Mathematics question, whether it is about geometry, statistics or algebra, eventually comes down to confident arithmetic with integers, fractions, decimals and directed numbers. This lesson consolidates that foundation: order of operations, working with negative numbers, and converting cleanly between fractions, decimals and percentages.</p><h2>Ratio and proportion</h2><p>Ratio questions ask you to compare quantities in a fixed relationship, while direct and inverse proportion describe how two quantities change together. The key exam skill is translating a worded problem, sharing an amount in a given ratio, scaling a recipe, into the correct number sentence before calculating.</p><h2>Percentages, increase and decrease</h2><p>Beyond calculating a percentage of an amount, the syllabus expects percentage increase and decrease, reverse percentage problems (working backwards from a final amount to an original one), and compound interest calculated over several periods.</p><h2>Standard form</h2><p>Standard form (scientific notation) writes very large or very small numbers as <code>a &times; 10^n</code> with 1 &le; a &lt; 10. Practise converting in both directions and performing calculations directly in standard form, since exam questions often require an answer in this form specifically.</p>',
+                        ],
+                        [
+                            'title' => 'Algebraic manipulation and equations',
+                            'minutes' => 50,
+                            'content' => '<h2>Expanding and factorising</h2><p>Algebraic manipulation is tested throughout the paper, not just in dedicated algebra questions. This lesson covers expanding single and double brackets, and factorising by taking out a common factor, by grouping, and factorising quadratic expressions of the form <code>x^2 + bx + c</code> and <code>ax^2 + bx + c</code>.</p><h2>Solving linear and quadratic equations</h2><p>Linear equations are solved by systematically isolating the unknown, including equations with brackets or the unknown on both sides. Quadratic equations can be solved by factorising, completing the square, or the quadratic formula, extended-tier learners should be comfortable choosing whichever method is fastest for a given equation.</p><h2>Simultaneous equations</h2><p>Two linear equations in two unknowns are solved by elimination or substitution. Extended-tier papers also expect one linear and one quadratic equation solved simultaneously by substitution, a common source of lost marks if the substitution is not set up carefully.</p><h2>Inequalities</h2><p>Linear inequalities follow the same rules as equations, with one crucial exception: multiplying or dividing by a negative number reverses the inequality sign. Practise representing solution sets on a number line and, for two variables, as a shaded region on a graph.</p>',
+                        ],
+                    ],
+                ],
+                [
+                    'title' => 'Geometry, Mensuration and Trigonometry',
+                    'lessons' => [
+                        [
+                            'title' => 'Properties of shapes and geometrical reasoning',
+                            'minutes' => 45,
+                            'content' => '<h2>Angle facts as building blocks</h2><p>Every geometrical reasoning question is built from a small set of angle facts: angles on a straight line sum to 180&deg;, angles at a point sum to 360&deg;, and angles in a triangle sum to 180&deg;. Alongside these, parallel-line angle facts (corresponding, alternate and co-interior angles) let you find unknown angles in almost any diagram.</p><h2>Polygons and circle theorems</h2><p>The sum of interior angles of a polygon with n sides is <code>(n-2) &times; 180&deg;</code>, and exterior angles of any convex polygon sum to 360&deg;. Extended-tier learners also need the circle theorems, such as the angle at the centre being twice the angle at the circumference, and the angle in a semicircle being 90&deg;.</p><h2>Congruence and similarity</h2><p>Two shapes are congruent if they are identical in shape and size, and similar if one is an enlargement of the other. Similar shapes have equal corresponding angles and proportional corresponding sides, which is the basis for solving many exam problems involving overlapping or nested triangles.</p><h2>Showing your reasoning</h2><p>Geometrical reasoning questions award marks for stated reasons ("angles on a straight line", "alternate angles are equal"), not just the correct numerical answer. Get in the habit of naming the angle fact used at every step.</p>',
+                        ],
+                        [
+                            'title' => 'Mensuration and right-angled trigonometry',
+                            'minutes' => 50,
+                            'content' => '<h2>Perimeter, area and volume</h2><p>This lesson consolidates the mensuration formulae for the syllabus: area and circumference of a circle, area of a triangle, parallelogram and trapezium, and volume and surface area of prisms, cylinders, pyramids, cones and spheres. Extended-tier questions frequently combine two or more shapes into a single compound solid.</p><h2>Arc length and sector area</h2><p>An arc length or sector area is a fraction of the full circumference or area, found using the fraction <code>&theta;/360</code> of the central angle. Keep the angle and radius clearly labelled on a sketch before substituting into the formula, this single habit prevents most sign and substitution errors.</p><h2>Pythagoras\' theorem</h2><p>In any right-angled triangle, <code>a^2 + b^2 = c^2</code> where c is the hypotenuse. This underpins distance calculations on coordinate grids as well as pure geometry problems, and is often combined with trigonometry in the same question.</p><h2>Right-angled trigonometry</h2><p>Sine, cosine and tangent relate an angle in a right-angled triangle to the ratio of two sides (SOH-CAHTOA). Extended-tier learners extend this to the sine rule, cosine rule and area of a triangle formula for non-right-angled triangles, and to 3D problems where the right angle must first be identified within a 3D solid.</p>',
+                        ],
+                    ],
+                ],
+                [
+                    'title' => 'Graphs, Statistics and Probability',
+                    'lessons' => [
+                        [
+                            'title' => 'Coordinate geometry and graphs of functions',
+                            'minutes' => 45,
+                            'content' => '<h2>Straight-line graphs</h2><p>The equation <code>y = mx + c</code> describes a straight line with gradient m and y-intercept c. From two coordinates you should be able to find the gradient, the midpoint, and the length of the line segment between them (using Pythagoras), and from there derive the full equation of the line.</p><h2>Quadratic and other curved graphs</h2><p>Quadratic graphs form a parabola; learners should be able to plot one from a table of values, identify its turning point and roots, and relate the graph back to factorised or completed-square forms of the equation. The syllabus also covers cubic, reciprocal and exponential graphs at a recognition and sketching level.</p><h2>Reading and interpreting graphs</h2><p>Many exam marks come from reading a given graph accurately: finding a gradient at a point, solving an equation by reading where a curve crosses a line, or interpreting a distance-time or speed-time graph, where the gradient represents speed or acceleration respectively.</p><h2>Transformations of graphs</h2><p>Extended-tier learners should recognise how changes to a function\'s equation, such as <code>f(x) + a</code> or <code>f(x - a)</code>, translate the graph vertically or horizontally, without needing to re-plot every point from scratch.</p>',
+                        ],
+                        [
+                            'title' => 'Statistics and probability for the exam',
+                            'minutes' => 45,
+                            'content' => '<h2>Summarising data</h2><p>The syllabus expects fluency with mean, median, mode and range, and with grouped frequency data, estimating the mean and identifying the modal and median classes. Learners should also be able to draw and interpret frequency tables, pie charts, bar charts and, for extended tier, histograms with unequal class widths.</p><h2>Cumulative frequency</h2><p>A cumulative frequency diagram lets you read off the median and quartiles for grouped data, and calculate the interquartile range, a common source of exam marks that depends entirely on plotting the cumulative totals against the upper class boundaries correctly.</p><h2>Probability rules</h2><p>Basic probability is the ratio of favourable to total outcomes. The addition rule applies to mutually exclusive events ("or"), and the multiplication rule to independent events ("and"). Tree diagrams make multi-stage probability problems, especially those without replacement, far less error-prone than working from a description alone.</p><h2>Exam technique for data questions</h2><p>Always state which measure of average or spread you are using and why, and double-check that a probability answer sits between 0 and 1. These verification habits catch a large share of avoidable slips under exam time pressure.</p>',
+                        ],
+                    ],
+                ],
+            ],
+            'mentor' => ['name' => 'Irene Achieng', 'role' => 'Cambridge IGCSE Mathematics Teacher'],
+        ],
+        [
+            'slug' => 'cambridge-igcse-physics',
+            'code' => 'IGCSE-02',
+            'category' => 'cambridge-igcse',
+            'title' => 'Cambridge IGCSE Physics (0625)',
+            'tagline' => 'Build a rigorous, exam-ready grasp of physics.',
+            'shortDescription' => 'A syllabus-aligned course covering motion and forces, thermal physics and waves, and electricity, magnetism and atomic physics for Cambridge IGCSE Physics (0625).',
+            'introduction' => 'Cambridge IGCSE Physics (0625) asks learners to explain everyday phenomena using a fairly small set of core principles, applied consistently. This course works through motion and forces, thermal physics and waves, and electricity, magnetism and atomic physics, with an emphasis on the practical, calculation and definition skills examiners test most often.',
+            'audience' => 'Secondary school learners preparing for the Cambridge IGCSE Physics (0625) examination, and independent learners revising the syllabus.',
+            'image' => 'full-stack-web-development.jpg',
+            'level' => 'beginner',
+            'tag' => 'new',
+            'spine' => 'black',
+            'durationWeeks' => 10,
+            'price' => 340,
+            'originalPrice' => 400,
+            'seatsLeft' => 26,
+            'nextCohort' => '2026-10-05',
+            'mode' => 'hybrid',
+            'classification' => 'o_level',
+            'certificateKind' => 'recognized',
+            'recognizedBody' => 'Cambridge Assessment International Education (CAIE)',
+            'objectives' => [
+                'Describe and calculate motion, forces, and energy transfers',
+                'Explain thermal properties, heat transfer and wave behaviour',
+                'Analyse electrical circuits and magnetic effects of current',
+                'Describe atomic structure and radioactive decay',
+            ],
+            'curriculum' => [
+                [
+                    'title' => 'Motion, Forces and Energy',
+                    'lessons' => [
+                        [
+                            'title' => 'Describing motion and Newton\'s laws',
+                            'minutes' => 45,
+                            'content' => '<h2>Speed, velocity and acceleration</h2><p>Speed is distance travelled per unit time; velocity adds direction; acceleration is the rate of change of velocity. Distance-time graphs have gradient equal to speed, and speed-time graphs have gradient equal to acceleration, with the area under a speed-time graph equal to distance travelled, three facts that unlock most motion-graph questions.</p><h2>Newton\'s first and second laws</h2><p>An object continues at constant velocity (including staying at rest) unless acted on by a resultant force, this is Newton\'s first law. Newton\'s second law quantifies what happens when there is a resultant force: <code>F = ma</code>, force equals mass times acceleration, so the same force produces less acceleration in a more massive object.</p><h2>Newton\'s third law and everyday forces</h2><p>For every force one object exerts on a second, the second exerts an equal and opposite force back. Combine this with friction, air resistance, weight and normal contact force to explain why a falling object reaches terminal velocity once resistive forces balance its weight.</p><h2>Momentum</h2><p>Momentum (mass &times; velocity) is conserved in collisions and explosions when no external force acts. Extended-tier learners should be able to apply conservation of momentum to calculate an unknown velocity before or after a collision.</p>',
+                        ],
+                        [
+                            'title' => 'Energy, work and power',
+                            'minutes' => 45,
+                            'content' => '<h2>Energy stores and transfers</h2><p>Physics describes energy as being transferred between stores, kinetic, gravitational potential, elastic, thermal, chemical and others, rather than created or destroyed. Being able to name the stores involved before and after a process is often worth as many marks as any calculation.</p><h2>Calculating kinetic and gravitational potential energy</h2><p>Kinetic energy is <code>&frac12;mv^2</code> and gravitational potential energy is <code>mgh</code>. These two formulae, combined with conservation of energy, let you solve a large share of mechanics problems, such as finding the speed of an object at the bottom of a slope from its height at the top.</p><h2>Work done and power</h2><p>Work done equals force multiplied by distance moved in the direction of the force, and is one way energy is transferred. Power is the rate of doing work, energy transferred per second, measured in watts. A common exam pattern gives a time and asks for power, or vice versa.</p><h2>Efficiency</h2><p>No real energy transfer is perfectly efficient; some energy is always dissipated, usually as heat. Efficiency is calculated as useful energy output divided by total energy input, expressed as a percentage, and is frequently tested using Sankey diagrams that show the relative size of each energy transfer.</p>',
+                        ],
+                    ],
+                ],
+                [
+                    'title' => 'Thermal Physics and Waves',
+                    'lessons' => [
+                        [
+                            'title' => 'Thermal properties and heat transfer',
+                            'minutes' => 40,
+                            'content' => '<h2>The kinetic particle model</h2><p>Solids, liquids and gases are explained by how their particles are arranged and how much energy they have: solids have particles vibrating in fixed positions, liquids have particles that can move past each other, and gases have particles moving freely and rapidly. Temperature is a measure of the average kinetic energy of these particles.</p><h2>Specific heat capacity and change of state</h2><p>Specific heat capacity describes how much energy is needed to raise the temperature of a given mass of a substance by one degree. During a change of state, temperature stays constant even as energy continues to be supplied, since that energy is instead breaking or forming bonds between particles (specific latent heat).</p><h2>Conduction, convection and radiation</h2><p>Conduction transfers heat through vibrating particles and, in metals, free electrons, and works best in solids. Convection relies on density differences in fluids that can flow. Radiation transfers heat as electromagnetic waves and needs no medium at all, which is why it is the only method that transfers heat through a vacuum.</p><h2>Applying the three methods</h2><p>Exam questions often describe a real object, a vacuum flask, a car radiator, and ask which transfer methods matter and how the design reduces or encourages them. Practise identifying all three methods operating in a single scenario.</p>',
+                        ],
+                        [
+                            'title' => 'Properties of waves, light and sound',
+                            'minutes' => 45,
+                            'content' => '<h2>Describing waves</h2><p>Every wave can be described by its amplitude, wavelength, frequency and speed, related by <code>speed = frequency &times; wavelength</code>. Transverse waves (like light) vibrate perpendicular to the direction of travel; longitudinal waves (like sound) vibrate parallel to it.</p><h2>Reflection and refraction of light</h2><p>Light reflects off a surface with the angle of incidence equal to the angle of reflection, and refracts (bends) when passing between materials of different density, slowing down and bending towards the normal when entering a denser material. Total internal reflection occurs beyond a critical angle and underlies how optical fibres work.</p><h2>The electromagnetic spectrum</h2><p>All electromagnetic waves travel at the same speed in a vacuum but differ in wavelength and frequency, from radio waves through to gamma rays. Learners should know the broad order of the spectrum and at least one practical use and one hazard associated with several of its regions.</p><h2>Sound waves</h2><p>Sound is a longitudinal wave that requires a medium and cannot travel through a vacuum, a common point of confusion with light. Pitch relates to frequency and loudness to amplitude, and the speed of sound can be measured using an echo over a known distance.</p>',
+                        ],
+                    ],
+                ],
+                [
+                    'title' => 'Electricity, Magnetism and Atomic Physics',
+                    'lessons' => [
+                        [
+                            'title' => 'Electrical circuits and magnetism',
+                            'minutes' => 50,
+                            'content' => '<h2>Current, voltage and resistance</h2><p>Current is the rate of flow of charge, voltage is the energy transferred per unit charge, and resistance opposes current flow, related by <code>V = IR</code>. Building confidence with this single equation, and rearranging it correctly, resolves most circuit calculation questions.</p><h2>Series and parallel circuits</h2><p>In series, current is the same everywhere and voltages share across components; in parallel, voltage is the same across each branch and current shares between branches. Total resistance behaves oppositely too: resistances add directly in series, but combine to give a smaller total resistance in parallel.</p><h2>Electrical power and cost</h2><p>Electrical power is <code>P = IV</code>, and combined with <code>V = IR</code> gives two further useful forms, <code>P = I^2R</code> and <code>P = V^2/R</code>. These let you choose the most convenient equation depending on which quantities a question actually gives you.</p><h2>Magnetic effects of current</h2><p>A current-carrying wire produces a magnetic field around it, which is the basis of the electromagnet, and can experience a force when placed in an external magnetic field, the basis of the electric motor. Learners should be able to predict field direction and force direction using the appropriate right-hand or left-hand rule.</p>',
+                        ],
+                        [
+                            'title' => 'Atomic structure and nuclear physics',
+                            'minutes' => 45,
+                            'content' => '<h2>Inside the atom</h2><p>An atom has a small, dense, positively charged nucleus containing protons and neutrons, surrounded by orbiting electrons. The number of protons (atomic number) defines the element, while the number of neutrons can vary between isotopes of the same element.</p><h2>Radioactive decay</h2><p>Unstable nuclei emit alpha, beta or gamma radiation to become more stable. Alpha particles are the most ionising but least penetrating (stopped by paper), beta particles are intermediate (stopped by a few millimetres of aluminium), and gamma rays are the least ionising but most penetrating, requiring thick lead or concrete to stop.</p><h2>Half-life</h2><p>Half-life is the time taken for half of the radioactive nuclei in a sample to decay, a constant property of a given isotope regardless of the current sample size. Exam questions typically give an initial count rate and ask how many half-lives have passed, or the reverse.</p><h2>Safe and responsible use</h2><p>Radioactive sources have genuine medical, industrial and power-generation uses, but require careful handling, shielding, distance and minimising exposure time, which examiners often expect you to state explicitly when asked about safety precautions.</p>',
+                        ],
+                    ],
+                ],
+            ],
+            'mentor' => ['name' => 'Brian Otieno', 'role' => 'Cambridge IGCSE Physics Teacher'],
+        ],
+        [
+            'slug' => 'cambridge-igcse-biology',
+            'code' => 'IGCSE-03',
+            'category' => 'cambridge-igcse',
+            'title' => 'Cambridge IGCSE Biology (0610)',
+            'tagline' => 'Understand life processes from cell to ecosystem.',
+            'shortDescription' => 'A syllabus-aligned course covering cell biology, human systems and reproduction, and genetics and ecology for Cambridge IGCSE Biology (0610).',
+            'introduction' => 'Cambridge IGCSE Biology (0610) builds from the structure of a single cell up to whole ecosystems. This course follows that same progression, covering cell biology and life processes, human body systems and reproduction, and genetics, evolution and ecology, with clear, jargon-free explanations of processes examiners frequently ask learners to describe or explain in their own words.',
+            'audience' => 'Secondary school learners preparing for the Cambridge IGCSE Biology (0610) examination, and independent learners revising the syllabus.',
+            'image' => 'full-stack-web-development.jpg',
+            'level' => 'beginner',
+            'tag' => 'new',
+            'spine' => 'green',
+            'durationWeeks' => 10,
+            'price' => 340,
+            'originalPrice' => 400,
+            'seatsLeft' => 28,
+            'nextCohort' => '2026-10-12',
+            'mode' => 'online',
+            'classification' => 'o_level',
+            'certificateKind' => 'recognized',
+            'recognizedBody' => 'Cambridge Assessment International Education (CAIE)',
+            'objectives' => [
+                'Explain cell structure, transport and nutrition in living organisms',
+                'Describe key human body systems and how they maintain health',
+                'Explain inheritance, variation and evolution by natural selection',
+                'Analyse how organisms interact within ecosystems and with humans',
+            ],
+            'curriculum' => [
+                [
+                    'title' => 'Cell Biology and Life Processes',
+                    'lessons' => [
+                        [
+                            'title' => 'Cell structure and movement of substances',
+                            'minutes' => 45,
+                            'content' => '<h2>Plant and animal cells compared</h2><p>Both plant and animal cells share a nucleus, cytoplasm and cell membrane, but plant cells additionally have a cell wall, chloroplasts and a large permanent vacuole. Being able to label and explain the function of each structure is a recurring exam requirement, not just a diagram-labelling exercise.</p><h2>Specialised cells</h2><p>Cells are adapted to their function: a red blood cell has no nucleus to maximise space for oxygen-carrying haemoglobin, a root hair cell has a large surface area to absorb water and minerals, and a neurone is elongated to carry electrical impulses over distance. Exam questions often ask you to link a structural feature directly to the function it enables.</p><h2>Diffusion, osmosis and active transport</h2><p>Diffusion is the net movement of particles from a region of higher to lower concentration, requiring no energy. Osmosis is a special case of diffusion specifically for water across a partially permeable membrane. Active transport moves substances against a concentration gradient and, unlike the other two, requires energy from respiration.</p><h2>Why this distinction matters</h2><p>A common exam trap is describing active transport as diffusion because both involve movement of particles. Always check whether movement is with or against the concentration gradient, and whether energy is required, before naming the process.</p>',
+                        ],
+                        [
+                            'title' => 'Nutrition and the human digestive system',
+                            'minutes' => 45,
+                            'content' => '<h2>Nutrient groups and their roles</h2><p>Carbohydrates and fats primarily provide energy, proteins provide the building blocks for growth and repair, and vitamins and minerals support specific body functions in small quantities. A balanced diet supplies each in appropriate proportion for a person\'s age, activity level and health.</p><h2>Digestion as a physical and chemical process</h2><p>Physical digestion (chewing, churning in the stomach) increases surface area for chemical digestion, where enzymes break large insoluble molecules into small soluble ones that can be absorbed. Each enzyme, amylase, protease and lipase, is specific to one type of nutrient.</p><h2>The role of enzymes</h2><p>Digestive enzymes work fastest at an optimum temperature and pH; conditions too far from this optimum reduce their activity, and extreme conditions denature them permanently. This is why the stomach\'s highly acidic environment suits pepsin, while pancreatic enzymes in the small intestine work in a more alkaline environment.</p><h2>Absorption in the small intestine</h2><p>The small intestine is adapted for absorption with villi and microvilli that dramatically increase surface area, a thin wall for short diffusion distance, and a rich blood supply that maintains a steep concentration gradient, all three features reinforcing each other.</p>',
+                        ],
+                    ],
+                ],
+                [
+                    'title' => 'Human Systems and Reproduction',
+                    'lessons' => [
+                        [
+                            'title' => 'Transport, gas exchange and respiration',
+                            'minutes' => 45,
+                            'content' => '<h2>The circulatory system as a transport network</h2><p>The heart pumps blood through a double circulatory system, one loop to the lungs and back, one loop to the rest of the body, which keeps oxygenated and deoxygenated blood mostly separate and allows blood to reach the body at higher pressure than a single loop would allow.</p><h2>Blood vessels compared</h2><p>Arteries carry blood away from the heart under high pressure and have thick, muscular, elastic walls; veins carry blood back to the heart under low pressure and rely on valves to prevent backflow; capillaries are one cell thick, allowing efficient exchange of substances with surrounding tissue.</p><h2>Gas exchange in the lungs</h2><p>The lungs are adapted for efficient gas exchange with millions of alveoli providing a large surface area, thin alveolar walls for a short diffusion path, and a dense capillary network maintaining a steep concentration gradient for oxygen and carbon dioxide, the same three adaptation principles seen in the small intestine.</p><h2>Aerobic and anaerobic respiration</h2><p>Aerobic respiration uses oxygen to release energy from glucose efficiently, producing carbon dioxide and water. Anaerobic respiration in humans occurs without sufficient oxygen (such as during intense exercise), releases far less energy, and produces lactic acid, which is why it cannot sustain prolonged activity.</p>',
+                        ],
+                        [
+                            'title' => 'Coordination, hormones and reproduction',
+                            'minutes' => 45,
+                            'content' => '<h2>Nervous versus hormonal coordination</h2><p>The nervous system sends fast, short-lived electrical impulses along neurones for immediate responses, such as reflex actions, while the hormonal system sends slower, longer-lasting chemical messages through the bloodstream, better suited to processes like growth or the menstrual cycle that unfold over hours or days.</p><h2>The reflex arc</h2><p>A reflex action follows a fixed pathway: a stimulus is detected by a receptor, an impulse travels along a sensory neurone to the spinal cord, is relayed to a motor neurone, and triggers an effector (muscle or gland), all without needing conscious brain involvement, which is why reflexes are so fast.</p><h2>Key hormones and their effects</h2><p>Insulin, secreted by the pancreas, lowers blood glucose by stimulating cells to take up glucose from the blood, part of a wider negative feedback system that keeps internal conditions stable. Reproductive hormones such as oestrogen, progesterone, FSH and LH interact to control the menstrual cycle and support pregnancy.</p><h2>Human reproduction</h2><p>The male and female reproductive systems are structured to produce gametes, enable fertilisation, and, in the female, support development of a fetus. Learners should be able to describe the roles of key structures (testes, ovaries, uterus, placenta) rather than only naming them.</p>',
+                        ],
+                    ],
+                ],
+                [
+                    'title' => 'Genetics, Evolution and Ecology',
+                    'lessons' => [
+                        [
+                            'title' => 'Inheritance and variation',
+                            'minutes' => 50,
+                            'content' => '<h2>DNA, genes and chromosomes</h2><p>DNA is a double-helix molecule carrying genetic information as a sequence of bases; a gene is a section of DNA coding for a particular characteristic, and chromosomes are structures within the nucleus that carry many genes together. Human body cells normally contain 23 pairs of chromosomes.</p><h2>Alleles, dominant and recessive</h2><p>Different versions of the same gene are called alleles. A dominant allele\'s characteristic appears whenever it is present, while a recessive allele\'s characteristic only appears when no dominant allele is present, which is why two apparently healthy carrier parents can have a child with a recessive genetic condition.</p><h2>Genetic diagrams</h2><p>Genetic diagrams (Punnett squares) predict the possible genotypes and phenotypes of offspring from parents of known genotype, and the resulting ratios. Setting out the diagram carefully, parent genotypes, gametes, then the offspring grid, is more reliable under exam conditions than trying to reason through probabilities in your head.</p><h2>Sources of variation</h2><p>Variation between individuals arises from genetic differences (inherited, including mutation), environmental differences (not inherited, such as diet or exercise), or a combination of both. Distinguishing which type of variation a scenario describes is a frequently tested skill.</p>',
+                        ],
+                        [
+                            'title' => 'Ecosystems, human impact and the environment',
+                            'minutes' => 45,
+                            'content' => '<h2>Energy flow through ecosystems</h2><p>Energy enters ecosystems through photosynthesis and flows from producers to primary, secondary and tertiary consumers through food chains and food webs. At each stage, most energy is lost as heat through respiration, movement and undigested material, which is why food chains rarely extend beyond four or five levels.</p><h2>Nutrient cycles</h2><p>The carbon cycle and nitrogen cycle describe how essential elements move between living organisms and the physical environment. Decomposers play a central role in both, breaking down dead organic matter and waste to release nutrients back into the soil or atmosphere for reuse.</p><h2>Human impact on ecosystems</h2><p>Human activity, deforestation, pollution, overfishing and the greenhouse effect, disrupts these natural cycles and reduces biodiversity. Learners should be able to explain the specific mechanism of impact for a given example, not just state that an activity is "bad for the environment".</p><h2>Conservation approaches</h2><p>Conservation strategies range from protected areas and captive breeding programmes to sustainable resource management practices. Effective answers connect a named strategy to the specific problem it addresses, rather than listing conservation methods generically.</p>',
+                        ],
+                    ],
+                ],
+            ],
+            'mentor' => ['name' => 'Grace Njoroge', 'role' => 'Cambridge IGCSE Biology Teacher'],
+        ],
+        [
+            'slug' => 'cambridge-igcse-business-studies',
+            'code' => 'IGCSE-04',
+            'category' => 'cambridge-igcse',
+            'title' => 'Cambridge IGCSE Business Studies (0450)',
+            'tagline' => 'Learn how real businesses are organised and run.',
+            'shortDescription' => 'A syllabus-aligned course covering business activity, people and marketing, and finance for Cambridge IGCSE Business Studies (0450).',
+            'introduction' => 'Cambridge IGCSE Business Studies (0450) develops an understanding of how businesses are organised, managed and financed, and of the wider environment they operate in. This course covers business activity and organisation, people and marketing, and finance and external influences, using the case-study style questions the exam relies on throughout.',
+            'audience' => 'Secondary school learners preparing for the Cambridge IGCSE Business Studies (0450) examination, and independent learners revising the syllabus.',
+            'image' => 'full-stack-web-development.jpg',
+            'level' => 'beginner',
+            'tag' => 'new',
+            'spine' => 'bright',
+            'durationWeeks' => 8,
+            'price' => 300,
+            'originalPrice' => null,
+            'seatsLeft' => 32,
+            'nextCohort' => '2026-10-12',
+            'mode' => 'hybrid',
+            'classification' => 'o_level',
+            'certificateKind' => 'recognized',
+            'recognizedBody' => 'Cambridge Assessment International Education (CAIE)',
+            'objectives' => [
+                'Explain why businesses exist and how they are organised',
+                'Describe how businesses manage and motivate people',
+                'Apply the marketing mix to real business scenarios',
+                'Interpret business finance and explain external influences on business',
+            ],
+            'curriculum' => [
+                [
+                    'title' => 'Business Activity and Organisation',
+                    'lessons' => [
+                        [
+                            'title' => 'Understanding business activity',
+                            'minutes' => 40,
+                            'content' => '<h2>Why businesses exist</h2><p>Businesses combine the factors of production, land, labour, capital and enterprise, to produce goods and services that satisfy customer needs and wants, while pursuing objectives such as profit, growth or survival. Every case study in this subject starts from identifying what need a business is actually meeting.</p><h2>The private and public sectors</h2><p>Private sector businesses are owned and run by individuals or groups aiming primarily for profit, while public sector organisations are owned and funded by government to provide services for the wider public benefit. Many economies also have a growing not-for-profit sector pursuing social rather than purely commercial goals.</p><h2>Business objectives</h2><p>Objectives commonly include survival (especially for new businesses), profit maximisation, growth, market share and increasingly social or environmental responsibility. Objectives can conflict, for example rapid growth can strain the cash a business needs to survive, which is a common theme in exam case studies.</p><h2>Stakeholders</h2><p>Stakeholders, owners, employees, customers, suppliers, government and the local community, each have different, sometimes conflicting interests in a business\'s decisions. Strong exam answers identify specific stakeholders affected by a scenario and explain the impact on each, rather than referring to "stakeholders" in general.</p>',
+                        ],
+                        [
+                            'title' => 'Organisation, structure and management',
+                            'minutes' => 45,
+                            'content' => '<h2>Forms of business organisation</h2><p>Sole traders are owned and controlled by one person with unlimited liability; partnerships share ownership among two or more people; and limited companies (private or public) have shareholders with limited liability, protecting personal assets beyond their investment if the business fails.</p><h2>Choosing a legal structure</h2><p>The choice between these structures involves trade-offs between ease of setting up, access to capital, control, and liability. A sole trader keeps full control but bears full risk personally; forming a limited company can raise more capital and share risk, but comes with more legal requirements and shared control.</p><h2>Organisational structure and span of control</h2><p>An organisational chart shows the formal hierarchy, chain of command and span of control (how many people a manager directly supervises) within a business. A wide span of control with fewer management layers can speed up communication but may reduce direct supervision of each employee.</p><h2>Leadership and management styles</h2><p>Autocratic leaders make decisions unilaterally, democratic leaders involve employees in decision-making, and laissez-faire leaders delegate heavily and intervene minimally. The most effective style depends on the situation, workforce skill and time pressure, not one style being universally best.</p>',
+                        ],
+                    ],
+                ],
+                [
+                    'title' => 'People and Marketing',
+                    'lessons' => [
+                        [
+                            'title' => 'Motivation, recruitment and people in business',
+                            'minutes' => 40,
+                            'content' => '<h2>Why motivation matters</h2><p>Motivated employees are typically more productive, produce higher-quality work and are less likely to leave, reducing recruitment and training costs. Motivation theories, such as Maslow\'s hierarchy of needs and Herzberg\'s two-factor theory, offer different explanations for what drives people at work.</p><h2>Financial and non-financial motivators</h2><p>Financial methods include wages, salaries, commission, bonuses and profit-sharing. Non-financial methods include job enrichment, training, promotion opportunities and improved working conditions. Effective case-study answers match a specific motivator to the specific problem described, rather than suggesting "pay them more" as a universal fix.</p><h2>The recruitment process</h2><p>Recruitment typically follows job analysis, drafting a job description and person specification, advertising internally or externally, shortlisting, interviewing and selecting. Internal recruitment is usually faster and cheaper; external recruitment brings in new skills and perspectives.</p><h2>Training and its costs</h2><p>Induction training orients new employees, on-the-job training develops skills in the actual work environment at lower cost, and off-the-job training (courses, workshops) can teach broader skills but at higher cost and with output lost while staff are away from work.</p>',
+                        ],
+                        [
+                            'title' => 'Marketing and the marketing mix',
+                            'minutes' => 45,
+                            'content' => '<h2>Market research: quantitative and qualitative</h2><p>Quantitative research produces numerical data (surveys, sales figures) that is easy to analyse and compare, while qualitative research (focus groups, interviews) explores opinions and motivations in depth but is harder to generalise from. Primary research is collected first-hand for a specific purpose; secondary research reuses existing data collected by someone else.</p><h2>Market segmentation</h2><p>Businesses segment markets by characteristics such as age, income, location or lifestyle, allowing marketing to be targeted more precisely than a single one-size-fits-all approach, which usually improves both the effectiveness and efficiency of marketing spend.</p><h2>The four Ps</h2><p>The marketing mix, product, price, place and promotion, describes the controllable variables a business combines to market a good or service. A strong exam answer explains how these four elements should be consistent with each other, a premium product needs a matching price and promotional tone, not just described separately.</p><h2>Pricing strategies</h2><p>Common strategies include penetration pricing (low initial price to gain market share), skimming (high initial price for a new, distinctive product), and competitive pricing (matching rivals). The right choice depends on the product\'s novelty, cost structure and competitive environment.</p>',
+                        ],
+                    ],
+                ],
+                [
+                    'title' => 'Finance and External Influences',
+                    'lessons' => [
+                        [
+                            'title' => 'Business finance and accounts',
+                            'minutes' => 45,
+                            'content' => '<h2>Sources of finance</h2><p>Internal sources include retained profit and selling assets; external sources include bank loans, overdrafts, share capital and trade credit. Short-term needs (such as cash flow gaps) are usually matched with short-term finance like an overdraft, while long-term investments are matched with long-term finance like a loan or share issue.</p><h2>Cash flow versus profit</h2><p>Cash flow is the movement of money in and out of a business, while profit is revenue minus costs over a period; a business can be profitable on paper yet still run out of cash if payments are timed poorly, one of the most commonly tested distinctions in this subject.</p><h2>Reading a cash flow forecast</h2><p>A cash flow forecast projects expected inflows and outflows to identify future cash shortages before they happen, allowing a business to arrange finance in advance rather than reactively. Exam questions often ask you to identify a specific month\'s shortfall and suggest an appropriate remedy.</p><h2>Statement of comprehensive income and financial position basics</h2><p>The statement of comprehensive income shows revenue, costs and profit over a trading period; the statement of financial position shows what a business owns (assets) and owes (liabilities) at a single point in time. Learners should be able to calculate simple profitability and liquidity ratios from these statements.</p>',
+                        ],
+                        [
+                            'title' => 'External influences on business',
+                            'minutes' => 40,
+                            'content' => '<h2>Economic influences</h2><p>Inflation, interest rates, unemployment and exchange rates all affect business costs, demand and competitiveness. For example, higher interest rates increase the cost of borrowing and can reduce consumer spending, typically reducing demand for non-essential goods and services.</p><h2>Government and legal influences</h2><p>Government policy affects business through taxation, regulation (such as consumer protection and employment law) and, in some cases, direct support or subsidy. Businesses need to adapt operations to remain compliant as legislation changes, which case studies often frame as a cost or constraint to be managed.</p><h2>Environmental and ethical influences</h2><p>Growing consumer and regulatory attention to environmental and ethical practice means businesses increasingly weigh sustainability alongside profit, whether through sourcing decisions, waste reduction or transparent supply chains, and case studies often ask you to evaluate the trade-off between ethical practice and short-term cost.</p><h2>Globalisation and competition</h2><p>Globalisation has increased both opportunities (larger markets, cheaper inputs) and competitive pressure (international rivals, exchange-rate risk) for businesses of all sizes. Strong evaluative answers weigh both the opportunities and the risks a specific business faces from operating in a more globalised market, rather than treating globalisation as purely positive or negative.</p>',
+                        ],
+                    ],
+                ],
+            ],
+            'mentor' => ['name' => 'Peter Kamau', 'role' => 'Cambridge IGCSE Business Studies Teacher'],
+        ],
     ];
 
     public function run(): void
@@ -1218,8 +1531,10 @@ class CourseCatalogSeeder extends Seeder
                     'original_price' => $courseData['originalPrice'],
                     'currency' => 'USD',
                     'status' => 'published',
-                    'classification' => 'skills_professional',
-                    'certificate_kind' => 'completion',
+                    'admin_approval_status' => 'approved',
+                    'classification' => $courseData['classification'] ?? 'skills_professional',
+                    'certificate_kind' => $courseData['certificateKind'] ?? 'completion',
+                    'recognized_body' => $courseData['recognizedBody'] ?? null,
                     'level' => $courseData['level'],
                     'tag' => $courseData['tag'],
                     'spine' => $courseData['spine'],
@@ -1283,7 +1598,7 @@ class CourseCatalogSeeder extends Seeder
         InstructorProfile::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'bio' => "{$mentor['name']} is a {$mentor['role']} and mentor at ScholarCompass.",
+                'bio' => "{$mentor['name']} is a {$mentor['role']} and mentor at GISE.",
                 'expertise_tags' => $mentor['role'],
                 'verification_status' => 'verified',
                 'approval_status' => 'approved',
