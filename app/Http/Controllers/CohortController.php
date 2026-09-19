@@ -7,10 +7,16 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\Cohort;
+use App\Models\CohortMentorApplication;
+use App\Models\Course;
 use App\Models\ScholarUser;
+use App\Services\ModuleProgressService;
+use App\Traits\AuthorizesCourseOwnership;
 
 class CohortController extends Controller
 {
+    use AuthorizesCourseOwnership;
+
     public function index(Request $request)
     {
         try {
@@ -93,6 +99,15 @@ class CohortController extends Controller
             ], 422);
         }
 
+        $course = Course::find($request->input('course_id'));
+
+        if (!$this->canManageCourse($request, $course)) {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         try {
             $data = $request->all();
             $cohort = Cohort::create($data);
@@ -168,7 +183,22 @@ class CohortController extends Controller
                 ], 404);
             }
 
-            $cohort->update($request->all());
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$this->canManageCourse($request, $cohort->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
+            $data = $request->all();
+
+            if ($user->role !== 'admin') {
+                unset($data['course_id']);
+            }
+
+            $cohort->update($data);
 
             return response()->json([
                 'status'  => 200,
@@ -205,6 +235,13 @@ class CohortController extends Controller
                 ], 404);
             }
 
+            if (!$this->canManageCourse($request, $cohort->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $cohort->delete();
 
             return response()->json([
@@ -218,5 +255,52 @@ class CohortController extends Controller
                 'message' => 'An error occurred while deleting the cohort.',
             ], 500);
         }
+    }
+
+    public function moduleProgress(Request $request, string $id)
+    {
+        try {
+            $cohort = Cohort::with('course')->find($id);
+
+            if (!$cohort) {
+                return response()->json([
+                    'status'  => 404,
+                    'message' => 'Cohort not found.',
+                ], 404);
+            }
+
+            if (!$this->canViewCohortProgress($request, $cohort)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
+            return response()->json([
+                'status' => 200,
+                'data'   => [
+                    'cohort' => $cohort,
+                    'modules' => ModuleProgressService::forCohort($cohort),
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CohortController@moduleProgress: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while retrieving module progress.',
+            ], 500);
+        }
+    }
+
+    private function canViewCohortProgress(Request $request, Cohort $cohort): bool
+    {
+        if ($this->canManageCourse($request, $cohort->course)) {
+            return true;
+        }
+
+        return CohortMentorApplication::where('cohort_id', $cohort->id)
+            ->where('instructor_id', $request->user()->id)
+            ->where('status', 'approved')
+            ->exists();
     }
 }

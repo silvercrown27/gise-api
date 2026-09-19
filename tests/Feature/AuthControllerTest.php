@@ -83,4 +83,29 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(422);
     }
+
+    public function test_user_endpoint_includes_instructor_approval_status_for_instructor(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        InstructorProfile::factory()->pending()->create(['user_id' => $instructor->id]);
+        \Laravel\Sanctum\Sanctum::actingAs($instructor);
+
+        $response = $this->getJson('/api/user');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('instructor_approval_status', 'pending');
+    }
+
+    public function test_user_endpoint_omits_instructor_approval_status_for_non_instructor(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        \Laravel\Sanctum\Sanctum::actingAs($student);
+
+        $response = $this->getJson('/api/user');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('instructor_approval_status', null);
+    }
 }

@@ -9,28 +9,25 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
-class ModuleQuiz extends Model
+class CohortMentorApplication extends Model
 {
     use HasFactory, UUID, HasTimezone, SoftDeletes;
 
     protected $primaryKey = 'id';
-    protected $table = 'module_quizzes';
+    protected $table = 'cohort_mentor_applications';
 
     protected $fillable = [
-        'module_id',
-        'title',
-        'instructions',
-        'passing_percent',
-        'max_attempts',
-        'cooldown_hours',
-        'admin_approval_status',
-        'admin_rejection_reason',
+        'cohort_id',
+        'instructor_id',
+        'status',
+        'message',
+        'rejection_reason',
+        'reviewed_at',
+        'reviewed_by',
     ];
 
     protected $casts = [
-        'passing_percent' => 'integer',
-        'max_attempts' => 'integer',
-        'cooldown_hours' => 'integer',
+        'reviewed_at' => 'datetime',
     ];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
@@ -55,18 +52,18 @@ class ModuleQuiz extends Model
         return $date->format('Y-m-d H:i:s');
     }
 
-    public function module()
+    public function cohort()
     {
-        return $this->belongsTo(CourseModule::class, 'module_id');
+        return $this->belongsTo(Cohort::class, 'cohort_id');
     }
 
-    public function questions()
+    public function instructor()
     {
-        return $this->hasMany(ModuleQuizQuestion::class, 'quiz_id');
+        return $this->belongsTo(User::class, 'instructor_id');
     }
 
-    public function attempts()
+    public function reviewer()
     {
-        return $this->hasMany(ModuleQuizAttempt::class, 'quiz_id');
+        return $this->belongsTo(User::class, 'reviewed_by');
     }
 }

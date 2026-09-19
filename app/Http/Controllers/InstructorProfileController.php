@@ -6,8 +6,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
+use App\Models\AdminAuditLog;
 use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
+use App\Services\NotificationService;
 
 class InstructorProfileController extends Controller
 {
@@ -225,6 +227,34 @@ class InstructorProfileController extends Controller
                 'approved_at' => $status === 'approved' ? now() : null,
                 'approved_by' => $status === 'approved' ? $request->user()->id : null,
             ]);
+
+            $actionByStatus = [
+                'approved' => 'approve_instructor',
+                'banned' => 'reject_instructor',
+                'pending' => 'reset_instructor_approval',
+            ];
+
+            AdminAuditLog::create([
+                'admin_id' => $request->user()->id,
+                'action' => $actionByStatus[$status],
+                'target_type' => 'user',
+                'target_id' => $instructorProfile->user_id,
+                'notes' => null,
+            ]);
+
+            if ($status === 'approved') {
+                NotificationService::notifyUser(
+                    $instructorProfile->user_id,
+                    'instructor_approval',
+                    'Your instructor account has been approved. You can now create and publish courses.'
+                );
+            } elseif ($status === 'banned') {
+                NotificationService::notifyUser(
+                    $instructorProfile->user_id,
+                    'instructor_approval',
+                    'Your instructor account has been banned. Contact support if you believe this is a mistake.'
+                );
+            }
 
             return response()->json([
                 'status'  => 200,

@@ -6,15 +6,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
+use App\Models\Course;
 use App\Models\CourseModule;
 use App\Models\ScholarUser;
+use App\Traits\AuthorizesCourseOwnership;
 
 class CourseModuleController extends Controller
 {
+    use AuthorizesCourseOwnership;
+
     public function index(Request $request)
     {
         try {
-            $query = CourseModule::withCount('lessons');
+            $query = CourseModule::withCount('lessons')
+                ->with(['quiz' => function ($quiz) {
+                    $quiz->withCount('questions');
+                }]);
 
             if ($request->boolean('with_lessons')) {
                 $query->with(['lessons' => function ($lessons) {
@@ -65,6 +72,15 @@ class CourseModuleController extends Controller
                 'message' => 'Validation failed.',
                 'errors'  => $validator->messages(),
             ], 422);
+        }
+
+        $course = Course::find($request->input('course_id'));
+
+        if (!$this->canManageCourse($request, $course)) {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
         }
 
         try {
@@ -142,7 +158,22 @@ class CourseModuleController extends Controller
                 ], 404);
             }
 
-            $courseModule->update($request->all());
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$this->canManageCourse($request, $courseModule->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
+            $data = $request->all();
+
+            if ($user->role !== 'admin') {
+                unset($data['course_id']);
+            }
+
+            $courseModule->update($data);
 
             return response()->json([
                 'status'  => 200,
@@ -177,6 +208,13 @@ class CourseModuleController extends Controller
                     'status'  => 404,
                     'message' => 'Course module not found.',
                 ], 404);
+            }
+
+            if (!$this->canManageCourse($request, $courseModule->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
             }
 
             $courseModule->delete();

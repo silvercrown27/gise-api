@@ -270,6 +270,82 @@ class InstructorProfileControllerTest extends TestCase
         $this->assertNull($profile->approved_by);
     }
 
+    public function test_set_approval_status_writes_admin_audit_log(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $profile = InstructorProfile::factory()->pending()->create();
+        Sanctum::actingAs($admin);
+
+        $this->patchJson("/api/instructor-profiles/{$profile->id}/approval-status", [
+            'approval_status' => 'approved',
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('admin_audit_logs', [
+            'admin_id' => $admin->id,
+            'action' => 'approve_instructor',
+            'target_type' => 'user',
+            'target_id' => $profile->user_id,
+        ]);
+    }
+
+    public function test_set_approval_status_notifies_instructor_on_approve(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $profile = InstructorProfile::factory()->pending()->create();
+        Sanctum::actingAs($admin);
+
+        $this->patchJson("/api/instructor-profiles/{$profile->id}/approval-status", [
+            'approval_status' => 'approved',
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $profile->user_id,
+            'type' => 'instructor_approval',
+        ]);
+    }
+
+    public function test_set_approval_status_notifies_instructor_on_ban(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $profile = InstructorProfile::factory()->create();
+        Sanctum::actingAs($admin);
+
+        $this->patchJson("/api/instructor-profiles/{$profile->id}/approval-status", [
+            'approval_status' => 'banned',
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $profile->user_id,
+            'type' => 'instructor_approval',
+        ]);
+    }
+
+    public function test_set_approval_status_reset_to_pending_does_not_notify(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $profile = InstructorProfile::factory()->create(['approval_status' => 'approved']);
+        Sanctum::actingAs($admin);
+
+        $this->patchJson("/api/instructor-profiles/{$profile->id}/approval-status", [
+            'approval_status' => 'pending',
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('admin_audit_logs', [
+            'admin_id' => $admin->id,
+            'action' => 'reset_instructor_approval',
+            'target_type' => 'user',
+            'target_id' => $profile->user_id,
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => $profile->user_id,
+            'type' => 'instructor_approval',
+        ]);
+    }
+
     public function test_set_approval_status_as_instructor_is_forbidden(): void
     {
         $instructor = User::factory()->create();

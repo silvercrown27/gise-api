@@ -91,6 +91,13 @@ class ModuleQuizAttemptController extends Controller
                 ], 403);
             }
 
+            if ($quiz->admin_approval_status !== 'approved') {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'This quiz is currently under review and is not available yet.',
+                ], 403);
+            }
+
             $accessCheck = ModuleAccessService::checkModuleAccess($enrollment, $quiz->module);
             if (!$accessCheck['accessible']) {
                 return response()->json([
@@ -99,11 +106,19 @@ class ModuleQuizAttemptController extends Controller
                 ], 403);
             }
 
-            $attemptsUsed = ModuleQuizAttempt::where('quiz_id', $quiz->id)
+            $totalAttempts = ModuleQuizAttempt::where('quiz_id', $quiz->id)
                 ->where('enrollment_id', $enrollment->id)
                 ->count();
 
-            if ($attemptsUsed >= $quiz->max_attempts) {
+            // Only submitted attempts count against the limit - matches submit()'s
+            // gating below, so an attempt a learner started but never finished
+            // (e.g. they navigated away) doesn't silently burn one of their tries.
+            $submittedAttempts = ModuleQuizAttempt::where('quiz_id', $quiz->id)
+                ->where('enrollment_id', $enrollment->id)
+                ->whereNotNull('submitted_at')
+                ->count();
+
+            if ($submittedAttempts >= $quiz->max_attempts) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'You have used all available attempts for this quiz.',
@@ -128,7 +143,7 @@ class ModuleQuizAttemptController extends Controller
             $attempt = ModuleQuizAttempt::create([
                 'quiz_id' => $quiz->id,
                 'enrollment_id' => $enrollment->id,
-                'attempt_number' => $attemptsUsed + 1,
+                'attempt_number' => $totalAttempts + 1,
                 'started_at' => now(),
             ]);
 

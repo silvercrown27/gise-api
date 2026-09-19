@@ -60,6 +60,40 @@ class AdminAuditLogControllerTest extends TestCase
         $this->assertDatabaseHas('admin_audit_logs', ['admin_id' => $admin->id, 'action' => 'suspended_user']);
     }
 
+    public function test_store_accepts_module_quiz_target_type(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/admin-audit-logs', [
+            'admin_id' => $admin->id,
+            'action' => 'approve_quiz',
+            'target_type' => 'module_quiz',
+            'target_id' => fake()->uuid(),
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('admin_audit_logs', ['admin_id' => $admin->id, 'target_type' => 'module_quiz']);
+    }
+
+    public function test_store_accepts_cohort_mentor_application_target_type(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/admin-audit-logs', [
+            'admin_id' => $admin->id,
+            'action' => 'approve_mentor_application',
+            'target_type' => 'cohort_mentor_application',
+            'target_id' => fake()->uuid(),
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('admin_audit_logs', ['admin_id' => $admin->id, 'target_type' => 'cohort_mentor_application']);
+    }
+
     public function test_show_requires_authentication(): void
     {
         $log = AdminAuditLog::factory()->create();

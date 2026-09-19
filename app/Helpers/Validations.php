@@ -197,6 +197,26 @@ class Validations
         ]);
     }
 
+    public static function validateCohortMentorApplication(array $data)
+    {
+        return Validator::make($data, [
+            'cohort_id'      => [
+                'required',
+                'uuid',
+                'exists:cohorts,id',
+                Rule::unique('cohort_mentor_applications', 'cohort_id')
+                    ->where(fn($q) => $q
+                        ->whereNull('deleted_at')
+                        ->where('instructor_id', $data['instructor_id'] ?? null)
+                        ->whereIn('status', ['pending', 'approved'])),
+            ],
+            'instructor_id'  => 'required|uuid|exists:users,id',
+            'message'        => 'nullable|string|max:2000',
+        ], [
+            'cohort_id.unique' => 'You already have an active application for this cohort.',
+        ]);
+    }
+
     public static function validateCourseMentor(array $data, $courseMentorId = null)
     {
         return Validator::make($data, [
@@ -491,7 +511,7 @@ class Validations
         return Validator::make($data, [
             'admin_id'     => 'required|uuid|exists:users,id',
             'action'       => 'required|string|max:255',
-            'target_type'  => 'nullable|string|in:user,course,payment',
+            'target_type'  => 'nullable|string|in:user,course,payment,module_quiz,cohort_mentor_application',
             'target_id'    => 'nullable|uuid',
             'notes'        => 'nullable|string',
         ]);
@@ -546,7 +566,7 @@ class Validations
     {
         return Validator::make($data, [
             'user_id'  => 'required|uuid|exists:users,id',
-            'type'     => 'required|string|in:payment,enrollment,certificate,rating,system',
+            'type'     => 'required|string|in:payment,enrollment,certificate,rating,system,quiz_review,mentor_application,instructor_approval,course_review',
             'message'  => 'required|string',
             'is_read'  => 'nullable|boolean',
         ]);

@@ -7,9 +7,11 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
 use App\Models\Cohort;
+use App\Models\CohortMentorApplication;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\InstructorProfile;
+use App\Models\ModuleQuiz;
 use App\Models\Payment;
 use App\Models\ScholarUser;
 
@@ -59,6 +61,8 @@ class AdminController extends Controller
 
             $pendingInstructors = InstructorProfile::where('approval_status', 'pending')->count();
             $pendingCourses = Course::where('admin_approval_status', 'pending')->count();
+            $pendingQuizzes = ModuleQuiz::where('admin_approval_status', 'pending')->count();
+            $pendingMentorApplications = CohortMentorApplication::where('status', 'pending')->count();
 
             $recentAuditLogs = AdminAuditLog::with('admin:id,name')
                 ->orderBy('created_at', 'desc')
@@ -93,6 +97,8 @@ class AdminController extends Controller
                     ],
                     'pending_instructors' => $pendingInstructors,
                     'pending_courses' => $pendingCourses,
+                    'pending_quizzes' => $pendingQuizzes,
+                    'pending_mentor_applications' => $pendingMentorApplications,
                     'recent_audit_logs' => $recentAuditLogs,
                 ],
             ], 200);

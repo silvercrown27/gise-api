@@ -6,15 +6,26 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
+use App\Models\ModuleQuiz;
 use App\Models\ModuleQuizQuestion;
 use App\Models\ScholarUser;
+use App\Services\NotificationService;
+use App\Traits\AuthorizesCourseOwnership;
 
 class ModuleQuizQuestionController extends Controller
 {
+    use AuthorizesCourseOwnership;
+
     public function index(Request $request)
     {
         try {
-            $user = $request->user() ? ScholarUser::find($request->user()->id) : null;
+            // This route has no auth:sanctum middleware (it's intentionally public -
+            // see routes/api.php), so $request->user() is never populated here even
+            // with a valid Bearer token. Resolve the "sanctum" guard directly so an
+            // authenticated instructor/admin is still recognized over real HTTP,
+            // while the endpoint stays reachable without a token for everyone else.
+            $authUser = $request->user('sanctum');
+            $user = $authUser ? ScholarUser::find($authUser->id) : null;
             $isAdminOrInstructor = $user && in_array($user->role, ['instructor', 'admin']);
 
             $query = ModuleQuizQuestion::query();
@@ -75,10 +86,21 @@ class ModuleQuizQuestionController extends Controller
             ], 422);
         }
 
+        $quiz = ModuleQuiz::find($data['quiz_id']);
+
+        if (!$this->canManageCourse($request, $quiz?->module?->course)) {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         try {
             $question = ModuleQuizQuestion::create($data);
             $question->refresh();
             $question->makeVisible('correct_option_key');
+
+            $this->syncQuizApprovalAfterQuestionChange($user, $quiz);
 
             return response()->json([
                 'status'  => 201,
@@ -135,8 +157,23 @@ class ModuleQuizQuestionController extends Controller
                 ], 404);
             }
 
+            $user = ScholarUser::find($request->user()->id);
+
+            if (!$this->canManageCourse($request, $question->quiz?->module?->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
+            if ($user->role !== 'admin') {
+                unset($data['quiz_id']);
+            }
+
             $question->update($data);
             $question->makeVisible('correct_option_key');
+
+            $this->syncQuizApprovalAfterQuestionChange($user, $question->quiz);
 
             return response()->json([
                 'status'  => 200,
@@ -173,7 +210,18 @@ class ModuleQuizQuestionController extends Controller
                 ], 404);
             }
 
+            $quiz = $question->quiz;
+
+            if (!$this->canManageCourse($request, $quiz?->module?->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $question->delete();
+
+            $this->syncQuizApprovalAfterQuestionChange($user, $quiz);
 
             return response()->json([
                 'status'  => 200,
@@ -186,5 +234,32 @@ class ModuleQuizQuestionController extends Controller
                 'message' => 'An error occurred while deleting the module quiz question.',
             ], 500);
         }
+    }
+
+    /**
+     * An instructor changing a quiz's questions sends the parent quiz back
+     * for re-review; an admin's own change on a non-approved quiz implicitly
+     * re-approves it, since an admin editing their own review shouldn't
+     * require a separate approval click.
+     */
+    private function syncQuizApprovalAfterQuestionChange(ScholarUser $user, ?ModuleQuiz $quiz): void
+    {
+        if (!$quiz) {
+            return;
+        }
+
+        if ($user->role === 'admin') {
+            if ($quiz->admin_approval_status !== 'approved') {
+                $quiz->forceFill(['admin_approval_status' => 'approved', 'admin_rejection_reason' => null])->save();
+            }
+            return;
+        }
+
+        $quiz->forceFill(['admin_approval_status' => 'pending', 'admin_rejection_reason' => null])->save();
+
+        NotificationService::notifyAdmins(
+            'quiz_review',
+            "{$user->email} changed a question on the quiz \"{$quiz->title}\", which needs re-review."
+        );
     }
 }

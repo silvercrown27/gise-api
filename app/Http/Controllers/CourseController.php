@@ -8,15 +8,16 @@ use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
 use App\Helpers\Utilities;
 use App\Helpers\Validations;
+use App\Models\AdminAuditLog;
 use App\Models\Cohort;
 use App\Models\Course;
 use App\Models\CourseRating;
 use App\Models\Enrollment;
-use App\Models\InstructorPayout;
 use App\Models\InstructorProfile;
 use App\Models\LessonProgress;
 use App\Models\ScholarUser;
 use App\Services\ModuleAccessService;
+use App\Services\NotificationService;
 
 class CourseController extends Controller
 {
@@ -83,14 +84,6 @@ class CourseController extends Controller
 
             $totalRegistrations = Enrollment::whereIn('course_id', $courseIds)->count();
 
-            $totalEarnings = InstructorPayout::where('instructor_id', $instructorId)
-                ->where('status', 'paid')
-                ->sum('net_amount');
-
-            $pendingEarnings = InstructorPayout::where('instructor_id', $instructorId)
-                ->where('status', 'pending')
-                ->sum('net_amount');
-
             $averageRating = CourseRating::whereIn('course_id', $courseIds)->avg('rating');
 
             $upcomingCohorts = Cohort::with('course:id,title')
@@ -112,8 +105,6 @@ class CourseController extends Controller
                     'total_courses' => $totalCourses,
                     'published_courses' => $publishedCourses,
                     'total_registrations' => $totalRegistrations,
-                    'total_earnings' => (int) $totalEarnings,
-                    'pending_earnings' => (int) $pendingEarnings,
                     'average_rating' => $averageRating ? round($averageRating, 1) : null,
                     'upcoming_cohorts' => $upcomingCohorts,
                     'top_courses' => $topCourses,
@@ -131,7 +122,7 @@ class CourseController extends Controller
     public function curriculum(Request $request, string $id)
     {
         try {
-            $course = Course::find($id);
+            $course = Course::with('instructor')->find($id);
 
             if (!$course) {
                 return response()->json([
@@ -166,9 +157,14 @@ class CourseController extends Controller
             }
 
             $modules = $course->modules()
-                ->with(['lessons' => function ($query) {
-                    $query->orderBy('order_index', 'asc')->with('resources');
-                }])
+                ->with([
+                    'lessons' => function ($query) {
+                        $query->orderBy('order_index', 'asc')->with('resources');
+                    },
+                    'quiz' => function ($query) {
+                        $query->withCount('questions');
+                    },
+                ])
                 ->orderBy('order_index', 'asc')
                 ->get();
 
@@ -507,6 +503,34 @@ class CourseController extends Controller
                 'admin_approval_status' => $status,
                 'admin_rejection_reason' => $status === 'rejected' ? $request->input('admin_rejection_reason') : null,
             ])->save();
+
+            $actionByStatus = [
+                'approved' => 'approve_course',
+                'rejected' => 'reject_course',
+                'pending' => 'reset_course_approval',
+            ];
+
+            AdminAuditLog::create([
+                'admin_id' => $request->user()->id,
+                'action' => $actionByStatus[$status],
+                'target_type' => 'course',
+                'target_id' => $course->id,
+                'notes' => $status === 'rejected' ? $course->admin_rejection_reason : null,
+            ]);
+
+            if ($status === 'approved') {
+                NotificationService::notifyUser(
+                    $course->instructor_id,
+                    'course_review',
+                    "Your course \"{$course->title}\" has been approved and is now live."
+                );
+            } elseif ($status === 'rejected') {
+                NotificationService::notifyUser(
+                    $course->instructor_id,
+                    'course_review',
+                    "Your course \"{$course->title}\" was rejected." . ($course->admin_rejection_reason ? " Reason: {$course->admin_rejection_reason}" : '')
+                );
+            }
 
             return response()->json([
                 'status'  => 200,

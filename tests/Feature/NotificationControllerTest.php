@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Notification;
+use App\Models\ScholarUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -65,6 +66,74 @@ class NotificationControllerTest extends TestCase
         $this->assertDatabaseMissing('notifications', ['user_id' => $victim->id]);
     }
 
+
+    public function test_store_accepts_quiz_review_type(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $recipient = User::factory()->create();
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/notifications', [
+            'user_id' => $recipient->id,
+            'type' => 'quiz_review',
+            'message' => 'A quiz needs review.',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('notifications', ['user_id' => $recipient->id, 'type' => 'quiz_review']);
+    }
+
+    public function test_store_accepts_mentor_application_type(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $recipient = User::factory()->create();
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/notifications', [
+            'user_id' => $recipient->id,
+            'type' => 'mentor_application',
+            'message' => 'A mentor application needs review.',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('notifications', ['user_id' => $recipient->id, 'type' => 'mentor_application']);
+    }
+
+    public function test_store_accepts_instructor_approval_type(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $recipient = User::factory()->create();
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/notifications', [
+            'user_id' => $recipient->id,
+            'type' => 'instructor_approval',
+            'message' => 'Your instructor account status changed.',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('notifications', ['user_id' => $recipient->id, 'type' => 'instructor_approval']);
+    }
+
+    public function test_store_accepts_course_review_type(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $recipient = User::factory()->create();
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/notifications', [
+            'user_id' => $recipient->id,
+            'type' => 'course_review',
+            'message' => 'Your course status changed.',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('notifications', ['user_id' => $recipient->id, 'type' => 'course_review']);
+    }
 
     public function test_show_requires_authentication(): void
     {

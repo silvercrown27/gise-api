@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\AuthController;
+use App\Models\InstructorProfile;
 use App\Http\Controllers\ScholarUserController;
 use App\Http\Controllers\InstructorProfileController;
 use App\Http\Controllers\InstructorDocumentController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\CertificationLevelController;
 use App\Http\Controllers\CertificationPaceController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CohortController;
+use App\Http\Controllers\CohortMentorApplicationController;
 use App\Http\Controllers\CourseMentorController;
 use App\Http\Controllers\CourseModuleController;
 use App\Http\Controllers\CourseLessonController;
@@ -100,6 +102,7 @@ Route::prefix('courses')->group(function () {
 Route::prefix('cohorts')->group(function () {
     Route::get('/',     [CohortController::class, 'index']);
     Route::get('/next', [CohortController::class, 'next']);
+    Route::middleware('auth:sanctum')->get('/{id}/module-progress', [CohortController::class, 'moduleProgress']);
     Route::get('/{id}', [CohortController::class, 'show']);
 });
 
@@ -115,6 +118,7 @@ Route::prefix('course-lessons')->group(function () {
 
 Route::prefix('module-quizzes')->group(function () {
     Route::get('/',     [ModuleQuizController::class, 'index']);
+    Route::middleware('auth:sanctum')->get('/for-review', [ModuleQuizController::class, 'forReview']);
     Route::get('/{id}', [ModuleQuizController::class, 'show']);
 });
 
@@ -154,11 +158,16 @@ Route::post('/contact-messages', [ContactMessageController::class, 'store']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
         $user = ScholarUser::find($request->user()->id);
+        $instructorApprovalStatus = ($user->role ?? null) === 'instructor'
+            ? InstructorProfile::where('user_id', $user->id)->value('approval_status')
+            : null;
+
         return response()->json([
             'id' => $request->user()->id,
             'name' => $request->user()->name,
             'email' => $request->user()->email,
             'role' => $user->role ?? null,
+            'instructor_approval_status' => $instructorApprovalStatus,
         ]);
     });
 
@@ -269,10 +278,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [CourseResourceController::class, 'delete']);
     });
 
-    // Module quizzes - write actions only (index/show are public above)
+    // Module quizzes - write actions only (index/show/for-review are public above,
+    // for-review itself is admin-gated in the controller)
     Route::prefix('module-quizzes')->group(function () {
         Route::post('/',      [ModuleQuizController::class, 'store']);
         Route::patch('/{id}', [ModuleQuizController::class, 'update']);
+        Route::patch('/{id}/approval-status', [ModuleQuizController::class, 'setApprovalStatus']);
         Route::delete('/{id}', [ModuleQuizController::class, 'delete']);
     });
 
@@ -388,6 +399,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}',   [InstructorPayoutController::class, 'show']);
         Route::patch('/{id}', [InstructorPayoutController::class, 'update']);
         Route::delete('/{id}', [InstructorPayoutController::class, 'delete']);
+    });
+
+    // Cohort mentor applications (the "apply to mentor a cohort" marketplace)
+    Route::prefix('cohort-mentor-applications')->group(function () {
+        Route::get('/',       [CohortMentorApplicationController::class, 'index']);
+        Route::post('/',      [CohortMentorApplicationController::class, 'store']);
+        Route::get('/{id}',   [CohortMentorApplicationController::class, 'show']);
+        Route::patch('/{id}/approval-status', [CohortMentorApplicationController::class, 'setApprovalStatus']);
+        Route::delete('/{id}', [CohortMentorApplicationController::class, 'delete']);
     });
 
     // Course pricing history

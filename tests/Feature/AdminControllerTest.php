@@ -55,6 +55,8 @@ class AdminControllerTest extends TestCase
                 'revenue' => ['total', 'last_30_days'],
                 'pending_instructors',
                 'pending_courses',
+                'pending_quizzes',
+                'pending_mentor_applications',
                 'recent_audit_logs',
             ],
         ]);
@@ -106,6 +108,26 @@ class AdminControllerTest extends TestCase
         $response->assertJsonPath('data.courses.by_status.draft', 1);
         $response->assertJsonPath('data.pending_courses', 1);
         $response->assertJsonPath('data.pending_instructors', 1);
+    }
+
+    public function test_dashboard_reports_correct_pending_quiz_and_mentor_application_counts(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+
+        \App\Models\ModuleQuiz::factory()->create(['admin_approval_status' => 'pending']);
+        \App\Models\ModuleQuiz::factory()->create(['admin_approval_status' => 'approved']);
+
+        \App\Models\CohortMentorApplication::factory()->create(['status' => 'pending']);
+        \App\Models\CohortMentorApplication::factory()->approved()->create();
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/admin/dashboard');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.pending_quizzes', 1);
+        $response->assertJsonPath('data.pending_mentor_applications', 1);
     }
 
     public function test_dashboard_computes_revenue_from_completed_payments_only(): void

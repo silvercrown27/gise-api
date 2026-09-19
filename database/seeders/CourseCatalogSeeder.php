@@ -13,6 +13,7 @@ use App\Models\ScholarUser;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class CourseCatalogSeeder extends Seeder
@@ -1526,7 +1527,7 @@ class CourseCatalogSeeder extends Seeder
                     'short_description' => $courseData['shortDescription'],
                     'full_description' => $this->buildFullDescription($courseData),
                     'outline' => ['objectives' => $courseData['objectives']],
-                    'thumbnail_url' => '/storage/courses/' . $courseData['image'],
+                    'thumbnail_url' => $this->resolveThumbnailUrl($courseData['slug']),
                     'price' => $courseData['price'],
                     'original_price' => $courseData['originalPrice'],
                     'currency' => 'USD',
@@ -1549,6 +1550,21 @@ class CourseCatalogSeeder extends Seeder
             $this->seedCohort($course, $courseData);
             $this->seedMentor($course, $instructor);
         }
+    }
+
+    /**
+     * Points at the real uploaded thumbnail for this course's slug on the
+     * "public" disk (storage/app/public/course-thumbnails) if one exists,
+     * otherwise leaves thumbnail_url null so the frontend falls back to its
+     * own bundled placeholder image instead of linking a file that 404s.
+     */
+    private function resolveThumbnailUrl(string $slug): ?string
+    {
+        $path = "course-thumbnails/{$slug}.jpg";
+
+        return Storage::disk('public')->exists($path)
+            ? Storage::disk('public')->url($path)
+            : null;
     }
 
     /**

@@ -71,6 +71,34 @@ class ModuleQuizAttemptControllerTest extends TestCase
         $response->assertJsonPath('data.attempt_number', 1);
     }
 
+    public function test_start_is_forbidden_when_quiz_is_pending(): void
+    {
+        $ctx = $this->makeEnrollmentWithModule();
+        $ctx['quiz']->update(['admin_approval_status' => 'pending']);
+        Sanctum::actingAs($ctx['student']);
+
+        $response = $this->postJson('/api/module-quiz-attempts/start', [
+            'enrollment_id' => $ctx['enrollment']->id,
+            'quiz_id' => $ctx['quiz']->id,
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_start_is_forbidden_when_quiz_is_rejected(): void
+    {
+        $ctx = $this->makeEnrollmentWithModule();
+        $ctx['quiz']->update(['admin_approval_status' => 'rejected']);
+        Sanctum::actingAs($ctx['student']);
+
+        $response = $this->postJson('/api/module-quiz-attempts/start', [
+            'enrollment_id' => $ctx['enrollment']->id,
+            'quiz_id' => $ctx['quiz']->id,
+        ]);
+
+        $response->assertStatus(403);
+    }
+
     public function test_start_forbidden_for_non_owning_learner(): void
     {
         $ctx = $this->makeEnrollmentWithModule();

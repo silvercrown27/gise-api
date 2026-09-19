@@ -88,6 +88,25 @@ class CourseModuleControllerTest extends TestCase
         $this->assertDatabaseHas('course_modules', ['course_id' => $course->id, 'title' => 'Module 1']);
     }
 
+    public function test_store_as_non_owning_instructor_is_forbidden(): void
+    {
+        $owner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $owner->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $owner->id]);
+
+        $otherInstructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $otherInstructor->id, 'role' => 'instructor']);
+        Sanctum::actingAs($otherInstructor);
+
+        $response = $this->postJson('/api/course-modules', [
+            'course_id' => $course->id,
+            'title' => 'Module 1',
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseMissing('course_modules', ['course_id' => $course->id]);
+    }
+
     public function test_store_as_student_is_forbidden(): void
     {
         $student = User::factory()->create();
@@ -145,6 +164,81 @@ class CourseModuleControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('data.force_unlocked', true);
         $this->assertDatabaseHas('course_modules', ['id' => $module->id, 'force_unlocked' => true]);
+    }
+
+    public function test_update_as_owning_instructor_succeeds(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $module = CourseModule::factory()->create(['course_id' => $course->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->patchJson("/api/course-modules/{$module->id}", [
+            'course_id' => $course->id,
+            'title' => 'Updated by owner',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.title', 'Updated by owner');
+    }
+
+    public function test_update_as_non_owning_instructor_is_forbidden(): void
+    {
+        $owner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $owner->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $owner->id]);
+        $module = CourseModule::factory()->create(['course_id' => $course->id, 'title' => 'Original title']);
+
+        $otherInstructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $otherInstructor->id, 'role' => 'instructor']);
+        Sanctum::actingAs($otherInstructor);
+
+        $response = $this->patchJson("/api/course-modules/{$module->id}", [
+            'course_id' => $course->id,
+            'title' => 'Hijacked title',
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('course_modules', ['id' => $module->id, 'title' => 'Original title']);
+    }
+
+    public function test_update_as_non_owning_instructor_cannot_reparent_by_changing_course_id(): void
+    {
+        $owner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $owner->id, 'role' => 'instructor']);
+        $ownerCourse = Course::factory()->create(['instructor_id' => $owner->id]);
+        $module = CourseModule::factory()->create(['course_id' => $ownerCourse->id]);
+
+        $attacker = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $attacker->id, 'role' => 'instructor']);
+        $attackerCourse = Course::factory()->create(['instructor_id' => $attacker->id]);
+        Sanctum::actingAs($attacker);
+
+        $response = $this->patchJson("/api/course-modules/{$module->id}", [
+            'course_id' => $attackerCourse->id,
+            'title' => 'Reparented',
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('course_modules', ['id' => $module->id, 'course_id' => $ownerCourse->id]);
+    }
+
+    public function test_delete_as_non_owning_instructor_is_forbidden(): void
+    {
+        $owner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $owner->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $owner->id]);
+        $module = CourseModule::factory()->create(['course_id' => $course->id]);
+
+        $otherInstructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $otherInstructor->id, 'role' => 'instructor']);
+        Sanctum::actingAs($otherInstructor);
+
+        $response = $this->deleteJson("/api/course-modules/{$module->id}");
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('course_modules', ['id' => $module->id]);
     }
 
     public function test_delete_requires_authentication(): void
