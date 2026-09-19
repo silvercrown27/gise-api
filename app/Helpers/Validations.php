@@ -511,7 +511,7 @@ class Validations
         return Validator::make($data, [
             'admin_id'     => 'required|uuid|exists:users,id',
             'action'       => 'required|string|max:255',
-            'target_type'  => 'nullable|string|in:user,course,payment,module_quiz,cohort_mentor_application',
+            'target_type'  => 'nullable|string|in:user,course,payment,module_quiz,cohort_mentor_application,exam,course_module',
             'target_id'    => 'nullable|uuid',
             'notes'        => 'nullable|string',
         ]);
@@ -566,7 +566,7 @@ class Validations
     {
         return Validator::make($data, [
             'user_id'  => 'required|uuid|exists:users,id',
-            'type'     => 'required|string|in:payment,enrollment,certificate,rating,system,quiz_review,mentor_application,instructor_approval,course_review',
+            'type'     => 'required|string|in:payment,enrollment,certificate,rating,system,quiz_review,mentor_application,instructor_approval,course_review,exam_review,module_review',
             'message'  => 'required|string',
             'is_read'  => 'nullable|boolean',
         ]);

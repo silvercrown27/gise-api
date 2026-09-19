@@ -55,9 +55,10 @@ class EnrollmentControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_lets_any_authenticated_user_enroll_any_learner(): void
+    public function test_store_forces_learner_id_to_self_for_a_plain_student(): void
     {
         $attacker = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $attacker->id, 'role' => 'student']);
         $victim = User::factory()->create();
         $course = Course::factory()->create();
         Sanctum::actingAs($attacker);
@@ -68,8 +69,33 @@ class EnrollmentControllerTest extends TestCase
         ]);
 
         $response->assertStatus(201);
+        $response->assertJsonPath('data.learner_id', (string) $attacker->id);
         $this->assertDatabaseHas('enrollments', [
+            'learner_id' => $attacker->id,
+            'course_id' => $course->id,
+        ]);
+        $this->assertDatabaseMissing('enrollments', [
             'learner_id' => $victim->id,
+            'course_id' => $course->id,
+        ]);
+    }
+
+    public function test_store_lets_an_admin_enroll_another_learner(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $learner = User::factory()->create();
+        $course = Course::factory()->create();
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $learner->id,
+            'course_id' => $course->id,
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('enrollments', [
+            'learner_id' => $learner->id,
             'course_id' => $course->id,
         ]);
     }
@@ -187,6 +213,42 @@ class EnrollmentControllerTest extends TestCase
         $ids = collect($response->json('data.data'))->pluck('id');
         $this->assertCount(1, $ids);
         $this->assertTrue($ids->contains((string) $matching->id));
+    }
+
+    public function test_index_as_admin_filters_by_learner_id(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $learner = User::factory()->create();
+        $matching = Enrollment::factory()->create(['learner_id' => $learner->id]);
+        Enrollment::factory()->create(); // a different learner
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson("/api/enrollments?learner_id={$learner->id}");
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $matching->id));
+    }
+
+    public function test_index_as_instructor_ignores_learner_id_filter(): void
+    {
+        // learner_id is admin-only; an instructor passing it still gets their
+        // normal course-scoped (here: everything, since no course_id was given
+        // and instructors aren't restricted to their own courses on index) results
+        // rather than a cross-course lookup of an arbitrary learner.
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $learner = User::factory()->create();
+        $enrollment = Enrollment::factory()->create(['learner_id' => $learner->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/enrollments?learner_id={$learner->id}");
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertTrue($ids->contains((string) $enrollment->id));
     }
 
     public function test_index_filters_by_course_id_include_learner(): void

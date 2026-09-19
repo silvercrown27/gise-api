@@ -9,7 +9,9 @@ use App\Models\AdminAuditLog;
 use App\Models\Cohort;
 use App\Models\CohortMentorApplication;
 use App\Models\Course;
+use App\Models\CourseModule;
 use App\Models\Enrollment;
+use App\Models\Exam;
 use App\Models\InstructorProfile;
 use App\Models\ModuleQuiz;
 use App\Models\Payment;
@@ -63,6 +65,8 @@ class AdminController extends Controller
             $pendingCourses = Course::where('admin_approval_status', 'pending')->count();
             $pendingQuizzes = ModuleQuiz::where('admin_approval_status', 'pending')->count();
             $pendingMentorApplications = CohortMentorApplication::where('status', 'pending')->count();
+            $pendingExams = Exam::where('admin_approval_status', 'pending')->count();
+            $pendingModules = CourseModule::where('admin_approval_status', 'pending')->count();
 
             $recentAuditLogs = AdminAuditLog::with('admin:id,name')
                 ->orderBy('created_at', 'desc')
@@ -99,6 +103,8 @@ class AdminController extends Controller
                     'pending_courses' => $pendingCourses,
                     'pending_quizzes' => $pendingQuizzes,
                     'pending_mentor_applications' => $pendingMentorApplications,
+                    'pending_exams' => $pendingExams,
+                    'pending_modules' => $pendingModules,
                     'recent_audit_logs' => $recentAuditLogs,
                 ],
             ], 200);

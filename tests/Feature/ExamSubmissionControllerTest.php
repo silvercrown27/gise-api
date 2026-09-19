@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Course;
+use App\Models\Enrollment;
 use App\Models\Exam;
+use App\Models\ExamAnswer;
+use App\Models\ExamQuestion;
 use App\Models\ExamSubmission;
 use App\Models\ScholarUser;
 use App\Models\User;
@@ -102,8 +105,10 @@ class ExamSubmissionControllerTest extends TestCase
         // id and score/status are stripped -- a learner cannot submit as someone else
         // or self-grade on creation.
         $attacker = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $attacker->id, 'role' => 'student']);
         $victim = User::factory()->create();
         $exam = Exam::factory()->create();
+        Enrollment::factory()->create(['learner_id' => $attacker->id, 'course_id' => $exam->course_id]);
         Sanctum::actingAs($attacker);
 
         $response = $this->postJson('/api/exam-submissions', [
@@ -240,5 +245,146 @@ class ExamSubmissionControllerTest extends TestCase
 
         $response->assertStatus(403);
         $this->assertDatabaseHas('exam_submissions', ['id' => $submission->id, 'deleted_at' => null]);
+    }
+
+    public function test_submit_auto_grades_mcq_and_marks_graded_when_no_manual_grading_needed(): void
+    {
+        $learner = User::factory()->create();
+        $exam = Exam::factory()->create(['admin_approval_status' => 'approved']);
+        $mcq = ExamQuestion::factory()->create([
+            'exam_id' => $exam->id,
+            'question_type' => 'mcq',
+            'options' => ['A' => 'Paris', 'B' => 'London'],
+            'correct_answer' => 'A',
+            'marks' => 10,
+        ]);
+        $trueFalse = ExamQuestion::factory()->create([
+            'exam_id' => $exam->id,
+            'question_type' => 'true_false',
+            'correct_answer' => 'true',
+            'marks' => 5,
+        ]);
+        $submission = ExamSubmission::factory()->create(['exam_id' => $exam->id, 'learner_id' => $learner->id, 'submitted_at' => null]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson("/api/exam-submissions/{$submission->id}/submit", [
+            'answers' => [
+                ['question_id' => $mcq->id, 'answer_given' => 'A'],
+                ['question_id' => $trueFalse->id, 'answer_given' => 'false'],
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.status', 'graded');
+        $response->assertJsonPath('data.score', 10);
+        $this->assertDatabaseHas('exam_answers', [
+            'submission_id' => $submission->id,
+            'question_id' => $mcq->id,
+            'is_correct' => 1,
+            'marks_awarded' => 10,
+        ]);
+        $this->assertDatabaseHas('exam_answers', [
+            'submission_id' => $submission->id,
+            'question_id' => $trueFalse->id,
+            'is_correct' => 0,
+            'marks_awarded' => 0,
+        ]);
+    }
+
+    public function test_submit_leaves_essay_ungraded_and_marks_submitted_pending_manual_grading(): void
+    {
+        $learner = User::factory()->create();
+        $exam = Exam::factory()->create(['admin_approval_status' => 'approved']);
+        $essay = ExamQuestion::factory()->create([
+            'exam_id' => $exam->id,
+            'question_type' => 'essay',
+            'correct_answer' => null,
+            'marks' => 20,
+        ]);
+        $submission = ExamSubmission::factory()->create(['exam_id' => $exam->id, 'learner_id' => $learner->id, 'submitted_at' => null]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson("/api/exam-submissions/{$submission->id}/submit", [
+            'answers' => [
+                ['question_id' => $essay->id, 'answer_given' => 'A long essay answer.'],
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.status', 'submitted');
+        $this->assertDatabaseHas('exam_answers', [
+            'submission_id' => $submission->id,
+            'question_id' => $essay->id,
+            'marks_awarded' => null,
+            'is_correct' => null,
+        ]);
+    }
+
+    public function test_submit_forbids_non_owner(): void
+    {
+        $attacker = User::factory()->create();
+        $submission = ExamSubmission::factory()->create(['submitted_at' => null]);
+        Sanctum::actingAs($attacker);
+
+        $response = $this->postJson("/api/exam-submissions/{$submission->id}/submit", [
+            'answers' => [['question_id' => fake()->uuid(), 'answer_given' => 'x']],
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_submit_rejects_an_already_submitted_submission(): void
+    {
+        $learner = User::factory()->create();
+        $submission = ExamSubmission::factory()->create(['learner_id' => $learner->id, 'submitted_at' => now()]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson("/api/exam-submissions/{$submission->id}/submit", [
+            'answers' => [['question_id' => fake()->uuid(), 'answer_given' => 'x']],
+        ]);
+
+        $response->assertStatus(409);
+    }
+
+    public function test_grade_recomputes_score_and_marks_graded(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $exam = Exam::factory()->create(['course_id' => $course->id]);
+        $essay = ExamQuestion::factory()->create(['exam_id' => $exam->id, 'question_type' => 'essay', 'marks' => 20]);
+        $submission = ExamSubmission::factory()->create(['exam_id' => $exam->id, 'status' => 'submitted', 'score' => 0]);
+        $answer = ExamAnswer::factory()->create([
+            'submission_id' => $submission->id,
+            'question_id' => $essay->id,
+            'marks_awarded' => null,
+            'is_correct' => null,
+        ]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->patchJson("/api/exam-submissions/{$submission->id}/grade", [
+            'answers' => [
+                ['answer_id' => $answer->id, 'marks_awarded' => 15, 'is_correct' => true],
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.status', 'graded');
+        $response->assertJsonPath('data.score', 15);
+        $this->assertDatabaseHas('exam_answers', ['id' => $answer->id, 'marks_awarded' => 15]);
+    }
+
+    public function test_grade_requires_course_ownership(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $submission = ExamSubmission::factory()->create(); // belongs to a different course/instructor
+        Sanctum::actingAs($instructor);
+
+        $response = $this->patchJson("/api/exam-submissions/{$submission->id}/grade", [
+            'answers' => [['answer_id' => fake()->uuid(), 'marks_awarded' => 5]],
+        ]);
+
+        $response->assertStatus(403);
     }
 }

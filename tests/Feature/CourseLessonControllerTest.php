@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Course;
 use App\Models\CourseLesson;
 use App\Models\CourseModule;
 use App\Models\ScholarUser;
@@ -58,7 +59,8 @@ class CourseLessonControllerTest extends TestCase
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $module = CourseModule::factory()->create();
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $module = CourseModule::factory()->create(['course_id' => $course->id]);
         Sanctum::actingAs($instructor);
 
         $response = $this->postJson('/api/course-lessons', [
@@ -78,7 +80,8 @@ class CourseLessonControllerTest extends TestCase
 
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $module = CourseModule::factory()->create();
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $module = CourseModule::factory()->create(['course_id' => $course->id]);
         Sanctum::actingAs($instructor);
 
         $response = $this->post('/api/course-lessons', [

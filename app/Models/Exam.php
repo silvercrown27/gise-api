@@ -25,6 +25,8 @@ class Exam extends Model
         'passing_marks',
         'duration_minutes',
         'attempts_allowed',
+        'admin_approval_status',
+        'admin_rejection_reason',
     ];
 
     protected $casts = [

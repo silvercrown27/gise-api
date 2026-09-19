@@ -22,6 +22,8 @@ class CourseModule extends Model
         'order_index',
         'unlock_after_days',
         'force_unlocked',
+        'admin_approval_status',
+        'admin_rejection_reason',
     ];
 
     protected $casts = [

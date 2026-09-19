@@ -59,6 +59,34 @@ class CourseModuleControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
+    public function test_show_hides_course_and_lessons_from_anonymous_visitors(): void
+    {
+        $module = CourseModule::factory()->create();
+        \App\Models\CourseLesson::factory()->create(['module_id' => $module->id]);
+
+        $response = $this->getJson("/api/course-modules/{$module->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonMissingPath('data.course');
+        $response->assertJsonMissingPath('data.lessons');
+    }
+
+    public function test_show_reveals_course_and_lessons_to_owning_instructor(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id, 'title' => 'Owned Course']);
+        $module = CourseModule::factory()->create(['course_id' => $course->id]);
+        \App\Models\CourseLesson::factory()->create(['module_id' => $module->id, 'title' => 'Lesson 1']);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/course-modules/{$module->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.course.title', 'Owned Course');
+        $response->assertJsonPath('data.lessons.0.title', 'Lesson 1');
+    }
+
     public function test_store_requires_authentication(): void
     {
         $course = Course::factory()->create();
@@ -261,5 +289,102 @@ class CourseModuleControllerTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertSoftDeleted('course_modules', ['id' => $module->id]);
+    }
+
+    public function test_store_as_instructor_starts_pending_and_notifies_admins(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->postJson('/api/course-modules', [
+            'course_id' => $course->id,
+            'title' => 'Module 1',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.admin_approval_status', 'pending');
+        $this->assertDatabaseHas('notifications', ['user_id' => $admin->id, 'type' => 'module_review']);
+    }
+
+    public function test_store_as_admin_is_auto_approved(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $course = Course::factory()->create();
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/course-modules', [
+            'course_id' => $course->id,
+            'title' => 'Module 1',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.admin_approval_status', 'approved');
+    }
+
+    public function test_update_as_owning_instructor_resets_an_approved_module_to_pending(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $module = CourseModule::factory()->create(['course_id' => $course->id, 'admin_approval_status' => 'approved']);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->patchJson("/api/course-modules/{$module->id}", [
+            'course_id' => $course->id,
+            'title' => 'Updated by owner',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.admin_approval_status', 'pending');
+    }
+
+    public function test_for_review_requires_admin(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson('/api/course-modules/for-review');
+
+        $response->assertStatus(403);
+    }
+
+    public function test_set_approval_status_approve_notifies_instructor_and_logs_audit(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $instructor = User::factory()->create();
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $module = CourseModule::factory()->create(['course_id' => $course->id, 'admin_approval_status' => 'pending']);
+        Sanctum::actingAs($admin);
+
+        $response = $this->patchJson("/api/course-modules/{$module->id}/approval-status", ['admin_approval_status' => 'approved']);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.admin_approval_status', 'approved');
+        $this->assertDatabaseHas('admin_audit_logs', [
+            'admin_id' => $admin->id,
+            'action' => 'approve_module',
+            'target_type' => 'course_module',
+            'target_id' => $module->id,
+        ]);
+        $this->assertDatabaseHas('notifications', ['user_id' => $instructor->id, 'type' => 'module_review']);
+    }
+
+    public function test_set_approval_status_requires_admin(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $module = CourseModule::factory()->create();
+        Sanctum::actingAs($instructor);
+
+        $response = $this->patchJson("/api/course-modules/{$module->id}/approval-status", ['admin_approval_status' => 'approved']);
+
+        $response->assertStatus(403);
     }
 }

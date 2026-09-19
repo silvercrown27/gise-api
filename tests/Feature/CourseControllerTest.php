@@ -7,6 +7,7 @@ use App\Models\CertificationLevel;
 use App\Models\CertificationPace;
 use App\Models\CertificationType;
 use App\Models\Course;
+use App\Models\Enrollment;
 use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
 use App\Models\User;
@@ -377,6 +378,38 @@ class CourseControllerTest extends TestCase
         $response->assertJsonPath('data.modules.0.lessons.0.content_url_or_body', null);
     }
 
+    public function test_curriculum_hides_content_for_a_module_pending_admin_approval(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        $enrollment = Enrollment::factory()->create([
+            'learner_id' => $student->id,
+            'course_id' => $course->id,
+        ]);
+
+        $module = \App\Models\CourseModule::factory()->create([
+            'course_id' => $course->id,
+            'order_index' => 0,
+            'unlock_after_days' => 0,
+            'admin_approval_status' => 'pending',
+        ]);
+        \App\Models\CourseLesson::factory()->create([
+            'module_id' => $module->id,
+            'order_index' => 0,
+            'content_url_or_body' => 'secret lesson content',
+        ]);
+
+        Sanctum::actingAs($student);
+
+        $response = $this->getJson("/api/courses/{$course->id}/curriculum");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.modules.0.is_accessible', false);
+        $response->assertJsonPath('data.modules.0.lock_reason', 'This module is awaiting admin review.');
+        $response->assertJsonPath('data.modules.0.lessons.0.content_url_or_body', null);
+    }
+
     public function test_curriculum_force_unlocked_module_is_accessible_before_its_unlock_date(): void
     {
         $student = User::factory()->create();
@@ -466,7 +499,7 @@ class CourseControllerTest extends TestCase
         $response->assertJsonPath('data.course.instructor.name', 'Jane Doe');
     }
 
-    public function test_show_includes_category_and_instructor(): void
+    public function test_show_includes_category_but_hides_instructor_from_anonymous_visitors(): void
     {
         $instructor = User::factory()->create(['name' => 'Jane Doe']);
         $category = Category::factory()->create(['name' => 'Software Engineering']);
@@ -478,8 +511,37 @@ class CourseControllerTest extends TestCase
         $response = $this->getJson("/api/courses/{$course->id}");
 
         $response->assertStatus(200);
-        $response->assertJsonPath('data.instructor.name', 'Jane Doe');
         $response->assertJsonPath('data.category.name', 'Software Engineering');
+        $response->assertJsonPath('data.instructor', null);
+        $response->assertJsonPath('data.mentor', null);
+    }
+
+    public function test_show_reveals_instructor_to_an_enrolled_learner(): void
+    {
+        $instructor = User::factory()->create(['name' => 'Jane Doe']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $learner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
+        Enrollment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->getJson("/api/courses/{$course->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.instructor.name', 'Jane Doe');
+    }
+
+    public function test_show_reveals_instructor_to_the_owning_instructor(): void
+    {
+        $instructor = User::factory()->create(['name' => 'Jane Doe']);
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/courses/{$course->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.instructor.name', 'Jane Doe');
     }
 
     public function test_show_returns_404_for_missing_course(): void

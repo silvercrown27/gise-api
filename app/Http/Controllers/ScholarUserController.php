@@ -21,8 +21,20 @@ class ScholarUserController extends Controller
                 $query = ScholarUser::query();
             }
 
+            $query->with('user');
+
+            if ($role = trim($request->input('role', ''))) {
+                $query->where('role', $role);
+            }
+
             if ($q = trim($request->input('q', ''))) {
-                $query->where('phone', 'like', '%' . $q . '%');
+                $query->where(function ($outer) use ($q) {
+                    $outer->where('phone', 'like', '%' . $q . '%')
+                        ->orWhereHas('user', function ($inner) use ($q) {
+                            $inner->where('name', 'like', '%' . $q . '%')
+                                ->orWhere('email', 'like', '%' . $q . '%');
+                        });
+                });
             }
 
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
@@ -84,7 +96,7 @@ class ScholarUserController extends Controller
     {
         try {
             $user = ScholarUser::find($request->user()->id);
-            $scholarUser = ScholarUser::find($id);
+            $scholarUser = ScholarUser::with('user')->find($id);
 
             if (!$scholarUser) {
                 return response()->json([

@@ -108,6 +108,7 @@ Route::prefix('cohorts')->group(function () {
 
 Route::prefix('course-modules')->group(function () {
     Route::get('/',     [CourseModuleController::class, 'index']);
+    Route::middleware('auth:sanctum')->get('/for-review', [CourseModuleController::class, 'forReview']);
     Route::get('/{id}', [CourseModuleController::class, 'show']);
 });
 
@@ -257,10 +258,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [CourseMentorController::class, 'delete']);
     });
 
-    // Course modules - write actions only (index/show are public above)
+    // Course modules - write actions only (index/show/for-review are public above,
+    // for-review itself is admin-gated in the controller)
     Route::prefix('course-modules')->group(function () {
         Route::post('/',      [CourseModuleController::class, 'store']);
         Route::patch('/{id}', [CourseModuleController::class, 'update']);
+        Route::patch('/{id}/approval-status', [CourseModuleController::class, 'setApprovalStatus']);
         Route::delete('/{id}', [CourseModuleController::class, 'delete']);
     });
 
@@ -333,8 +336,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('exams')->group(function () {
         Route::get('/',       [ExamController::class, 'index']);
         Route::post('/',      [ExamController::class, 'store']);
+        Route::get('/for-review', [ExamController::class, 'forReview']);
         Route::get('/{id}',   [ExamController::class, 'show']);
         Route::patch('/{id}', [ExamController::class, 'update']);
+        Route::patch('/{id}/approval-status', [ExamController::class, 'setApprovalStatus']);
         Route::delete('/{id}', [ExamController::class, 'delete']);
     });
 
@@ -353,6 +358,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/',      [ExamSubmissionController::class, 'store']);
         Route::get('/{id}',   [ExamSubmissionController::class, 'show']);
         Route::patch('/{id}', [ExamSubmissionController::class, 'update']);
+        Route::post('/{id}/submit', [ExamSubmissionController::class, 'submit']);
+        Route::patch('/{id}/grade', [ExamSubmissionController::class, 'grade']);
         Route::delete('/{id}', [ExamSubmissionController::class, 'delete']);
     });
 

@@ -9,10 +9,15 @@ use App\Http\Controllers\Controller;
 use App\Helpers\Utilities;
 use App\Helpers\Validations;
 use App\Models\CourseLesson;
+use App\Models\CourseModule;
 use App\Models\ScholarUser;
+use App\Services\NotificationService;
+use App\Traits\AuthorizesCourseOwnership;
 
 class CourseLessonController extends Controller
 {
+    use AuthorizesCourseOwnership;
+
     public function index(Request $request)
     {
         try {
@@ -78,9 +83,20 @@ class CourseLessonController extends Controller
             ], 422);
         }
 
+        $module = CourseModule::find($data['module_id']);
+
+        if (!$this->canManageCourse($request, $module?->course)) {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         try {
             $courseLesson = CourseLesson::create($data);
             $courseLesson->refresh();
+
+            $this->syncModuleApprovalAfterLessonChange($user, $module);
 
             return response()->json([
                 'status'  => 201,
@@ -168,7 +184,22 @@ class CourseLessonController extends Controller
                 ], 404);
             }
 
+            $module = $courseLesson->module;
+
+            if (!$this->canManageCourse($request, $module?->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
+            if ($user->role !== 'admin') {
+                unset($data['module_id']);
+            }
+
             $courseLesson->update($data);
+
+            $this->syncModuleApprovalAfterLessonChange($user, $module);
 
             return response()->json([
                 'status'  => 200,
@@ -205,7 +236,18 @@ class CourseLessonController extends Controller
                 ], 404);
             }
 
+            $module = $courseLesson->module;
+
+            if (!$this->canManageCourse($request, $module?->course)) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Forbidden.',
+                ], 403);
+            }
+
             $courseLesson->delete();
+
+            $this->syncModuleApprovalAfterLessonChange($user, $module);
 
             return response()->json([
                 'status'  => 200,
@@ -218,5 +260,32 @@ class CourseLessonController extends Controller
                 'message' => 'An error occurred while deleting the course lesson.',
             ], 500);
         }
+    }
+
+    /**
+     * An instructor changing a module's lessons sends the parent module back
+     * for re-review; an admin's own change on a non-approved module implicitly
+     * re-approves it, since an admin editing their own review shouldn't
+     * require a separate approval click.
+     */
+    private function syncModuleApprovalAfterLessonChange(ScholarUser $user, ?CourseModule $module): void
+    {
+        if (!$module) {
+            return;
+        }
+
+        if ($user->role === 'admin') {
+            if ($module->admin_approval_status !== 'approved') {
+                $module->forceFill(['admin_approval_status' => 'approved', 'admin_rejection_reason' => null])->save();
+            }
+            return;
+        }
+
+        $module->forceFill(['admin_approval_status' => 'pending', 'admin_rejection_reason' => null])->save();
+
+        NotificationService::notifyAdmins(
+            'module_review',
+            "{$user->email} changed a lesson in the module \"{$module->title}\", which needs re-review."
+        );
     }
 }

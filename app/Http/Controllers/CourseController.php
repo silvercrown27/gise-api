@@ -374,7 +374,7 @@ class CourseController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         try {
             $course = Course::with(['category', 'instructor', 'pace.certificationLevel.certificationType', 'mentor'])
@@ -386,6 +386,28 @@ class CourseController extends Controller
                     'status'  => 404,
                     'message' => 'Course not found.',
                 ], 404);
+            }
+
+            // This route has no auth:sanctum middleware (it's the public course-detail
+            // page), so $request->user() is never populated even with a valid Bearer
+            // token - resolve the sanctum guard directly so a logged-in caller is still
+            // recognized. Instructor/mentor identity is only revealed to the owning
+            // instructor, an admin, or a learner already enrolled in this course -
+            // everyone else (including anonymous visitors) sees the course without it
+            // until they enroll.
+            $authUser = $request->user('sanctum');
+            $user = $authUser ? ScholarUser::find($authUser->id) : null;
+
+            $isAdmin = $user && $user->role === 'admin';
+            $isOwningInstructor = $user && $user->role === 'instructor'
+                && (string) $course->instructor_id === (string) $authUser->id;
+            $isEnrolled = $authUser && Enrollment::where('course_id', $course->id)
+                ->where('learner_id', $authUser->id)
+                ->exists();
+
+            if (!$isAdmin && !$isOwningInstructor && !$isEnrolled) {
+                $course->setRelation('mentor', null);
+                $course->setRelation('instructor', null);
             }
 
             return response()->json([

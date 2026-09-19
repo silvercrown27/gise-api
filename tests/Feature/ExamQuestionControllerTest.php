@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Course;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Models\ScholarUser;
@@ -21,26 +22,63 @@ class ExamQuestionControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_index_hides_correct_answer_for_unresolvable_authenticated_user(): void
+    public function test_index_as_unresolvable_user_returns_empty_results(): void
     {
-        // index() hides correct_answer when "!$user || $user->role === 'learner'".
-        // Because ScholarUser::find($request->user()->id) always returns null for a
-        // real authenticated caller (the lookup bug), !$user is always true here, so
-        // correct_answer is hidden for EVERY caller right now -- including instructors
-        // and admins who should legitimately see it. This is a case where the lookup
-        // bug accidentally over-restricts rather than leaks data.
+        // Fixed: index() is now scoped like ExamController@index - a caller with no
+        // resolvable ScholarUser row (and therefore no known role) is neither an
+        // instructor, student, nor admin, so they get an empty list rather than
+        // every question on the platform.
         $user = User::factory()->create();
-        $question = ExamQuestion::factory()->create(['correct_answer' => 'A']);
+        ExamQuestion::factory()->create(['correct_answer' => 'A']);
         Sanctum::actingAs($user);
 
         $response = $this->getJson('/api/exam-questions');
 
         $response->assertStatus(200);
-        $data = $response->json('data.data');
-        $this->assertNotEmpty($data);
-        foreach ($data as $row) {
-            $this->assertArrayNotHasKey('correct_answer', $row);
-        }
+        $this->assertEmpty($response->json('data.data'));
+    }
+
+    public function test_index_filters_by_exam_id(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $exam = Exam::factory()->create();
+        $matching = ExamQuestion::factory()->create(['exam_id' => $exam->id]);
+        ExamQuestion::factory()->create(); // different exam entirely
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson("/api/exam-questions?exam_id={$exam->id}");
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $matching->id));
+    }
+
+    public function test_index_as_student_only_sees_questions_for_approved_enrolled_exams(): void
+    {
+        $student = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $student->id, 'role' => 'student']);
+
+        $enrolledCourse = Course::factory()->create();
+        \App\Models\Enrollment::factory()->create(['learner_id' => $student->id, 'course_id' => $enrolledCourse->id]);
+        $approvedExam = Exam::factory()->create(['course_id' => $enrolledCourse->id, 'admin_approval_status' => 'approved']);
+        $visibleQuestion = ExamQuestion::factory()->create(['exam_id' => $approvedExam->id]);
+
+        $pendingExam = Exam::factory()->create(['course_id' => $enrolledCourse->id, 'admin_approval_status' => 'pending']);
+        ExamQuestion::factory()->create(['exam_id' => $pendingExam->id]);
+
+        $otherExam = Exam::factory()->create(['admin_approval_status' => 'approved']); // not enrolled
+        ExamQuestion::factory()->create(['exam_id' => $otherExam->id]);
+
+        Sanctum::actingAs($student);
+
+        $response = $this->getJson('/api/exam-questions');
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('data.data'))->pluck('id');
+        $this->assertCount(1, $ids);
+        $this->assertTrue($ids->contains((string) $visibleQuestion->id));
     }
 
     public function test_store_requires_authentication(): void
@@ -61,7 +99,8 @@ class ExamQuestionControllerTest extends TestCase
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $exam = Exam::factory()->create();
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $exam = Exam::factory()->create(['course_id' => $course->id]);
         Sanctum::actingAs($instructor);
 
         $response = $this->postJson('/api/exam-questions', [
@@ -173,7 +212,9 @@ class ExamQuestionControllerTest extends TestCase
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $question = ExamQuestion::factory()->create();
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $exam = Exam::factory()->create(['course_id' => $course->id]);
+        $question = ExamQuestion::factory()->create(['exam_id' => $exam->id]);
         Sanctum::actingAs($instructor);
 
         $response = $this->patchJson("/api/exam-questions/{$question->id}", [
@@ -218,7 +259,9 @@ class ExamQuestionControllerTest extends TestCase
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $question = ExamQuestion::factory()->create();
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $exam = Exam::factory()->create(['course_id' => $course->id]);
+        $question = ExamQuestion::factory()->create(['exam_id' => $exam->id]);
         Sanctum::actingAs($instructor);
 
         $response = $this->deleteJson("/api/exam-questions/{$question->id}");

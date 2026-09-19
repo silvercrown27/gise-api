@@ -18,6 +18,13 @@ class ModuleAccessService
      */
     public static function checkModuleAccess(Enrollment $enrollment, CourseModule $module): array
     {
+        if ($module->admin_approval_status !== 'approved') {
+            return [
+                'accessible' => false,
+                'reason' => 'This module is awaiting admin review.',
+            ];
+        }
+
         $unlockDate = self::unlockDateFor($enrollment, $module);
 
         if (!$module->force_unlocked && $unlockDate && now()->startOfDay()->lt($unlockDate)) {

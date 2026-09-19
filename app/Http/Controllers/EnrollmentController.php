@@ -38,6 +38,13 @@ class EnrollmentController extends Controller
                 $query->where('course_id', $courseId);
             }
 
+            // Admin-only: lets the admin students view look up one learner's full
+            // enrollment history. Instructors/students already get their own scoping
+            // above and don't need an arbitrary cross-course learner lookup.
+            if ($user && $user->role === 'admin' && $learnerId = trim($request->input('learner_id', ''))) {
+                $query->where('learner_id', $learnerId);
+            }
+
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
 
             return response()->json([
@@ -73,6 +80,9 @@ class EnrollmentController extends Controller
 
             if (!$isElevated) {
                 unset($data['enrollment_status'], $data['progress_percent'], $data['completed_at']);
+                // Only an instructor/admin may enroll someone other than
+                // themselves - a student can never set an arbitrary learner_id.
+                $data['learner_id'] = $request->user()->id;
             }
 
             if (!empty($data['cohort_id'])) {
