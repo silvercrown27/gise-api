@@ -40,7 +40,8 @@ class CourseModuleController extends Controller
                 $query->where('course_id', $courseId);
             }
 
-            $results = $query->orderBy('order_index', 'asc')->paginate(10);
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 100);
+            $results = $query->orderBy('order_index', 'asc')->paginate($perPage);
 
             return response()->json([
                 'status' => 200,

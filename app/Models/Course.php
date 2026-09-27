@@ -32,6 +32,7 @@ class Course extends Model
         'full_description',
         'outline',
         'thumbnail_url',
+        'brochure_url',
         'price',
         'original_price',
         'currency',
@@ -178,6 +179,11 @@ class Course extends Model
         return $this->belongsToMany(Tool::class, 'course_tools', 'course_id', 'tool_id')
             ->withPivot('licence_price')
             ->withTimestamps();
+    }
+
+    public function materials()
+    {
+        return $this->hasMany(CourseMaterial::class, 'course_id');
     }
 
     public function changeRequests()

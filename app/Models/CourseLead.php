@@ -23,11 +23,19 @@ class CourseLead extends Model
         'full_name',
         'email',
         'phone',
+        'source',
+        'brochure_status',
+        'brochure_sent_at',
+        'reviewed_by',
+        'reviewed_at',
         'notes',
         'status',
     ];
 
-    protected $casts = [];
+    protected $casts = [
+        'brochure_sent_at' => 'datetime',
+        'reviewed_at' => 'datetime',
+    ];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
 

@@ -532,6 +532,17 @@ class Validations
         ]);
     }
 
+    public static function validateBrochureRequest(array $data)
+    {
+        return Validator::make($data, [
+            'full_name'  => 'required|string|max:255',
+            'email'      => 'required|email|max:255',
+            'phone'      => ['required', 'string', 'min:7', 'max:20', 'regex:/^[0-9+()\-\s]+$/'],
+        ], [
+            'phone.regex' => 'Enter a valid phone number.',
+        ]);
+    }
+
     public static function validateCourseLead(array $data)
     {
         return Validator::make($data, [

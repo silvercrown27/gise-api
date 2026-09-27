@@ -16,6 +16,7 @@ use App\Http\Controllers\CertificationLevelController;
 use App\Http\Controllers\CertificationPaceController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CourseChangeRequestController;
+use App\Http\Controllers\CourseMaterialController;
 use App\Http\Controllers\ToolController;
 use App\Http\Controllers\CohortController;
 use App\Http\Controllers\CohortMentorApplicationController;
@@ -156,6 +157,9 @@ Route::prefix('platform-stats')->group(function () {
 });
 
 Route::get('/tools', [ToolController::class, 'index']);
+
+// Public brochure requests - stored as leads, rate-limited per visitor.
+Route::middleware('throttle:6,1')->post('/courses/{id}/brochure-requests', [CourseLeadController::class, 'requestBrochure']);
 
 // Public contact form submission - no login required, matches the frontend /contact page.
 Route::post('/contact-messages', [ContactMessageController::class, 'store']);
@@ -430,6 +434,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [ToolController::class, 'delete']);
     });
 
+    // Course materials: content PDF, brochure and module slides - mentors upload, admins approve
+    Route::prefix('course-materials')->group(function () {
+        Route::get('/',       [CourseMaterialController::class, 'index']);
+        Route::post('/',      [CourseMaterialController::class, 'store']);
+        Route::patch('/{id}/status', [CourseMaterialController::class, 'setStatus']);
+        Route::delete('/{id}', [CourseMaterialController::class, 'delete']);
+    });
+
     // Course change requests: approved mentors propose edits, admins review them
     Route::prefix('course-change-requests')->group(function () {
         Route::get('/',       [CourseChangeRequestController::class, 'index']);
@@ -486,6 +498,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Course leads
     Route::prefix('course-leads')->group(function () {
+        Route::patch('/{id}/brochure-status', [CourseLeadController::class, 'reviewBrochureRequest']);
         Route::get('/',       [CourseLeadController::class, 'index']);
         Route::post('/',      [CourseLeadController::class, 'store']);
         Route::get('/{id}',   [CourseLeadController::class, 'show']);

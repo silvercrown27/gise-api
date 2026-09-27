@@ -13,13 +13,15 @@ class NotificationService
      * notify must never fail the action that triggered it, so any error is
      * logged and swallowed.
      */
-    public static function notifyUser(string $userId, string $type, string $message): void
+    public static function notifyUser(string $userId, string $type, string $message, ?string $link = null): void
     {
         try {
             Notification::create([
                 'user_id' => $userId,
                 'type' => $type,
                 'message' => $message,
+                // Frontend path the notification opens, e.g. "/admin/brochure-requests".
+                'link' => $link,
                 'is_read' => false,
             ]);
         } catch (\Exception $e) {
@@ -30,17 +32,17 @@ class NotificationService
     /**
      * Creates one notification per user id in the given list.
      */
-    public static function notifyUsers(iterable $userIds, string $type, string $message): void
+    public static function notifyUsers(iterable $userIds, string $type, string $message, ?string $link = null): void
     {
         foreach ($userIds as $userId) {
-            self::notifyUser($userId, $type, $message);
+            self::notifyUser($userId, $type, $message, $link);
         }
     }
 
     /**
      * Notifies every ScholarUser with the given role.
      */
-    public static function notifyRole(string $role, string $type, string $message): void
+    public static function notifyRole(string $role, string $type, string $message, ?string $link = null): void
     {
         try {
             $userIds = ScholarUser::where('role', $role)->pluck('id');
@@ -49,14 +51,14 @@ class NotificationService
             return;
         }
 
-        self::notifyUsers($userIds, $type, $message);
+        self::notifyUsers($userIds, $type, $message, $link);
     }
 
     /**
      * Sugar for notifying every admin.
      */
-    public static function notifyAdmins(string $type, string $message): void
+    public static function notifyAdmins(string $type, string $message, ?string $link = null): void
     {
-        self::notifyRole('admin', $type, $message);
+        self::notifyRole('admin', $type, $message, $link);
     }
 }
