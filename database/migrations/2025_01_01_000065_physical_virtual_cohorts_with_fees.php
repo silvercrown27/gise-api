@@ -42,6 +42,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('cohorts', function (Blueprint $table) {
+            // Keep an index for the course_id foreign key (see 000069's down()).
+            if (!Schema::hasIndex('cohorts', ['course_id'])) {
+                $table->index('course_id');
+            }
             $table->dropIndex(['course_id', 'mode']);
             $table->dropColumn(['price', 'location_city']);
         });

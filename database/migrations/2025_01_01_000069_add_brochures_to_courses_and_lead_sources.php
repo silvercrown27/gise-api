@@ -25,6 +25,11 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('course_leads', function (Blueprint $table) {
+            // MySQL may be using this index for the course_id foreign key; give
+            // the key its own index before dropping the compound one.
+            if (!Schema::hasIndex('course_leads', ['course_id'])) {
+                $table->index('course_id');
+            }
             $table->dropIndex(['course_id', 'source']);
             $table->dropColumn(['source', 'brochure_sent_at']);
         });

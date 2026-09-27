@@ -49,8 +49,18 @@ return new class extends Migration
     {
         Schema::table('courses', function (Blueprint $table) {
             $table->dropIndex('courses_catalogue_index');
-            $table->dropIndex('courses_category_index');
             $table->dropIndex('courses_title_index');
+        });
+
+        // MySQL dropped the foreign key's own index when courses_category_index
+        // was added, so the key has to come off while that index goes.
+        Schema::table('courses', function (Blueprint $table) {
+            $table->dropForeign(['category_id']);
+            $table->dropIndex('courses_category_index');
+        });
+
+        Schema::table('courses', function (Blueprint $table) {
+            $table->foreign('category_id')->references('id')->on('categories')->nullOnDelete();
         });
 
         Schema::table('categories', function (Blueprint $table) {
