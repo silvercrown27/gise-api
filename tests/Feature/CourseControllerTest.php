@@ -516,19 +516,56 @@ class CourseControllerTest extends TestCase
         $response->assertJsonPath('data.mentor', null);
     }
 
-    public function test_show_reveals_instructor_to_an_enrolled_learner(): void
+    public function test_show_gives_enrolled_learner_their_cohorts_approved_mentor_only(): void
     {
-        $instructor = User::factory()->create(['name' => 'Jane Doe']);
-        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $course = Course::factory()->create();
+        $cohort = \App\Models\Cohort::factory()->create(['course_id' => $course->id]);
+        $otherCohort = \App\Models\Cohort::factory()->create(['course_id' => $course->id]);
+
+        $mentor = User::factory()->create(['name' => 'Jane Doe']);
+        ScholarUser::factory()->create(['id' => $mentor->id, 'role' => 'instructor']);
+        InstructorProfile::factory()->create(['user_id' => $mentor->id, 'specialization_one' => 'Remote sensing', 'specialization_two' => null, 'bio' => 'GIS lead']);
+        \App\Models\CohortMentorApplication::factory()->create(['cohort_id' => $cohort->id, 'instructor_id' => $mentor->id, 'status' => 'approved']);
+
+        $elsewhere = User::factory()->create(['name' => 'Other Mentor']);
+        \App\Models\CohortMentorApplication::factory()->create(['cohort_id' => $otherCohort->id, 'instructor_id' => $elsewhere->id, 'status' => 'approved']);
+        $pending = User::factory()->create(['name' => 'Pending Mentor']);
+        \App\Models\CohortMentorApplication::factory()->create(['cohort_id' => $cohort->id, 'instructor_id' => $pending->id, 'status' => 'pending']);
+
         $learner = User::factory()->create();
         ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
-        Enrollment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id]);
+        Enrollment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id, 'cohort_id' => $cohort->id]);
         Sanctum::actingAs($learner);
 
         $response = $this->getJson("/api/courses/{$course->id}");
 
         $response->assertStatus(200);
-        $response->assertJsonPath('data.instructor.name', 'Jane Doe');
+        $response->assertJsonPath('data.cohort_mentors', [['name' => 'Jane Doe', 'title' => 'Remote sensing', 'bio' => 'GIS lead']]);
+        // The course owner (super admin) and course-level mentor record stay hidden.
+        $response->assertJsonPath('data.instructor', null);
+        $response->assertJsonPath('data.mentor', null);
+    }
+
+    public function test_show_has_no_mentor_for_learner_whose_cohort_has_none_yet(): void
+    {
+        $course = Course::factory()->create();
+        $cohort = \App\Models\Cohort::factory()->create(['course_id' => $course->id]);
+        $learner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
+        Enrollment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id, 'cohort_id' => $cohort->id]);
+        Sanctum::actingAs($learner);
+
+        $this->getJson("/api/courses/{$course->id}")->assertJsonPath('data.cohort_mentors', []);
+    }
+
+    public function test_show_hides_cohort_mentors_from_visitors_who_are_not_enrolled(): void
+    {
+        $course = Course::factory()->create();
+        $cohort = \App\Models\Cohort::factory()->create(['course_id' => $course->id]);
+        $mentor = User::factory()->create();
+        \App\Models\CohortMentorApplication::factory()->create(['cohort_id' => $cohort->id, 'instructor_id' => $mentor->id, 'status' => 'approved']);
+
+        $this->getJson("/api/courses/{$course->id}")->assertJsonPath('data.cohort_mentors', []);
     }
 
     public function test_show_reveals_instructor_to_the_owning_instructor(): void

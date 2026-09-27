@@ -106,6 +106,19 @@ class CourseCatalogue
             ->whereNotIn('status', ['completed', 'closed']);
     }
 
+    /**
+     * Titles only - for the browse menu, where a subject expands into its
+     * list of courses. Much lighter than the card listing.
+     */
+    public function compact(int $perPage)
+    {
+        return $this->query()
+            ->select('courses.id', 'courses.code', 'courses.title')
+            ->orderBy('courses.title')
+            ->orderBy('courses.id')
+            ->paginate($perPage);
+    }
+
     public function paginate(string $sort, int $perPage)
     {
         $today = now()->toDateString();

@@ -12,6 +12,8 @@ use App\Helpers\Validations;
 use App\Models\AdminAuditLog;
 use App\Models\Cohort;
 use App\Models\Category;
+use App\Models\CohortMentorApplication;
+use App\Models\InstructorProfile;
 use App\Models\Course;
 use App\Models\CourseTool;
 use App\Models\CourseRating;
@@ -31,6 +33,14 @@ class CourseController extends Controller
     {
         try {
             $catalogue = new CourseCatalogue($request->only(CourseCatalogue::FILTERS));
+
+            if ($request->boolean('compact')) {
+                return response()->json([
+                    'status' => 200,
+                    'data'   => $catalogue->compact(min(max((int) $request->input('per_page', 50), 1), 200)),
+                ], 200);
+            }
+
             $perPage = min(max((int) $request->input('per_page', 12), 1), 48);
             $results = $catalogue->paginate((string) $request->input('sort', 'title'), $perPage);
 
@@ -126,6 +136,35 @@ class CourseController extends Controller
                 'message' => 'An error occurred while updating the course tools.',
             ], 500);
         }
+    }
+
+    /**
+     * Instructors approved to mentor a cohort, as learners see them.
+     */
+    private function cohortMentors(?string $cohortId): array
+    {
+        if (!$cohortId) {
+            return [];
+        }
+
+        return CohortMentorApplication::with('instructor:id,name')
+            ->where('cohort_id', $cohortId)
+            ->where('status', 'approved')
+            ->orderBy('reviewed_at')
+            ->get()
+            ->map(function ($application) {
+                $profile = InstructorProfile::where('user_id', $application->instructor_id)
+                    ->first(['bio', 'specialization_one', 'specialization_two']);
+
+                return [
+                    'name' => $application->instructor?->name,
+                    'title' => collect([$profile?->specialization_one, $profile?->specialization_two])->filter()->implode(' · ') ?: null,
+                    'bio' => $profile?->bio,
+                ];
+            })
+            ->filter(fn ($mentor) => $mentor['name'])
+            ->values()
+            ->all();
     }
 
     /**
@@ -247,6 +286,11 @@ class CourseController extends Controller
                 ->get();
 
             $bypassesGating = $isAdmin || $isOwningInstructor || !$enrollment;
+
+            // The owner is the super admin account - not something learners need.
+            if (!$isAdmin && !$isOwningInstructor) {
+                $course->setRelation('instructor', null);
+            }
 
             $modules->each(function ($module) use ($progressByLessonId, $enrollment, $bypassesGating) {
                 $access = $bypassesGating
@@ -469,25 +513,27 @@ class CourseController extends Controller
             // This route has no auth:sanctum middleware (it's the public course-detail
             // page), so $request->user() is never populated even with a valid Bearer
             // token - resolve the sanctum guard directly so a logged-in caller is still
-            // recognized. Instructor/mentor identity is only revealed to the owning
-            // instructor, an admin, or a learner already enrolled in this course -
-            // everyone else (including anonymous visitors) sees the course without it
-            // until they enroll.
+            // recognized.
             $authUser = $request->user('sanctum');
             $user = $authUser ? ScholarUser::find($authUser->id) : null;
 
             $isAdmin = $user && $user->role === 'admin';
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $course->isManageableBy($authUser->id);
-            $isEnrolled = $authUser && Enrollment::where('course_id', $course->id)
-                ->where('learner_id', $authUser->id)
-                ->exists();
 
-            if (!$isAdmin && !$isOwningInstructor && !$isEnrolled) {
+            // The course-level mentor record and owner (the super admin) are for
+            // admins and the course's mentors only. Learners instead see the
+            // mentors approved for their own cohort - and nothing until then.
+            if (!$isAdmin && !$isOwningInstructor) {
                 $course->setRelation('mentor', null);
                 $course->setRelation('instructor', null);
             }
 
+            $enrollment = $authUser
+                ? Enrollment::where('course_id', $course->id)->where('learner_id', $authUser->id)->first()
+                : null;
+
+            $course->setAttribute('cohort_mentors', $enrollment ? $this->cohortMentors($enrollment->cohort_id) : []);
             $course->setAttribute('licence_total', $course->licenceTotal());
 
             return response()->json([

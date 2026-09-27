@@ -205,4 +205,18 @@ class CourseCatalogueTest extends TestCase
             'price' => 600,
         ])->assertStatus(422)->assertJsonValidationErrors(['location_city', 'location_country']);
     }
+
+    public function test_compact_listing_returns_titles_for_a_subject(): void
+    {
+        $physics = Category::factory()->create(['slug' => 'a-level-physics', 'classification' => 'a_level']);
+        $this->publishedCourse(['classification' => 'a_level', 'category_id' => $physics->id, 'title' => 'Waves']);
+        $this->publishedCourse(['classification' => 'a_level', 'category_id' => $physics->id, 'title' => 'Mechanics']);
+        $this->publishedCourse(['classification' => 'a_level', 'title' => 'Elsewhere']);
+
+        $rows = $this->getJson('/api/courses?compact=1&category=a-level-physics')->json('data.data');
+
+        $this->assertSame(['Mechanics', 'Waves'], array_column($rows, 'title'));
+        $this->assertSame(['id', 'code', 'title'], array_keys($rows[0]));
+    }
+
 }
