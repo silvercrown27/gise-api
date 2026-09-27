@@ -22,7 +22,12 @@ class CategoryController extends Controller
                 $query->where('name', 'like', '%' . $q . '%');
             }
 
-            $results = $query->orderBy('name', 'asc')->paginate(10);
+            if ($classification = trim($request->input('classification', ''))) {
+                $query->where('classification', $classification);
+            }
+
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 200);
+            $results = $query->orderBy('name', 'asc')->paginate($perPage);
 
             return response()->json([
                 'status' => 200,
@@ -41,7 +46,8 @@ class CategoryController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        // Sub-distinctions shape the public catalogue, so only admins manage them.
+        if (!$user || $user->role !== 'admin') {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -106,14 +112,28 @@ class CategoryController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        // Sub-distinctions shape the public catalogue, so only admins manage them.
+        if (!$user || $user->role !== 'admin') {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
             ], 403);
         }
 
-        $validator = Validations::validateCategory($request->all(), $id);
+        $category = Category::find($id);
+
+        if (!$category) {
+            return response()->json([
+                'status'  => 404,
+                'message' => 'Category not found.',
+            ], 404);
+        }
+
+        // Moving a sub-distinction to another level is allowed, but an edit
+        // that doesn't mention the level keeps the current one.
+        $data = array_merge(['classification' => $category->classification], $request->all());
+
+        $validator = Validations::validateCategory($data, $id);
 
         if ($validator->fails()) {
             return response()->json([
@@ -123,17 +143,16 @@ class CategoryController extends Controller
             ], 422);
         }
 
+        if ($data['classification'] !== $category->classification && $category->courses()->exists()) {
+            return response()->json([
+                'status'  => 422,
+                'message' => 'This sub-distinction has courses - move them before changing its level.',
+                'errors'  => ['classification' => ['This sub-distinction has courses - move them before changing its level.']],
+            ], 422);
+        }
+
         try {
-            $category = Category::find($id);
-
-            if (!$category) {
-                return response()->json([
-                    'status'  => 404,
-                    'message' => 'Category not found.',
-                ], 404);
-            }
-
-            $category->update($request->all());
+            $category->update($data);
 
             return response()->json([
                 'status'  => 200,
@@ -153,7 +172,8 @@ class CategoryController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        // Sub-distinctions shape the public catalogue, so only admins manage them.
+        if (!$user || $user->role !== 'admin') {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -168,6 +188,13 @@ class CategoryController extends Controller
                     'status'  => 404,
                     'message' => 'Category not found.',
                 ], 404);
+            }
+
+            if ($category->courses()->exists()) {
+                return response()->json([
+                    'status'  => 422,
+                    'message' => 'Move this sub-distinction\'s courses elsewhere before deleting it.',
+                ], 422);
             }
 
             $category->delete();

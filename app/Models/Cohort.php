@@ -24,7 +24,9 @@ class Cohort extends Model
         'registration_opens_at',
         'registration_closes_at',
         'mode',
+        'price',
         'location_country',
+        'location_city',
         'location_county',
         'capacity',
         'seats_taken',
@@ -38,6 +40,7 @@ class Cohort extends Model
         'end_date' => 'date:Y-m-d',
         'registration_opens_at' => 'date:Y-m-d',
         'registration_closes_at' => 'date:Y-m-d',
+        'price' => 'integer',
         'capacity' => 'integer',
         'seats_taken' => 'integer',
     ];
@@ -79,6 +82,15 @@ class Cohort extends Model
     public function leads()
     {
         return $this->hasMany(CourseLead::class, 'cohort_id');
+    }
+
+    /**
+     * What a learner pays for a seat, before any licences: the cohort's own
+     * fee, falling back to the course price.
+     */
+    public function effectiveFee(): int
+    {
+        return (int) ($this->price ?? $this->course?->price ?? 0);
     }
 
     public function mentorApplications()

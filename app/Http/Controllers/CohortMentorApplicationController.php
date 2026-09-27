@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\AdminAuditLog;
 use App\Models\CohortMentorApplication;
+use App\Models\InstructorDocument;
 use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
 use App\Services\NotificationService;
@@ -121,7 +122,7 @@ class CohortMentorApplicationController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $application = CohortMentorApplication::with(['cohort.course', 'instructor:id,name,email', 'reviewer:id,name'])->find($id);
+            $application = CohortMentorApplication::with(['cohort.course.category', 'instructor:id,name,email', 'reviewer:id,name'])->find($id);
 
             if (!$application) {
                 return response()->json([
@@ -139,6 +140,10 @@ class CohortMentorApplicationController extends Controller
                     'status'  => 403,
                     'message' => 'Forbidden.',
                 ], 403);
+            }
+
+            if ($isAdmin) {
+                $application->setAttribute('review_context', $this->reviewContext($application));
             }
 
             return response()->json([
@@ -273,4 +278,43 @@ class CohortMentorApplicationController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * What an admin needs to judge whether the applicant fits this course:
+     * their profile, verification documents and mentoring track record.
+     * Payout details are deliberately left out.
+     */
+    private function reviewContext(CohortMentorApplication $application): array
+    {
+        $profile = InstructorProfile::where('user_id', $application->instructor_id)->first([
+            'id', 'bio', 'expertise_tags', 'specialization_one', 'specialization_two',
+            'average_rating', 'approval_status', 'approved_at',
+        ]);
+
+        $documents = InstructorDocument::where('instructor_id', $application->instructor_id)
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'document_type', 'title', 'file_url', 'file_type', 'created_at']);
+
+        $otherApproved = CohortMentorApplication::with('cohort.course:id,title')
+            ->where('instructor_id', $application->instructor_id)
+            ->where('status', 'approved')
+            ->where('id', '!=', $application->id)
+            ->get()
+            ->map(fn ($other) => [
+                'cohort_label' => $other->cohort?->label,
+                'course_title' => $other->cohort?->course?->title,
+            ])
+            ->values();
+
+        return [
+            'profile' => $profile,
+            'documents' => $documents,
+            'missing_documents' => array_values(array_diff(
+                array_keys(InstructorDocument::REQUIRED_TYPES),
+                $documents->pluck('document_type')->all()
+            )),
+            'approved_mentorships' => $otherApproved,
+        ];
+    }
+
 }

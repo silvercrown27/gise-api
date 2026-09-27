@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Cohort;
 use App\Models\CohortMentorApplication;
+use App\Models\InstructorDocument;
 use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
 use App\Models\User;
@@ -316,4 +317,42 @@ class CohortMentorApplicationControllerTest extends TestCase
         $response->assertStatus(200);
         $this->assertSoftDeleted('cohort_mentor_applications', ['id' => $application->id]);
     }
+
+    public function test_show_gives_admin_the_applicants_qualifications(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        InstructorProfile::factory()->create([
+            'user_id' => $instructor->id,
+            'specialization_one' => 'Remote sensing',
+            'payout_details' => 'ACC-123',
+        ]);
+        InstructorDocument::factory()->create(['instructor_id' => $instructor->id, 'document_type' => 'cv']);
+        $application = CohortMentorApplication::factory()->create(['instructor_id' => $instructor->id]);
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson("/api/cohort-mentor-applications/{$application->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.review_context.profile.specialization_one', 'Remote sensing');
+        $response->assertJsonPath('data.review_context.documents.0.document_type', 'cv');
+        $response->assertJsonPath('data.review_context.missing_documents', ['national_id', 'academic_certificate']);
+        $this->assertArrayNotHasKey('payout_details', $response->json('data.review_context.profile'));
+    }
+
+    public function test_show_hides_review_context_from_the_applicant(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $application = CohortMentorApplication::factory()->create(['instructor_id' => $instructor->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson("/api/cohort-mentor-applications/{$application->id}");
+
+        $response->assertStatus(200);
+        $this->assertNull($response->json('data.review_context'));
+    }
+
 }

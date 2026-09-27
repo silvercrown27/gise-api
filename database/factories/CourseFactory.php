@@ -37,7 +37,7 @@ class CourseFactory extends Factory
             'level' => fake()->randomElement(['beginner', 'intermediate', 'advanced', 'career_switch']),
             'tag' => fake()->optional()->randomElement(['beginner_friendly', 'high_demand', 'portfolio_track', 'career_switch', 'leadership', 'new']),
             'spine' => fake()->optional()->randomElement(['green', 'blue', 'black', 'bright']),
-            'mode' => fake()->randomElement(['online', 'in_person', 'hybrid']),
+            'mode' => fake()->randomElement(['physical', 'virtual', 'both']),
             'duration_weeks' => fake()->numberBetween(2, 13),
             'language' => 'en',
             'published_at' => fake()->optional()->dateTimeThisYear(),

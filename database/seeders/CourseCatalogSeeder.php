@@ -1539,7 +1539,7 @@ class CourseCatalogSeeder extends Seeder
                     'level' => $courseData['level'],
                     'tag' => $courseData['tag'],
                     'spine' => $courseData['spine'],
-                    'mode' => $courseData['mode'],
+                    'mode' => self::COURSE_MODES[$courseData['mode']],
                     'duration_weeks' => $courseData['durationWeeks'],
                     'language' => 'en',
                     'published_at' => now(),
@@ -1661,6 +1661,9 @@ class CourseCatalogSeeder extends Seeder
         }
     }
 
+    // The catalogue data below still uses the original delivery labels.
+    private const COURSE_MODES = ['online' => 'virtual', 'in_person' => 'physical', 'hybrid' => 'both'];
+
     private function seedCohort(Course $course, array $courseData): void
     {
         $startDate = $courseData['nextCohort'];
@@ -1673,7 +1676,10 @@ class CourseCatalogSeeder extends Seeder
             ],
             [
                 'label' => $label,
-                'mode' => $courseData['mode'],
+                'mode' => $courseData['mode'] === 'online' ? 'virtual' : 'physical',
+                'price' => $courseData['price'],
+                'location_city' => $courseData['mode'] === 'online' ? null : 'Nairobi',
+                'location_country' => $courseData['mode'] === 'online' ? null : 'Kenya',
                 'capacity' => $courseData['seatsLeft'] + 5,
                 'seats_taken' => 5,
                 'status' => 'upcoming',

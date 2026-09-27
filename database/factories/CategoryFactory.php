@@ -19,6 +19,7 @@ class CategoryFactory extends Factory
         return [
             'name' => $name,
             'slug' => \Illuminate\Support\Str::slug($name) . '-' . fake()->unique()->numberBetween(1000, 9999),
+            'classification' => 'skills_professional',
             'description' => fake()->optional()->sentence(),
             'parent_category_id' => null,
         ];

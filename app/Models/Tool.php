@@ -9,24 +9,26 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
-class Category extends Model
+class Tool extends Model
 {
     use HasFactory, UUID, HasTimezone, SoftDeletes;
 
     protected $primaryKey = 'id';
-    protected $table = 'categories';
+    protected $table = 'tools';
 
     protected $fillable = [
         'name',
         'slug',
-        'classification',
+        'vendor',
         'description',
-        'parent_category_id',
+        'licence_price',
+        'currency',
+        'licence_term',
     ];
 
-    protected $casts = [];
-
-    protected $dates = ['created_at', 'updated_at', 'deleted_at'];
+    protected $casts = [
+        'licence_price' => 'integer',
+    ];
 
     protected static function boot()
     {
@@ -48,18 +50,8 @@ class Category extends Model
         return $date->format('Y-m-d H:i:s');
     }
 
-    public function parentCategory()
-    {
-        return $this->belongsTo(Category::class, 'parent_category_id');
-    }
-
-    public function subCategories()
-    {
-        return $this->hasMany(Category::class, 'parent_category_id');
-    }
-
     public function courses()
     {
-        return $this->hasMany(Course::class, 'category_id');
+        return $this->belongsToMany(Course::class, 'course_tools', 'tool_id', 'course_id');
     }
 }

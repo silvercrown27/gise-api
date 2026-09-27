@@ -168,6 +168,34 @@ class Course extends Model
         return $this->hasMany(Cohort::class, 'course_id');
     }
 
+    public function courseTools()
+    {
+        return $this->hasMany(CourseTool::class, 'course_id');
+    }
+
+    public function tools()
+    {
+        return $this->belongsToMany(Tool::class, 'course_tools', 'course_id', 'tool_id')
+            ->withPivot('licence_price')
+            ->withTimestamps();
+    }
+
+    public function changeRequests()
+    {
+        return $this->hasMany(CourseChangeRequest::class, 'course_id');
+    }
+
+    /**
+     * Total licence cost a learner adds by registering "with licences":
+     * each tool's course-specific price, or its catalogue price.
+     */
+    public function licenceTotal(): int
+    {
+        $tools = $this->relationLoaded('tools') ? $this->tools : $this->tools()->get();
+
+        return (int) $tools->sum(fn (Tool $tool) => $tool->pivot->licence_price ?? $tool->licence_price);
+    }
+
     public function modules()
     {
         return $this->hasMany(CourseModule::class, 'course_id');

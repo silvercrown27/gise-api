@@ -15,6 +15,8 @@ use App\Http\Controllers\CertificationTypeController;
 use App\Http\Controllers\CertificationLevelController;
 use App\Http\Controllers\CertificationPaceController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\CourseChangeRequestController;
+use App\Http\Controllers\ToolController;
 use App\Http\Controllers\CohortController;
 use App\Http\Controllers\CohortMentorApplicationController;
 use App\Http\Controllers\CourseMentorController;
@@ -90,6 +92,7 @@ Route::prefix('certification-paces')->group(function () {
 
 Route::prefix('courses')->group(function () {
     Route::get('/',        [CourseController::class, 'index']);
+    Route::get('/facets',  [CourseController::class, 'facets']);
     Route::get('/popular', [CourseController::class, 'popular']);
     Route::middleware('auth:sanctum')->get('/mine', [CourseController::class, 'mine']);
     Route::middleware('auth:sanctum')->get('/summary', [CourseController::class, 'summary']);
@@ -151,6 +154,8 @@ Route::prefix('platform-stats')->group(function () {
     Route::get('/',     [PlatformStatController::class, 'index']);
     Route::get('/{id}', [PlatformStatController::class, 'show']);
 });
+
+Route::get('/tools', [ToolController::class, 'index']);
 
 // Public contact form submission - no login required, matches the frontend /contact page.
 Route::post('/contact-messages', [ContactMessageController::class, 'store']);
@@ -239,6 +244,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Courses - write actions only (index/show/mine are above)
     Route::prefix('courses')->group(function () {
+        Route::put('/{id}/tools', [CourseController::class, 'syncTools']);
         Route::post('/',      [CourseController::class, 'store']);
         Route::patch('/{id}', [CourseController::class, 'update']);
         Route::delete('/{id}', [CourseController::class, 'delete']);
@@ -415,6 +421,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}',   [CohortMentorApplicationController::class, 'show']);
         Route::patch('/{id}/approval-status', [CohortMentorApplicationController::class, 'setApprovalStatus']);
         Route::delete('/{id}', [CohortMentorApplicationController::class, 'delete']);
+    });
+
+    // Tools & licences - write actions only (index is public above)
+    Route::prefix('tools')->group(function () {
+        Route::post('/',      [ToolController::class, 'store']);
+        Route::patch('/{id}', [ToolController::class, 'update']);
+        Route::delete('/{id}', [ToolController::class, 'delete']);
+    });
+
+    // Course change requests: approved mentors propose edits, admins review them
+    Route::prefix('course-change-requests')->group(function () {
+        Route::get('/',       [CourseChangeRequestController::class, 'index']);
+        Route::post('/',      [CourseChangeRequestController::class, 'store']);
+        Route::get('/{id}',   [CourseChangeRequestController::class, 'show']);
+        Route::patch('/{id}/status', [CourseChangeRequestController::class, 'setStatus']);
+        Route::delete('/{id}', [CourseChangeRequestController::class, 'delete']);
     });
 
     // Course pricing history

@@ -20,6 +20,9 @@ class Enrollment extends Model
         'learner_id',
         'course_id',
         'cohort_id',
+        'with_licences',
+        'quoted_fee',
+        'currency',
         'enrollment_status',
         'failed_module_id',
         'progress_percent',
@@ -29,6 +32,8 @@ class Enrollment extends Model
 
     protected $casts = [
         'progress_percent' => 'integer',
+        'with_licences' => 'boolean',
+        'quoted_fee' => 'integer',
         'enrolled_at' => 'datetime',
         'completed_at' => 'datetime',
     ];

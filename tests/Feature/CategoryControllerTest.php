@@ -70,24 +70,52 @@ class CategoryControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_succeeds(): void
+    public function test_store_as_instructor_is_forbidden(): void
     {
-        // CategoryController allows role in [instructor, admin], and now that
-        // ScholarUser::find($request->user()->id) correctly finds the caller's
-        // row (scholar_users.id shares users.id), instructors can create categories.
+        // Sub-distinctions shape the public catalogue - admins manage them.
         $user = User::factory()->create();
         ScholarUser::factory()->create(['id' => $user->id, 'role' => 'instructor']);
-
         Sanctum::actingAs($user);
 
         $response = $this->postJson('/api/categories', [
             'name' => 'New Category',
             'slug' => 'new-category',
-            'description' => 'A category',
+            'classification' => 'skills_professional',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_admin_creates_sub_distinction_under_a_level(): void
+    {
+        $user = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $user->id, 'role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/categories', [
+            'name' => 'Business Administration',
+            'slug' => 'business-administration',
+            'classification' => 'skills_professional',
         ]);
 
         $response->assertStatus(201);
-        $this->assertDatabaseHas('categories', ['name' => 'New Category', 'slug' => 'new-category']);
+        $this->assertDatabaseHas('categories', ['slug' => 'business-administration', 'classification' => 'skills_professional']);
+
+        $this->getJson('/api/categories?classification=o_level')
+            ->assertStatus(200)
+            ->assertJsonMissing(['slug' => 'business-administration']);
+    }
+
+    public function test_cannot_delete_sub_distinction_that_still_has_courses(): void
+    {
+        $user = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $user->id, 'role' => 'admin']);
+        $category = Category::factory()->create();
+        \App\Models\Course::factory()->create(['category_id' => $category->id, 'classification' => 'skills_professional']);
+        Sanctum::actingAs($user);
+
+        $this->deleteJson("/api/categories/{$category->id}")->assertStatus(422);
+        $this->assertNotSoftDeleted('categories', ['id' => $category->id]);
     }
 
     public function test_store_validation_failure_returns_422(): void

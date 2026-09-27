@@ -20,10 +20,20 @@ class CohortFactory extends Factory
             'label' => fake()->monthName() . ' ' . fake()->year(),
             'start_date' => fake()->dateTimeBetween('now', '+2 months')->format('Y-m-d'),
             'end_date' => fake()->dateTimeBetween('+3 months', '+6 months')->format('Y-m-d'),
-            'mode' => fake()->randomElement(['online', 'in_person', 'hybrid']),
+            'mode' => 'virtual',
+            'price' => fake()->numberBetween(100, 900),
             'capacity' => fake()->numberBetween(10, 100),
             'seats_taken' => fake()->numberBetween(0, 10),
             'status' => fake()->randomElement(['upcoming', 'open']),
         ];
+    }
+
+    public function physical(string $city = 'Nairobi', string $country = 'Kenya'): static
+    {
+        return $this->state(fn () => [
+            'mode' => 'physical',
+            'location_city' => $city,
+            'location_country' => $country,
+        ]);
     }
 }

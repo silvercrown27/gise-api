@@ -26,7 +26,7 @@ class ScholarUserFactory extends Factory
             'role' => fake()->randomElement(['student', 'instructor', 'admin']),
             'phone' => fake()->optional()->phoneNumber(),
             'avatar_url' => fake()->optional()->imageUrl(),
-            'status' => fake()->randomElement(['active', 'suspended', 'pending_verification']),
+            'status' => fake()->randomElement(['active', 'suspended']),
             'last_login_at' => fake()->optional()->dateTimeThisYear(),
         ];
     }

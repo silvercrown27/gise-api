@@ -66,6 +66,8 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $role,
                 'phone' => $request->phone,
+                // Email verification is optional, so accounts are usable straight away.
+                'status' => 'active',
             ]);
 
             if ($role === 'instructor') {
@@ -210,6 +212,12 @@ class AuthController extends Controller
 
             if (!$validationResult->status) {
                 return response()->json(['message' => $validationResult->message], 400);
+            }
+
+            // A valid OTP proves the user controls this inbox. Verification is
+            // optional, but record it so admins can see who has confirmed.
+            if (!$user->email_verified_at) {
+                $user->forceFill(['email_verified_at' => now()])->save();
             }
 
             return response()->json([

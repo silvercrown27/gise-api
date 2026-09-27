@@ -6,27 +6,24 @@ use App\Traits\HasTimezone;
 use App\Traits\UUID;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
-class Category extends Model
+class CourseTool extends Model
 {
-    use HasFactory, UUID, HasTimezone, SoftDeletes;
+    use HasFactory, UUID, HasTimezone;
 
     protected $primaryKey = 'id';
-    protected $table = 'categories';
+    protected $table = 'course_tools';
 
     protected $fillable = [
-        'name',
-        'slug',
-        'classification',
-        'description',
-        'parent_category_id',
+        'course_id',
+        'tool_id',
+        'licence_price',
     ];
 
-    protected $casts = [];
-
-    protected $dates = ['created_at', 'updated_at', 'deleted_at'];
+    protected $casts = [
+        'licence_price' => 'integer',
+    ];
 
     protected static function boot()
     {
@@ -48,18 +45,13 @@ class Category extends Model
         return $date->format('Y-m-d H:i:s');
     }
 
-    public function parentCategory()
+    public function course()
     {
-        return $this->belongsTo(Category::class, 'parent_category_id');
+        return $this->belongsTo(Course::class, 'course_id');
     }
 
-    public function subCategories()
+    public function tool()
     {
-        return $this->hasMany(Category::class, 'parent_category_id');
-    }
-
-    public function courses()
-    {
-        return $this->hasMany(Course::class, 'category_id');
+        return $this->belongsTo(Tool::class, 'tool_id');
     }
 }

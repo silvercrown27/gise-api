@@ -231,7 +231,7 @@ class CohortControllerTest extends TestCase
         $this->assertDatabaseMissing('cohorts', ['course_id' => $course->id, 'label' => 'Fall 2026']);
     }
 
-    public function test_store_saves_location_fields_for_in_person_cohort(): void
+    public function test_store_saves_location_fields_for_physical_cohort(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
@@ -242,8 +242,10 @@ class CohortControllerTest extends TestCase
             'course_id' => $course->id,
             'label' => 'Nairobi In-Person Cohort',
             'start_date' => now()->addMonth()->format('Y-m-d'),
-            'mode' => 'in_person',
+            'mode' => 'physical',
+            'price' => 450,
             'location_country' => 'Kenya',
+            'location_city' => 'Nairobi',
             'location_county' => 'Nairobi',
             'capacity' => 20,
         ]);

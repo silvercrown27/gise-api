@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
@@ -10,12 +11,15 @@ use App\Helpers\Utilities;
 use App\Helpers\Validations;
 use App\Models\AdminAuditLog;
 use App\Models\Cohort;
+use App\Models\Category;
 use App\Models\Course;
+use App\Models\CourseTool;
 use App\Models\CourseRating;
 use App\Models\Enrollment;
 use App\Models\LessonProgress;
 use App\Models\ScholarUser;
 use App\Services\ModuleAccessService;
+use App\Services\CourseCatalogue;
 use App\Services\NotificationService;
 use App\Traits\AuthorizesCourseOwnership;
 
@@ -26,38 +30,16 @@ class CourseController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Course::with(['category', 'pace.certificationLevel.certificationType', 'mentor'])
-                ->withCount(['enrollments', 'ratings']);
+            $catalogue = new CourseCatalogue($request->only(CourseCatalogue::FILTERS));
+            $perPage = min(max((int) $request->input('per_page', 12), 1), 48);
+            $results = $catalogue->paginate((string) $request->input('sort', 'title'), $perPage);
 
-            if ($q = trim($request->input('q', ''))) {
-                $query->where('title', 'like', '%' . $q . '%');
-            }
-
-            if ($category = trim($request->input('category', ''))) {
-                $query->whereHas('category', function ($q) use ($category) {
-                    $q->where('slug', $category);
-                });
-            }
-
-            if ($certificationLevel = trim($request->input('certification_level', ''))) {
-                $query->whereHas('pace.certificationLevel', function ($q) use ($certificationLevel) {
-                    $q->where('slug', $certificationLevel);
-                });
-            }
-
-            if ($certificationType = trim($request->input('certification_type', ''))) {
-                $query->whereHas('pace.certificationLevel.certificationType', function ($q) use ($certificationType) {
-                    $q->where('slug', $certificationType);
-                });
-            }
-
-            if ($classification = trim($request->input('classification', ''))) {
-                $query->where('classification', $classification);
-            }
-
-            $query->where('status', 'published')->where('admin_approval_status', 'approved');
-
-            $results = $query->orderBy('title', 'asc')->paginate(9);
+            $results->getCollection()->each(function ($course) {
+                $course->from_price = $course->from_price !== null ? (int) $course->from_price : null;
+                $course->licence_total = (int) $course->licence_total;
+                $course->physical_cohorts_count = (int) $course->physical_cohorts_count;
+                $course->virtual_cohorts_count = (int) $course->virtual_cohorts_count;
+            });
 
             return response()->json([
                 'status' => 200,
@@ -70,6 +52,100 @@ class CourseController extends Controller
                 'message' => 'An error occurred while retrieving courses.',
             ], 500);
         }
+    }
+
+    public function facets(Request $request)
+    {
+        try {
+            $catalogue = new CourseCatalogue($request->only(CourseCatalogue::FILTERS));
+
+            return response()->json([
+                'status' => 200,
+                'data'   => $catalogue->facets(),
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@facets: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while retrieving course filters.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Replace the tools (and their licence prices) a course uses. Admin-only.
+     */
+    public function syncTools(Request $request, string $id)
+    {
+        if (!$this->isAdminRequest($request)) {
+            return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
+        }
+
+        $course = Course::find($id);
+        if (!$course) {
+            return response()->json(['status' => 404, 'message' => 'Course not found.'], 404);
+        }
+
+        $validator = Validations::validateCourseTools($request->all());
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => 422,
+                'message' => 'Validation failed.',
+                'errors'  => $validator->messages(),
+            ], 422);
+        }
+
+        try {
+            DB::transaction(function () use ($course, $request) {
+                $wanted = collect($request->input('tools', []))->keyBy('tool_id');
+
+                $course->courseTools()->whereNotIn('tool_id', $wanted->keys())->delete();
+
+                foreach ($wanted as $toolId => $row) {
+                    CourseTool::updateOrCreate(
+                        ['course_id' => $course->id, 'tool_id' => $toolId],
+                        ['licence_price' => $row['licence_price'] ?? null]
+                    );
+                }
+            });
+
+            $course->load('tools');
+
+            return response()->json([
+                'status'  => 200,
+                'message' => 'Course tools updated successfully.',
+                'data'    => [
+                    'tools' => $course->tools,
+                    'licence_total' => $course->licenceTotal(),
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@syncTools: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while updating the course tools.',
+            ], 500);
+        }
+    }
+
+    /**
+     * A sub-distinction belongs to one distinction - keep a course's
+     * category inside its classification.
+     */
+    private function categoryMismatch(array $data, ?Course $course = null): ?string
+    {
+        $categoryId = array_key_exists('category_id', $data) ? $data['category_id'] : $course?->category_id;
+        $classification = $data['classification'] ?? $course?->classification ?? 'skills_professional';
+
+        if (!$categoryId) {
+            return null;
+        }
+
+        $category = Category::find($categoryId);
+
+        return $category && $category->classification !== $classification
+            ? "\"{$category->name}\" belongs to a different level. Pick a sub-distinction under the course's level."
+            : null;
     }
 
     public function summary(Request $request)
@@ -350,6 +426,14 @@ class CourseController extends Controller
             ], 422);
         }
 
+        if ($mismatch = $this->categoryMismatch($data)) {
+            return response()->json([
+                'status'  => 422,
+                'message' => $mismatch,
+                'errors'  => ['category_id' => [$mismatch]],
+            ], 422);
+        }
+
         try {
             $course = Course::create($data);
             $course->refresh();
@@ -371,7 +455,7 @@ class CourseController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $course = Course::with(['category', 'instructor', 'pace.certificationLevel.certificationType', 'mentor'])
+            $course = Course::with(['category', 'instructor', 'pace.certificationLevel.certificationType', 'mentor', 'tools'])
                 ->withCount(['enrollments', 'ratings'])
                 ->find($id);
 
@@ -403,6 +487,8 @@ class CourseController extends Controller
                 $course->setRelation('mentor', null);
                 $course->setRelation('instructor', null);
             }
+
+            $course->setAttribute('licence_total', $course->licenceTotal());
 
             return response()->json([
                 'status' => 200,
@@ -463,6 +549,14 @@ class CourseController extends Controller
                     'status'  => 422,
                     'message' => 'Validation failed.',
                     'errors'  => $validator->messages(),
+                ], 422);
+            }
+
+            if ($mismatch = $this->categoryMismatch($data, $course)) {
+                return response()->json([
+                    'status'  => 422,
+                    'message' => $mismatch,
+                    'errors'  => ['category_id' => [$mismatch]],
                 ], 422);
             }
 

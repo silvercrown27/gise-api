@@ -75,6 +75,8 @@ class EnrollmentController extends Controller
         $isAdmin = $user && $user->role === 'admin';
 
         $data = $request->all();
+        // The fee is always worked out here, never taken from the client.
+        unset($data['quoted_fee'], $data['currency']);
 
         if (!$isAdmin) {
             unset($data['enrollment_status'], $data['progress_percent'], $data['completed_at'], $data['enrolled_at'], $data['failed_module_id']);
@@ -132,10 +134,19 @@ class EnrollmentController extends Controller
                 }
             }
 
+            // Licences only apply to courses that actually use tools.
+            $withLicences = filter_var($data['with_licences'] ?? false, FILTER_VALIDATE_BOOLEAN)
+                && $course->tools()->exists();
+
             $attributes = array_merge([
                 'enrollment_status' => 'active',
                 'enrolled_at' => now(),
-            ], array_intersect_key($data, array_flip((new Enrollment)->getFillable())));
+            ], array_intersect_key($data, array_flip((new Enrollment)->getFillable())), [
+                'with_licences' => $withLicences,
+                'quoted_fee' => ($cohort ? $cohort->effectiveFee() : (int) $course->price)
+                    + ($withLicences ? $course->licenceTotal() : 0),
+                'currency' => $course->currency ?? 'USD',
+            ]);
 
             // The (learner, course) pair is unique at the database level, soft
             // deletes included, so a learner coming back after being dropped or

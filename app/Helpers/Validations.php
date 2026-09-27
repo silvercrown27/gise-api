@@ -91,9 +91,63 @@ class Validations
                 'max:255',
                 Rule::unique('categories', 'slug')->ignore($categoryId)->where(fn($q) => $q->whereNull('deleted_at')),
             ],
+            'classification'      => 'required|string|in:o_level,a_level,skills_professional',
             'description'         => 'nullable|string',
             'parent_category_id'  => 'nullable|uuid|exists:categories,id',
         ]);
+    }
+
+    public static function validateTool(array $data, $toolId = null)
+    {
+        return Validator::make($data, [
+            'name'           => 'required|string|max:255',
+            'slug'           => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('tools', 'slug')->ignore($toolId)->where(fn($q) => $q->whereNull('deleted_at')),
+            ],
+            'vendor'         => 'nullable|string|max:255',
+            'description'    => 'nullable|string',
+            'licence_price'  => 'required|integer|min:0',
+            'currency'       => 'nullable|string|size:3',
+            'licence_term'   => 'nullable|string|max:255',
+        ]);
+    }
+
+    public static function validateCourseTools(array $data)
+    {
+        return Validator::make($data, [
+            'tools'                  => 'present|array',
+            'tools.*.tool_id'        => 'required|uuid|distinct|exists:tools,id',
+            'tools.*.licence_price'  => 'nullable|integer|min:0',
+        ]);
+    }
+
+    public static function validateCourseChangeRequest(array $data)
+    {
+        $fields = \App\Models\CourseChangeRequest::EDITABLE_FIELDS;
+
+        return Validator::make($data, [
+            'course_id'                  => 'required|uuid|exists:courses,id',
+            'changes'                    => 'required|array|min:1',
+            'changes.*'                  => 'nullable',
+            'changes.title'              => 'sometimes|required|string|max:255',
+            'changes.tagline'            => 'sometimes|nullable|string|max:255',
+            'changes.short_description'  => 'sometimes|nullable|string',
+            'changes.full_description'   => 'sometimes|nullable|string',
+            'changes.level'              => 'sometimes|required|string|in:beginner,intermediate,advanced,career_switch',
+            'changes.duration_weeks'     => 'sometimes|nullable|integer|min:1',
+            'changes.language'           => 'sometimes|nullable|string|max:50',
+            'message'                    => 'nullable|string|max:2000',
+        ], [
+            'changes.required' => 'Propose at least one change.',
+        ])->after(function ($validator) use ($data, $fields) {
+            $unknown = array_diff(array_keys($data['changes'] ?? []), $fields);
+            if ($unknown) {
+                $validator->errors()->add('changes', 'These fields can only be changed by an admin: ' . implode(', ', $unknown) . '.');
+            }
+        });
     }
 
     public static function validateCertificationType(array $data, $certificationTypeId = null)
@@ -173,7 +227,7 @@ class Validations
             'level'               => 'nullable|string|in:beginner,intermediate,advanced,career_switch',
             'tag'                 => 'nullable|string|in:beginner_friendly,high_demand,portfolio_track,career_switch,leadership,new',
             'spine'               => 'nullable|string|in:green,blue,black,bright',
-            'mode'                => 'nullable|string|in:online,in_person,hybrid',
+            'mode'                => 'nullable|string|in:physical,virtual,both',
             'duration_weeks'      => 'nullable|integer|min:2|max:13',
             'language'            => 'nullable|string|max:50',
             'published_at'        => 'nullable|date',
@@ -189,8 +243,11 @@ class Validations
             'end_date'                 => 'nullable|date|after_or_equal:start_date',
             'registration_opens_at'    => 'nullable|date',
             'registration_closes_at'   => 'nullable|date|after_or_equal:registration_opens_at|before_or_equal:start_date',
-            'mode'                     => 'nullable|string|in:online,in_person,hybrid',
-            'location_country'         => 'nullable|string|max:255',
+            'mode'                     => 'nullable|string|in:physical,virtual',
+            'price'                    => 'nullable|integer|min:0',
+            // Physical cohorts meet somewhere - learners pick by City, Country.
+            'location_country'         => 'nullable|required_if:mode,physical|string|max:255',
+            'location_city'            => 'nullable|required_if:mode,physical|string|max:255',
             'location_county'          => 'nullable|string|max:255',
             'capacity'                 => 'required|integer|min:0',
             'seats_taken'              => 'nullable|integer|min:0',
@@ -277,6 +334,7 @@ class Validations
             'learner_id'         => 'required|uuid|exists:users,id',
             'course_id'          => 'required|uuid|exists:courses,id',
             'cohort_id'          => 'nullable|uuid|exists:cohorts,id',
+            'with_licences'      => 'nullable|boolean',
             'enrollment_status'  => 'nullable|string|in:active,completed,dropped,failed',
             'failed_module_id'   => 'nullable|uuid|exists:course_modules,id',
             'progress_percent'   => 'nullable|integer|min:0|max:100',
