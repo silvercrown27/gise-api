@@ -26,7 +26,7 @@ class ExamController extends Controller
 
             if ($user && $user->role === 'instructor') {
                 $query->whereHas('course', function ($q) use ($request) {
-                    $q->where('instructor_id', $request->user()->id);
+                    $q->manageableBy($request->user()->id);
                 });
             } elseif ($user && $user->role === 'student') {
                 // Students only ever see exams that are live (approved) on a
@@ -142,7 +142,7 @@ class ExamController extends Controller
             $isAdmin = $user && $user->role === 'admin';
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $exam->course
-                && $exam->course->instructor_id === $request->user()->id;
+                && $exam->course->isManageableBy($request->user()->id);
 
             if (!$isAdmin && !$isOwningInstructor && (!$user || $user->role !== 'student')) {
                 return response()->json([
@@ -187,7 +187,7 @@ class ExamController extends Controller
             $isAdmin = $user && $user->role === 'admin';
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $exam->course
-                && $exam->course->instructor_id === $request->user()->id;
+                && $exam->course->isManageableBy($request->user()->id);
 
             if (!$isAdmin && !$isOwningInstructor) {
                 return response()->json([
@@ -259,7 +259,7 @@ class ExamController extends Controller
             $isAdmin = $user && $user->role === 'admin';
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $exam->course
-                && $exam->course->instructor_id === $request->user()->id;
+                && $exam->course->isManageableBy($request->user()->id);
 
             if (!$isAdmin && !$isOwningInstructor) {
                 return response()->json([
@@ -371,20 +371,22 @@ class ExamController extends Controller
                 'notes' => $status === 'rejected' ? $exam->admin_rejection_reason : null,
             ]);
 
-            $instructorId = $exam->course?->instructor_id;
+            $recipientIds = $exam->course?->reviewRecipientIds($request->user()->id) ?? [];
 
-            if ($instructorId && $status === 'approved') {
-                NotificationService::notifyUser(
-                    $instructorId,
-                    'exam_review',
-                    "Your exam \"{$exam->title}\" has been approved and is now live."
-                );
-            } elseif ($instructorId && $status === 'rejected') {
-                NotificationService::notifyUser(
-                    $instructorId,
-                    'exam_review',
-                    "Your exam \"{$exam->title}\" was rejected." . ($exam->admin_rejection_reason ? " Reason: {$exam->admin_rejection_reason}" : '')
-                );
+            foreach ($recipientIds as $recipientId) {
+                if ($status === 'approved') {
+                    NotificationService::notifyUser(
+                        $recipientId,
+                        'exam_review',
+                        "Your exam \"{$exam->title}\" has been approved and is now live."
+                    );
+                } elseif ($status === 'rejected') {
+                    NotificationService::notifyUser(
+                        $recipientId,
+                        'exam_review',
+                        "Your exam \"{$exam->title}\" was rejected." . ($exam->admin_rejection_reason ? " Reason: {$exam->admin_rejection_reason}" : '')
+                    );
+                }
             }
 
             return response()->json([

@@ -357,20 +357,22 @@ class ModuleQuizController extends Controller
                 'notes' => $status === 'rejected' ? $quiz->admin_rejection_reason : null,
             ]);
 
-            $instructorId = $quiz->module?->course?->instructor_id;
+            $recipientIds = $quiz->module?->course?->reviewRecipientIds($request->user()->id) ?? [];
 
-            if ($instructorId && $status === 'approved') {
-                NotificationService::notifyUser(
-                    $instructorId,
-                    'quiz_review',
-                    "Your quiz \"{$quiz->title}\" has been approved and is live again."
-                );
-            } elseif ($instructorId && $status === 'rejected') {
-                NotificationService::notifyUser(
-                    $instructorId,
-                    'quiz_review',
-                    "Your quiz \"{$quiz->title}\" was rejected." . ($quiz->admin_rejection_reason ? " Reason: {$quiz->admin_rejection_reason}" : '')
-                );
+            foreach ($recipientIds as $recipientId) {
+                if ($status === 'approved') {
+                    NotificationService::notifyUser(
+                        $recipientId,
+                        'quiz_review',
+                        "Your quiz \"{$quiz->title}\" has been approved and is live again."
+                    );
+                } elseif ($status === 'rejected') {
+                    NotificationService::notifyUser(
+                        $recipientId,
+                        'quiz_review',
+                        "Your quiz \"{$quiz->title}\" was rejected." . ($quiz->admin_rejection_reason ? " Reason: {$quiz->admin_rejection_reason}" : '')
+                    );
+                }
             }
 
             return response()->json([

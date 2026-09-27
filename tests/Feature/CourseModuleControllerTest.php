@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Cohort;
+use App\Models\CohortMentorApplication;
 use App\Models\Course;
 use App\Models\CourseModule;
 use App\Models\ScholarUser;
@@ -97,6 +99,48 @@ class CourseModuleControllerTest extends TestCase
         ]);
 
         $response->assertStatus(401);
+    }
+
+    public function test_store_as_approved_cohort_mentor_succeeds(): void
+    {
+        // Courses belong to the super admin; an instructor gains authoring rights
+        // on a course once approved to mentor one of its cohorts.
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $cohort = Cohort::factory()->create();
+        CohortMentorApplication::factory()->create([
+            'cohort_id' => $cohort->id,
+            'instructor_id' => $instructor->id,
+            'status' => 'approved',
+        ]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->postJson('/api/course-modules', [
+            'course_id' => $cohort->course_id,
+            'title' => 'Mentor module',
+        ]);
+
+        $response->assertStatus(201);
+    }
+
+    public function test_store_as_pending_cohort_mentor_is_forbidden(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $cohort = Cohort::factory()->create();
+        CohortMentorApplication::factory()->create([
+            'cohort_id' => $cohort->id,
+            'instructor_id' => $instructor->id,
+            'status' => 'pending',
+        ]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->postJson('/api/course-modules', [
+            'course_id' => $cohort->course_id,
+            'title' => 'Mentor module',
+        ]);
+
+        $response->assertStatus(403);
     }
 
     public function test_store_as_instructor_succeeds(): void

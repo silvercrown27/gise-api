@@ -196,6 +196,6 @@ class CourseMentorController extends Controller
             return true;
         }
 
-        return $user->role === 'instructor' && (string) $course->instructor_id === (string) $request->user()->id;
+        return $user->role === 'instructor' && $course->isManageableBy($request->user()->id);
     }
 }

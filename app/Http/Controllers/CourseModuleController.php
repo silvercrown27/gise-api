@@ -141,7 +141,7 @@ class CourseModuleController extends Controller
             $caller = $authUser ? ScholarUser::find($authUser->id) : null;
             $course = Course::find($courseModule->course_id);
             $canManage = $caller && ($caller->role === 'admin'
-                || ($caller->role === 'instructor' && (string) $course?->instructor_id === (string) $authUser->id));
+                || ($caller->role === 'instructor' && $course?->isManageableBy($authUser->id)));
 
             if ($canManage) {
                 $courseModule->load(['course.instructor', 'lessons' => function ($lessons) {
@@ -369,20 +369,22 @@ class CourseModuleController extends Controller
                 'notes' => $status === 'rejected' ? $courseModule->admin_rejection_reason : null,
             ]);
 
-            $instructorId = $courseModule->course?->instructor_id;
+            $recipientIds = $courseModule->course?->reviewRecipientIds($request->user()->id) ?? [];
 
-            if ($instructorId && $status === 'approved') {
-                NotificationService::notifyUser(
-                    $instructorId,
-                    'module_review',
-                    "Your module \"{$courseModule->title}\" has been approved and is now live."
-                );
-            } elseif ($instructorId && $status === 'rejected') {
-                NotificationService::notifyUser(
-                    $instructorId,
-                    'module_review',
-                    "Your module \"{$courseModule->title}\" was rejected." . ($courseModule->admin_rejection_reason ? " Reason: {$courseModule->admin_rejection_reason}" : '')
-                );
+            foreach ($recipientIds as $recipientId) {
+                if ($status === 'approved') {
+                    NotificationService::notifyUser(
+                        $recipientId,
+                        'module_review',
+                        "Your module \"{$courseModule->title}\" has been approved and is now live."
+                    );
+                } elseif ($status === 'rejected') {
+                    NotificationService::notifyUser(
+                        $recipientId,
+                        'module_review',
+                        "Your module \"{$courseModule->title}\" was rejected." . ($courseModule->admin_rejection_reason ? " Reason: {$courseModule->admin_rejection_reason}" : '')
+                    );
+                }
             }
 
             return response()->json([

@@ -420,4 +420,22 @@ class InstructorProfileControllerTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    public function test_instructor_can_update_own_profile_without_resending_user_id(): void
+    {
+        // The onboarding form only sends the fields it edits.
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+        $profile = InstructorProfile::factory()->create(['user_id' => $instructor->id]);
+        Sanctum::actingAs($instructor);
+
+        $response = $this->patchJson("/api/instructor-profiles/{$profile->id}", [
+            'bio' => 'GIS analyst',
+            'specialization_one' => 'Remote sensing',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('instructor_profiles', ['id' => $profile->id, 'bio' => 'GIS analyst', 'user_id' => $instructor->id]);
+    }
+
 }

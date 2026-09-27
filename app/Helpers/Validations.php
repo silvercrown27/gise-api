@@ -66,6 +66,7 @@ class Validations
     {
         return Validator::make($data, [
             'instructor_id'  => 'required|uuid|exists:users,id',
+            'document_type'  => 'nullable|string|in:' . implode(',', \App\Models\InstructorDocument::TYPES),
             'title'          => 'required|string|max:255',
             'file_url'       => 'required|string',
             'file_type'      => 'nullable|string|max:50',
@@ -279,6 +280,22 @@ class Validations
             'enrollment_status'  => 'nullable|string|in:active,completed,dropped,failed',
             'failed_module_id'   => 'nullable|uuid|exists:course_modules,id',
             'progress_percent'   => 'nullable|integer|min:0|max:100',
+            'enrolled_at'        => 'nullable|date',
+            'completed_at'       => 'nullable|date',
+        ]);
+    }
+
+    /**
+     * Partial update of an existing enrollment - every field optional, and the
+     * learner/course pair is fixed once created.
+     */
+    public static function validateEnrollmentUpdate(array $data)
+    {
+        return Validator::make($data, [
+            'cohort_id'          => 'nullable|uuid|exists:cohorts,id',
+            'enrollment_status'  => 'sometimes|string|in:active,completed,dropped,failed',
+            'failed_module_id'   => 'nullable|uuid|exists:course_modules,id',
+            'progress_percent'   => 'sometimes|integer|min:0|max:100',
             'enrolled_at'        => 'nullable|date',
             'completed_at'       => 'nullable|date',
         ]);

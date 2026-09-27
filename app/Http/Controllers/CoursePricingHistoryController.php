@@ -27,7 +27,7 @@ class CoursePricingHistoryController extends Controller
 
             if ($user->role === 'instructor') {
                 $query->whereHas('course', function ($q) use ($request) {
-                    $q->where('instructor_id', $request->user()->id);
+                    $q->manageableBy($request->user()->id);
                 });
             }
 
@@ -102,7 +102,7 @@ class CoursePricingHistoryController extends Controller
             $isAdmin = $user && $user->role === 'admin';
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $coursePricingHistory->course
-                && $coursePricingHistory->course->instructor_id === $request->user()->id;
+                && $coursePricingHistory->course->isManageableBy($request->user()->id);
 
             if (!$isAdmin && !$isOwningInstructor) {
                 return response()->json([

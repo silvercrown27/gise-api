@@ -33,7 +33,7 @@ class ExamSubmissionController extends Controller
 
                 if ($user && $user->role === 'instructor') {
                     $query->whereHas('exam.course', function ($q) use ($request) {
-                        $q->where('instructor_id', $request->user()->id);
+                        $q->manageableBy($request->user()->id);
                     });
                 }
             }

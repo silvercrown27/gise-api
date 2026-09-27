@@ -29,7 +29,7 @@ class ExamQuestionController extends Controller
 
             if ($user && $user->role === 'instructor') {
                 $query->whereHas('exam.course', function ($q) use ($request) {
-                    $q->where('instructor_id', $request->user()->id);
+                    $q->manageableBy($request->user()->id);
                 });
             } elseif ($user && $user->role === 'student') {
                 // Same visibility rule as ExamController@index - a student only ever

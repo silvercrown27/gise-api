@@ -16,8 +16,21 @@ class InstructorDocument extends Model
     protected $primaryKey = 'id';
     protected $table = 'instructor_documents';
 
+    /**
+     * Documents every instructor must upload during onboarding before an admin
+     * can verify them.
+     */
+    public const REQUIRED_TYPES = [
+        'national_id' => 'National ID or passport',
+        'cv' => 'CV / résumé',
+        'academic_certificate' => 'Academic certificates',
+    ];
+
+    public const TYPES = ['national_id', 'cv', 'academic_certificate', 'other'];
+
     protected $fillable = [
         'instructor_id',
+        'document_type',
         'title',
         'file_url',
         'file_type',

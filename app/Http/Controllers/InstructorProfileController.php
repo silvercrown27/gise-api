@@ -132,16 +132,6 @@ class InstructorProfileController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $validator = Validations::validateInstructorProfile($request->all());
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status'  => 422,
-                'message' => 'Validation failed.',
-                'errors'  => $validator->messages(),
-            ], 422);
-        }
-
         try {
             $user = ScholarUser::find($request->user()->id);
             $instructorProfile = InstructorProfile::find($id);
@@ -163,7 +153,19 @@ class InstructorProfileController extends Controller
                 ], 403);
             }
 
-            $data = $request->all();
+            // A profile always belongs to the same user - validate against that
+            // rather than requiring (or allowing) the client to resend user_id.
+            $data = array_merge($request->all(), ['user_id' => $instructorProfile->user_id]);
+
+            $validator = Validations::validateInstructorProfile($data);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'  => 422,
+                    'message' => 'Validation failed.',
+                    'errors'  => $validator->messages(),
+                ], 422);
+            }
 
             if (!$isAdmin) {
                 unset(

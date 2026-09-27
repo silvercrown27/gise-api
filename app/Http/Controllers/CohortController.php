@@ -20,7 +20,7 @@ class CohortController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Cohort::withCount('enrollments');
+            $query = Cohort::with('course:id,title,slug,code')->withCount('enrollments');
 
             if ($q = trim($request->input('q', ''))) {
                 $query->where('label', 'like', '%' . $q . '%');
@@ -30,7 +30,8 @@ class CohortController extends Controller
                 $query->where('course_id', $courseId);
             }
 
-            $results = $query->orderBy('start_date', 'asc')->paginate(10);
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 100);
+            $results = $query->orderBy('start_date', 'asc')->paginate($perPage);
 
             return response()->json([
                 'status' => 200,
@@ -80,9 +81,9 @@ class CohortController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
-
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        // Cohort dates, windows and capacity are set by the admin who manages
+        // every course - mentors only teach them.
+        if (!$this->isAdminRequest($request)) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -97,15 +98,6 @@ class CohortController extends Controller
                 'message' => 'Validation failed.',
                 'errors'  => $validator->messages(),
             ], 422);
-        }
-
-        $course = Course::find($request->input('course_id'));
-
-        if (!$this->canManageCourse($request, $course)) {
-            return response()->json([
-                'status'  => 403,
-                'message' => 'Forbidden.',
-            ], 403);
         }
 
         try {
@@ -154,9 +146,9 @@ class CohortController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
-
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        // Cohort dates, windows and capacity are set by the admin who manages
+        // every course - mentors only teach them.
+        if (!$this->isAdminRequest($request)) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -183,22 +175,8 @@ class CohortController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
-
-            if (!$this->canManageCourse($request, $cohort->course)) {
-                return response()->json([
-                    'status'  => 403,
-                    'message' => 'Forbidden.',
-                ], 403);
-            }
-
-            $data = $request->all();
-
-            if ($user->role !== 'admin') {
-                unset($data['course_id']);
-            }
-
-            $cohort->update($data);
+            $cohort->update($request->all());
+            $cohort->syncSeatsTaken();
 
             return response()->json([
                 'status'  => 200,
@@ -216,9 +194,9 @@ class CohortController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
-
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        // Cohort dates, windows and capacity are set by the admin who manages
+        // every course - mentors only teach them.
+        if (!$this->isAdminRequest($request)) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -233,13 +211,6 @@ class CohortController extends Controller
                     'status'  => 404,
                     'message' => 'Cohort not found.',
                 ], 404);
-            }
-
-            if (!$this->canManageCourse($request, $cohort->course)) {
-                return response()->json([
-                    'status'  => 403,
-                    'message' => 'Forbidden.',
-                ], 403);
             }
 
             $cohort->delete();

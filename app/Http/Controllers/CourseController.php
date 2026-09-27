@@ -13,14 +13,16 @@ use App\Models\Cohort;
 use App\Models\Course;
 use App\Models\CourseRating;
 use App\Models\Enrollment;
-use App\Models\InstructorProfile;
 use App\Models\LessonProgress;
 use App\Models\ScholarUser;
 use App\Services\ModuleAccessService;
 use App\Services\NotificationService;
+use App\Traits\AuthorizesCourseOwnership;
 
 class CourseController extends Controller
 {
+    use AuthorizesCourseOwnership;
+
     public function index(Request $request)
     {
         try {
@@ -75,10 +77,10 @@ class CourseController extends Controller
         try {
             $instructorId = $request->user()->id;
 
-            $courseIds = Course::where('instructor_id', $instructorId)->pluck('id');
+            $courseIds = Course::manageableBy($instructorId)->pluck('id');
 
             $totalCourses = $courseIds->count();
-            $publishedCourses = Course::where('instructor_id', $instructorId)
+            $publishedCourses = Course::manageableBy($instructorId)
                 ->where('status', 'published')
                 ->count();
 
@@ -93,7 +95,7 @@ class CourseController extends Controller
                 ->limit(3)
                 ->get(['id', 'course_id', 'label', 'start_date', 'capacity', 'seats_taken']);
 
-            $topCourses = Course::where('instructor_id', $instructorId)
+            $topCourses = Course::manageableBy($instructorId)
                 ->withCount('enrollments')
                 ->orderBy('enrollments_count', 'desc')
                 ->limit(3)
@@ -136,7 +138,7 @@ class CourseController extends Controller
 
             $isAdmin = $user && $user->role === 'admin';
             $isOwningInstructor = $user && $user->role === 'instructor'
-                && (string) $course->instructor_id === (string) $userId;
+                && $course->isManageableBy($userId);
 
             $enrollment = Enrollment::where('course_id', $course->id)
                 ->where('learner_id', $userId)
@@ -214,8 +216,13 @@ class CourseController extends Controller
     {
         try {
             $query = Course::with(['category', 'pace.certificationLevel.certificationType', 'mentor'])
-                ->withCount(['enrollments', 'ratings'])
-                ->where('instructor_id', $request->user()->id);
+                ->withCount(['enrollments', 'ratings']);
+
+            // Admins manage the whole (single-account) catalogue; instructors see
+            // the courses they're approved to mentor.
+            if (!$this->isAdminRequest($request)) {
+                $query->manageableBy($request->user()->id);
+            }
 
             if ($q = trim($request->input('q', ''))) {
                 $query->where('title', 'like', '%' . $q . '%');
@@ -225,7 +232,7 @@ class CourseController extends Controller
                 $query->where('status', $status);
             }
 
-            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+            $results = $query->orderBy('created_at', 'desc')->paginate(min(max((int) $request->input('per_page', 10), 1), 100));
 
             return response()->json([
                 'status' => 200,
@@ -310,30 +317,17 @@ class CourseController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        // Courses are centrally managed by the super admin. Instructors take
+        // part by applying to mentor a cohort, not by creating courses.
+        if (!$user || $user->role !== 'admin') {
             return response()->json([
                 'status'  => 403,
-                'message' => 'Forbidden.',
+                'message' => 'Only an admin can create courses. Instructors can apply to mentor a cohort instead.',
             ], 403);
         }
 
         $data = $request->all();
-        $isAdmin = $user->role === 'admin';
-
-        if (!$isAdmin || empty($data['instructor_id'])) {
-            $data['instructor_id'] = $request->user()->id;
-        }
-
-        if (!$isAdmin) {
-            $instructorProfile = InstructorProfile::where('user_id', $request->user()->id)->first();
-
-            if (!$instructorProfile || $instructorProfile->approval_status !== 'approved') {
-                return response()->json([
-                    'status'  => 403,
-                    'message' => 'Your instructor account must be approved by an admin before you can create courses.',
-                ], 403);
-            }
-        }
+        $data['instructor_id'] = Course::superAdminId() ?? $request->user()->id;
 
         if ($request->hasFile('thumbnail')) {
             $upload = $this->uploadThumbnail($request);
@@ -400,7 +394,7 @@ class CourseController extends Controller
 
             $isAdmin = $user && $user->role === 'admin';
             $isOwningInstructor = $user && $user->role === 'instructor'
-                && (string) $course->instructor_id === (string) $authUser->id;
+                && $course->isManageableBy($authUser->id);
             $isEnrolled = $authUser && Enrollment::where('course_id', $course->id)
                 ->where('learner_id', $authUser->id)
                 ->exists();
@@ -438,9 +432,7 @@ class CourseController extends Controller
             $user = ScholarUser::find($request->user()->id);
 
             $isAdmin = $user && $user->role === 'admin';
-            $isOwningInstructor = $user && $user->role === 'instructor' && (string) $course->instructor_id === (string) $request->user()->id;
-
-            if (!$isAdmin && !$isOwningInstructor) {
+            if (!$isAdmin) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -460,6 +452,10 @@ class CourseController extends Controller
                 $data['thumbnail_url'] = $upload['url'];
             }
 
+            // Ownership is fixed to the super admin - validate against it rather
+            // than requiring every edit form to resend it.
+            $data['instructor_id'] = $course->instructor_id;
+
             $validator = Validations::validateCourse($data, $id);
 
             if ($validator->fails()) {
@@ -470,9 +466,6 @@ class CourseController extends Controller
                 ], 422);
             }
 
-            if (!$isAdmin) {
-                unset($data['instructor_id']);
-            }
 
             $course->update($data);
 
@@ -583,9 +576,7 @@ class CourseController extends Controller
             $user = ScholarUser::find($request->user()->id);
 
             $isAdmin = $user && $user->role === 'admin';
-            $isOwningInstructor = $user && $user->role === 'instructor' && (string) $course->instructor_id === (string) $request->user()->id;
-
-            if (!$isAdmin && !$isOwningInstructor) {
+            if (!$isAdmin) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',

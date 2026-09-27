@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
@@ -17,17 +18,21 @@ class EnrollmentController extends Controller
     {
         try {
             $user = ScholarUser::find($request->user()->id);
+            $role = $user->role ?? 'student';
 
             $query = Enrollment::with(['course', 'learner', 'cohort']);
 
-            if (!$user || $user->role === 'student') {
+            if ($role === 'student') {
                 $query->where('learner_id', $request->user()->id);
+            } elseif ($role === 'instructor') {
+                // Mentors only see learners on courses they're approved to teach.
+                $query->whereHas('course', fn ($q) => $q->manageableBy($request->user()->id));
             }
 
             if ($courseId = trim($request->input('course_id', ''))) {
-                if ($user && $user->role === 'instructor') {
+                if ($role === 'instructor') {
                     $course = Course::find($courseId);
-                    if (!$course || (string) $course->instructor_id !== (string) $request->user()->id) {
+                    if (!$course || !$course->isManageableBy($request->user()->id)) {
                         return response()->json([
                             'status'  => 403,
                             'message' => 'Forbidden.',
@@ -38,14 +43,18 @@ class EnrollmentController extends Controller
                 $query->where('course_id', $courseId);
             }
 
+            if ($cohortId = trim($request->input('cohort_id', ''))) {
+                $query->where('cohort_id', $cohortId);
+            }
+
             // Admin-only: lets the admin students view look up one learner's full
-            // enrollment history. Instructors/students already get their own scoping
-            // above and don't need an arbitrary cross-course learner lookup.
-            if ($user && $user->role === 'admin' && $learnerId = trim($request->input('learner_id', ''))) {
+            // enrollment history.
+            if ($role === 'admin' && $learnerId = trim($request->input('learner_id', ''))) {
                 $query->where('learner_id', $learnerId);
             }
 
-            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 100);
+            $results = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
             return response()->json([
                 'status' => 200,
@@ -62,7 +71,18 @@ class EnrollmentController extends Controller
 
     public function store(Request $request)
     {
-        $validator = Validations::validateEnrollment($request->all());
+        $user = ScholarUser::find($request->user()->id);
+        $isAdmin = $user && $user->role === 'admin';
+
+        $data = $request->all();
+
+        if (!$isAdmin) {
+            unset($data['enrollment_status'], $data['progress_percent'], $data['completed_at'], $data['enrolled_at'], $data['failed_module_id']);
+            // Only an admin may enroll someone other than themselves.
+            $data['learner_id'] = $request->user()->id;
+        }
+
+        $validator = Validations::validateEnrollment($data);
 
         if ($validator->fails()) {
             return response()->json([
@@ -73,45 +93,66 @@ class EnrollmentController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $course = Course::find($data['course_id']);
+            $cohort = !empty($data['cohort_id']) ? Cohort::find($data['cohort_id']) : null;
 
-            $data = $request->all();
-
-            if (!$isElevated) {
-                unset($data['enrollment_status'], $data['progress_percent'], $data['completed_at']);
-                // Only an instructor/admin may enroll someone other than
-                // themselves - a student can never set an arbitrary learner_id.
-                $data['learner_id'] = $request->user()->id;
+            if ($cohort && (string) $cohort->course_id !== (string) $course->id) {
+                return $this->unprocessable('The selected cohort does not belong to this course.', 'cohort_id');
             }
 
-            if (!empty($data['cohort_id'])) {
-                $cohort = Cohort::find($data['cohort_id']);
-
-                if ($cohort && !$cohort->isRegistrationOpen()) {
-                    return response()->json([
-                        'status'  => 422,
-                        'message' => 'Registration for this cohort is not currently open.',
-                    ], 422);
-                }
+            if (!$cohort && !$isAdmin && $course->cohorts()->exists()) {
+                return $this->unprocessable('Please choose a cohort to join.', 'cohort_id');
             }
 
-            $course = Course::find($data['course_id'] ?? null);
+            // Admins can place a learner in any cohort (e.g. a late joiner after
+            // the start date); everyone else must respect the registration rules.
+            if ($cohort && !$isAdmin && ($reason = $cohort->registrationClosedReason())) {
+                return $this->unprocessable($reason, 'cohort_id');
+            }
 
-            if ($course && $course->max_students !== null) {
+            $existing = Enrollment::withTrashed()
+                ->where('learner_id', $data['learner_id'])
+                ->where('course_id', $course->id)
+                ->first();
+
+            if ($existing && !$existing->trashed() && $existing->enrollment_status !== 'dropped') {
+                return $this->unprocessable(
+                    $isAdmin ? 'This learner is already enrolled in this course.' : 'You are already enrolled in this course.',
+                    'course_id'
+                );
+            }
+
+            if ($course->max_students !== null) {
                 $activeEnrollments = Enrollment::where('course_id', $course->id)
                     ->where('enrollment_status', '!=', 'dropped')
                     ->count();
 
                 if ($activeEnrollments >= $course->max_students) {
-                    return response()->json([
-                        'status'  => 422,
-                        'message' => 'This course has reached its maximum number of students.',
-                    ], 422);
+                    return $this->unprocessable('This course has reached its maximum number of students.');
                 }
             }
 
-            $enrollment = Enrollment::create($data);
+            $attributes = array_merge([
+                'enrollment_status' => 'active',
+                'enrolled_at' => now(),
+            ], array_intersect_key($data, array_flip((new Enrollment)->getFillable())));
+
+            // The (learner, course) pair is unique at the database level, soft
+            // deletes included, so a learner coming back after being dropped or
+            // removed re-activates their old row rather than hitting a 500.
+            $enrollment = DB::transaction(function () use ($existing, $attributes) {
+                if (!$existing) {
+                    return Enrollment::create($attributes);
+                }
+
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+
+                $existing->update(array_merge(['completed_at' => null, 'failed_module_id' => null], $attributes));
+
+                return $existing;
+            });
 
             $enrollment->refresh();
 
@@ -132,8 +173,7 @@ class EnrollmentController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
-            $enrollment = Enrollment::find($id);
+            $enrollment = Enrollment::with(['course', 'learner', 'cohort'])->find($id);
 
             if (!$enrollment) {
                 return response()->json([
@@ -142,10 +182,7 @@ class EnrollmentController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
-            $isOwner = (string) $enrollment->learner_id === (string) $request->user()->id;
-
-            if (!$isElevated && !$isOwner) {
+            if (!$this->canView($request, $enrollment)) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -165,9 +202,14 @@ class EnrollmentController extends Controller
         }
     }
 
+    /**
+     * Admins can change anything about an enrollment - move a learner to
+     * another cohort, fix the enrolled date, change status. A course's mentors
+     * may only record progress/outcome. Learners can't edit their enrollment.
+     */
     public function update(Request $request, string $id)
     {
-        $validator = Validations::validateEnrollment($request->all());
+        $validator = Validations::validateEnrollmentUpdate($request->all());
 
         if ($validator->fails()) {
             return response()->json([
@@ -188,23 +230,33 @@ class EnrollmentController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
-            $isOwner = (string) $enrollment->learner_id === (string) $request->user()->id;
+            $isAdmin = $user && $user->role === 'admin';
+            $isMentor = $user && $user->role === 'instructor'
+                && $enrollment->course?->isManageableBy($request->user()->id);
 
-            if (!$isElevated && !$isOwner) {
+            if (!$isAdmin && !$isMentor) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
                 ], 403);
             }
 
-            $data = $request->all();
+            $editable = $isAdmin
+                ? ['cohort_id', 'enrollment_status', 'failed_module_id', 'progress_percent', 'enrolled_at', 'completed_at']
+                : ['enrollment_status', 'failed_module_id', 'progress_percent', 'completed_at'];
 
-            if (!$isElevated) {
-                unset($data['enrollment_status'], $data['progress_percent'], $data['completed_at']);
+            $data = array_intersect_key($request->all(), array_flip($editable));
+
+            if (!empty($data['cohort_id'])) {
+                $cohort = Cohort::find($data['cohort_id']);
+
+                if ((string) $cohort->course_id !== (string) $enrollment->course_id) {
+                    return $this->unprocessable('The selected cohort does not belong to this course.', 'cohort_id');
+                }
             }
 
             $enrollment->update($data);
+            $enrollment->load(['course', 'learner', 'cohort']);
 
             return response()->json([
                 'status'  => 200,
@@ -233,10 +285,10 @@ class EnrollmentController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isAdmin = $user && $user->role === 'admin';
             $isOwner = (string) $enrollment->learner_id === (string) $request->user()->id;
 
-            if (!$isElevated && !$isOwner) {
+            if (!$isAdmin && !$isOwner) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -256,5 +308,30 @@ class EnrollmentController extends Controller
                 'message' => 'An error occurred while deleting the enrollment.',
             ], 500);
         }
+    }
+
+    private function canView(Request $request, Enrollment $enrollment): bool
+    {
+        $user = ScholarUser::find($request->user()->id);
+
+        if ((string) $enrollment->learner_id === (string) $request->user()->id) {
+            return true;
+        }
+
+        if ($user && $user->role === 'admin') {
+            return true;
+        }
+
+        return $user && $user->role === 'instructor'
+            && $enrollment->course?->isManageableBy($request->user()->id);
+    }
+
+    private function unprocessable(string $message, ?string $field = null)
+    {
+        return response()->json(array_filter([
+            'status'  => 422,
+            'message' => $message,
+            'errors'  => $field ? [$field => [$message]] : null,
+        ]), 422);
     }
 }

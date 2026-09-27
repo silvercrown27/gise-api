@@ -172,8 +172,9 @@ class CohortControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_as_instructor_succeeds(): void
+    public function test_store_as_instructor_is_forbidden(): void
     {
+        // Cohorts belong to the centrally managed course - the admin sets them up.
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
@@ -186,7 +187,26 @@ class CohortControllerTest extends TestCase
             'capacity' => 30,
         ]);
 
+        $response->assertStatus(403);
+        $this->assertDatabaseMissing('cohorts', ['label' => 'Fall 2026']);
+    }
+
+    public function test_store_as_admin_succeeds(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $course = Course::factory()->create(['instructor_id' => $admin->id]);
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/cohorts', [
+            'course_id' => $course->id,
+            'label' => 'Fall 2026',
+            'start_date' => now()->addMonth()->format('Y-m-d'),
+            'capacity' => 30,
+        ]);
+
         $response->assertStatus(201);
+        $response->assertJsonPath('data.is_registration_open', true);
         $this->assertDatabaseHas('cohorts', ['course_id' => $course->id, 'label' => 'Fall 2026']);
     }
 
@@ -213,10 +233,10 @@ class CohortControllerTest extends TestCase
 
     public function test_store_saves_location_fields_for_in_person_cohort(): void
     {
-        $instructor = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
-        Sanctum::actingAs($instructor);
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $course = Course::factory()->create(['instructor_id' => $admin->id]);
+        Sanctum::actingAs($admin);
 
         $response = $this->postJson('/api/cohorts', [
             'course_id' => $course->id,
@@ -279,7 +299,7 @@ class CohortControllerTest extends TestCase
         $this->assertDatabaseHas('cohorts', ['id' => $cohort->id, 'label' => 'Updated']);
     }
 
-    public function test_update_as_owning_instructor_succeeds(): void
+    public function test_update_as_instructor_is_forbidden(): void
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -294,8 +314,45 @@ class CohortControllerTest extends TestCase
             'capacity' => $cohort->capacity,
         ]);
 
+        $response->assertStatus(403);
+    }
+
+    public function test_admin_can_change_start_date_and_registration_window(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $course = Course::factory()->create(['instructor_id' => $admin->id]);
+        $cohort = Cohort::factory()->create(['course_id' => $course->id, 'start_date' => now()->subWeek()]);
+        Sanctum::actingAs($admin);
+
+        $newStart = now()->addMonth()->format('Y-m-d');
+        $response = $this->patchJson("/api/cohorts/{$cohort->id}", [
+            'course_id' => $course->id,
+            'label' => $cohort->label,
+            'start_date' => $newStart,
+            'registration_opens_at' => now()->format('Y-m-d'),
+            'registration_closes_at' => now()->addWeeks(2)->format('Y-m-d'),
+            'capacity' => $cohort->capacity,
+            'status' => 'open',
+        ]);
+
         $response->assertStatus(200);
-        $response->assertJsonPath('data.label', 'Updated by owner');
+        $response->assertJsonPath('data.is_registration_open', true);
+        $this->assertSame($newStart, $cohort->fresh()->start_date->format('Y-m-d'));
+    }
+
+    public function test_registration_closes_once_cohort_has_started(): void
+    {
+        $course = Course::factory()->create();
+        $started = Cohort::factory()->create([
+            'course_id' => $course->id,
+            'start_date' => now()->subDay(),
+            'registration_opens_at' => null,
+            'registration_closes_at' => null,
+            'status' => 'open',
+        ]);
+
+        $this->assertFalse($started->isRegistrationOpen());
     }
 
     public function test_update_as_non_owning_instructor_is_forbidden(): void

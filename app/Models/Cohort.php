@@ -32,13 +32,17 @@ class Cohort extends Model
     ];
 
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
-        'registration_opens_at' => 'date',
-        'registration_closes_at' => 'date',
+        // Serialized as plain Y-m-d: these are calendar dates, and the frontend
+        // feeds them straight into <input type="date">.
+        'start_date' => 'date:Y-m-d',
+        'end_date' => 'date:Y-m-d',
+        'registration_opens_at' => 'date:Y-m-d',
+        'registration_closes_at' => 'date:Y-m-d',
         'capacity' => 'integer',
         'seats_taken' => 'integer',
     ];
+
+    protected $appends = ['is_registration_open', 'registration_closed_reason'];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
 
@@ -77,18 +81,64 @@ class Cohort extends Model
         return $this->hasMany(CourseLead::class, 'cohort_id');
     }
 
-    public function isRegistrationOpen(): bool
+    public function mentorApplications()
+    {
+        return $this->hasMany(CohortMentorApplication::class, 'cohort_id');
+    }
+
+    /**
+     * Why registration is shut, or null when a learner can sign up. This is the
+     * single rule for "can I join this cohort" - the register page reads it
+     * through the is_registration_open / registration_closed_reason attributes.
+     */
+    public function registrationClosedReason(): ?string
     {
         $today = now()->startOfDay();
 
+        if (in_array($this->status, ['closed', 'completed'], true)) {
+            return 'Registration for this cohort is closed.';
+        }
+
         if ($this->registration_opens_at && $today->lt($this->registration_opens_at)) {
-            return false;
+            return 'Registration for this cohort opens on ' . $this->registration_opens_at->toDateString() . '.';
         }
 
-        if ($this->registration_closes_at && $today->gt($this->registration_closes_at)) {
-            return false;
+        // Without an explicit closing date, registration runs until the cohort starts.
+        $closesAt = $this->registration_closes_at ?? $this->start_date;
+
+        if ($closesAt && $today->gt($closesAt)) {
+            return 'Registration for this cohort has closed.';
         }
 
-        return true;
+        if ($this->capacity > 0 && $this->seats_taken >= $this->capacity) {
+            return 'This cohort is full.';
+        }
+
+        return null;
+    }
+
+    public function isRegistrationOpen(): bool
+    {
+        return $this->registrationClosedReason() === null;
+    }
+
+    public function getIsRegistrationOpenAttribute(): bool
+    {
+        return $this->isRegistrationOpen();
+    }
+
+    public function getRegistrationClosedReasonAttribute(): ?string
+    {
+        return $this->registrationClosedReason();
+    }
+
+    /**
+     * Recount seats from live enrollments. Dropped learners give their seat back.
+     */
+    public function syncSeatsTaken(): void
+    {
+        $this->forceFill([
+            'seats_taken' => $this->enrollments()->where('enrollment_status', '!=', 'dropped')->count(),
+        ])->saveQuietly();
     }
 }

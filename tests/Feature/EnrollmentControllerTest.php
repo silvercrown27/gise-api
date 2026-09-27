@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Cohort;
+use App\Models\CohortMentorApplication;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\ScholarUser;
@@ -232,23 +233,28 @@ class EnrollmentControllerTest extends TestCase
         $this->assertTrue($ids->contains((string) $matching->id));
     }
 
-    public function test_index_as_instructor_ignores_learner_id_filter(): void
+    public function test_index_as_instructor_is_scoped_to_courses_they_mentor(): void
     {
-        // learner_id is admin-only; an instructor passing it still gets their
-        // normal course-scoped (here: everything, since no course_id was given
-        // and instructors aren't restricted to their own courses on index) results
-        // rather than a cross-course lookup of an arbitrary learner.
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $learner = User::factory()->create();
-        $enrollment = Enrollment::factory()->create(['learner_id' => $learner->id]);
+
+        $mentoredCohort = Cohort::factory()->create();
+        CohortMentorApplication::factory()->create([
+            'cohort_id' => $mentoredCohort->id,
+            'instructor_id' => $instructor->id,
+            'status' => 'approved',
+        ]);
+        $mentored = Enrollment::factory()->create(['course_id' => $mentoredCohort->course_id]);
+        $unrelated = Enrollment::factory()->create();
         Sanctum::actingAs($instructor);
 
-        $response = $this->getJson("/api/enrollments?learner_id={$learner->id}");
+        // learner_id is admin-only, so passing it doesn't widen the scope.
+        $response = $this->getJson("/api/enrollments?learner_id={$unrelated->learner_id}");
 
         $response->assertStatus(200);
         $ids = collect($response->json('data.data'))->pluck('id');
-        $this->assertTrue($ids->contains((string) $enrollment->id));
+        $this->assertTrue($ids->contains((string) $mentored->id));
+        $this->assertFalse($ids->contains((string) $unrelated->id));
     }
 
     public function test_index_filters_by_course_id_include_learner(): void
@@ -386,10 +392,10 @@ class EnrollmentControllerTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_update_strips_enrollment_status_and_progress_for_owner(): void
+    public function test_update_is_forbidden_for_the_learner_themselves(): void
     {
-        // Fixed: even the enrollment's own learner cannot self-mark it completed --
-        // enrollment_status/progress_percent are stripped for non-elevated callers.
+        // A learner can't self-mark completion or hop into another cohort,
+        // bypassing its registration rules.
         $learner = User::factory()->create();
         $enrollment = Enrollment::factory()->create([
             'learner_id' => $learner->id,
@@ -399,15 +405,167 @@ class EnrollmentControllerTest extends TestCase
         Sanctum::actingAs($learner);
 
         $response = $this->patchJson("/api/enrollments/{$enrollment->id}", [
-            'learner_id' => $learner->id,
-            'course_id' => $enrollment->course_id,
             'enrollment_status' => 'completed',
             'progress_percent' => 100,
         ]);
 
+        $response->assertStatus(403);
+        $this->assertSame(10, $enrollment->fresh()->progress_percent);
+    }
+
+    public function test_admin_can_move_learner_to_another_cohort_and_fix_dates(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $course = Course::factory()->create();
+        $from = Cohort::factory()->create(['course_id' => $course->id, 'seats_taken' => 0]);
+        $to = Cohort::factory()->create(['course_id' => $course->id, 'seats_taken' => 0]);
+        $enrollment = Enrollment::factory()->create([
+            'course_id' => $course->id,
+            'cohort_id' => $from->id,
+            'enrollment_status' => 'active',
+        ]);
+        Sanctum::actingAs($admin);
+
+        $response = $this->patchJson("/api/enrollments/{$enrollment->id}", [
+            'cohort_id' => $to->id,
+            'enrolled_at' => '2026-01-15 09:00:00',
+            'enrollment_status' => 'completed',
+        ]);
+
         $response->assertStatus(200);
+        $response->assertJsonPath('data.cohort_id', (string) $to->id);
+        $response->assertJsonPath('data.enrollment_status', 'completed');
+        $response->assertJsonPath('data.enrolled_at', '2026-01-15 09:00:00');
+        $this->assertSame(0, $from->fresh()->seats_taken);
+        $this->assertSame(1, $to->fresh()->seats_taken);
+    }
+
+    public function test_admin_cannot_move_learner_to_a_cohort_of_another_course(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $enrollment = Enrollment::factory()->create();
+        $foreignCohort = Cohort::factory()->create();
+        Sanctum::actingAs($admin);
+
+        $response = $this->patchJson("/api/enrollments/{$enrollment->id}", ['cohort_id' => $foreignCohort->id]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_store_rejects_duplicate_enrollment_with_422(): void
+    {
+        $learner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        Enrollment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id, 'cohort_id' => null, 'enrollment_status' => 'active']);
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $learner->id,
+            'course_id' => $course->id,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'You are already enrolled in this course.');
+    }
+
+    public function test_store_reactivates_a_previously_removed_enrollment(): void
+    {
+        $learner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        $cohort = Cohort::factory()->create(['course_id' => $course->id, 'start_date' => now()->addWeek(), 'status' => 'open']);
+        $old = Enrollment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id]);
+        $old->delete();
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $learner->id,
+            'course_id' => $course->id,
+            'cohort_id' => $cohort->id,
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.id', (string) $old->id);
         $response->assertJsonPath('data.enrollment_status', 'active');
-        $response->assertJsonPath('data.progress_percent', 10);
+        $this->assertNotSoftDeleted('enrollments', ['id' => $old->id]);
+        $this->assertSame(1, $cohort->fresh()->seats_taken);
+    }
+
+    public function test_store_rejects_cohort_that_already_started(): void
+    {
+        $learner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
+        $cohort = Cohort::factory()->create([
+            'start_date' => now()->subWeek(),
+            'registration_opens_at' => null,
+            'registration_closes_at' => null,
+            'status' => 'upcoming',
+        ]);
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $learner->id,
+            'course_id' => $cohort->course_id,
+            'cohort_id' => $cohort->id,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Registration for this cohort has closed.');
+    }
+
+    public function test_store_rejects_full_cohort(): void
+    {
+        $learner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
+        $cohort = Cohort::factory()->create(['start_date' => now()->addWeek(), 'status' => 'open', 'capacity' => 1]);
+        Enrollment::factory()->create(['course_id' => $cohort->course_id, 'cohort_id' => $cohort->id, 'enrollment_status' => 'active']);
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $learner->id,
+            'course_id' => $cohort->course_id,
+            'cohort_id' => $cohort->id,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'This cohort is full.');
+    }
+
+    public function test_store_rejects_cohort_from_a_different_course(): void
+    {
+        $learner = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
+        $course = Course::factory()->create();
+        $foreignCohort = Cohort::factory()->create(['start_date' => now()->addWeek(), 'status' => 'open']);
+        Sanctum::actingAs($learner);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $learner->id,
+            'course_id' => $course->id,
+            'cohort_id' => $foreignCohort->id,
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_admin_can_enroll_learner_into_a_cohort_that_already_started(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        $learner = User::factory()->create();
+        $cohort = Cohort::factory()->create(['start_date' => now()->subWeek(), 'status' => 'open']);
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/enrollments', [
+            'learner_id' => $learner->id,
+            'course_id' => $cohort->course_id,
+            'cohort_id' => $cohort->id,
+        ]);
+
+        $response->assertStatus(201);
     }
 
     public function test_update_returns_404_for_missing_enrollment(): void

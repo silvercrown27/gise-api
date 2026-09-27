@@ -48,6 +48,23 @@ class Enrollment extends Model
         static::updating(function ($model) {
             $model->updated_at = $model->getDateTime();
         });
+
+        // Keep cohort.seats_taken honest whenever a learner joins, leaves,
+        // switches cohort or is dropped.
+        $syncSeats = function (Enrollment $enrollment) {
+            $cohortIds = array_filter(array_unique([
+                $enrollment->cohort_id,
+                $enrollment->getOriginal('cohort_id'),
+            ]));
+
+            foreach (Cohort::whereIn('id', $cohortIds)->get() as $cohort) {
+                $cohort->syncSeatsTaken();
+            }
+        };
+
+        static::saved($syncSeats);
+        static::deleted($syncSeats);
+        static::restored($syncSeats);
     }
 
     protected function serializeDate(\DateTimeInterface $date)

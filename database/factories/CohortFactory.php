@@ -23,7 +23,7 @@ class CohortFactory extends Factory
             'mode' => fake()->randomElement(['online', 'in_person', 'hybrid']),
             'capacity' => fake()->numberBetween(10, 100),
             'seats_taken' => fake()->numberBetween(0, 10),
-            'status' => fake()->randomElement(['upcoming', 'open', 'closed', 'completed']),
+            'status' => fake()->randomElement(['upcoming', 'open']),
         ];
     }
 }

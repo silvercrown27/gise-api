@@ -81,6 +81,73 @@ class Course extends Model
         return $this->belongsTo(User::class, 'instructor_id');
     }
 
+    /**
+     * The account every course belongs to. Courses are centrally managed, so
+     * they all sit under the platform's original (first-created) admin.
+     */
+    public static function superAdminId(): ?string
+    {
+        return ScholarUser::where('role', 'admin')->orderBy('created_at')->value('id');
+    }
+
+    public function mentorApplications()
+    {
+        return $this->hasManyThrough(CohortMentorApplication::class, Cohort::class, 'course_id', 'cohort_id');
+    }
+
+    /**
+     * Courses a user may author content for: ones they own (legacy - every
+     * course now belongs to the super admin) or have an approved mentor
+     * application on at least one cohort of.
+     */
+    public function scopeManageableBy($query, string $userId)
+    {
+        return $query->where(function ($q) use ($userId) {
+            $q->where('instructor_id', $userId)
+                ->orWhereHas('cohorts.mentorApplications', function ($applications) use ($userId) {
+                    $applications->where('instructor_id', $userId)->where('status', 'approved');
+                });
+        });
+    }
+
+    public function isManageableBy(?string $userId): bool
+    {
+        if (!$userId) {
+            return false;
+        }
+
+        return (string) $this->instructor_id === (string) $userId
+            || $this->mentorApplications()
+                ->where('cohort_mentor_applications.instructor_id', $userId)
+                ->where('cohort_mentor_applications.status', 'approved')
+                ->exists();
+    }
+
+    /**
+     * Instructors approved to mentor any cohort of this course - the people
+     * to notify when their content is reviewed.
+     */
+    /**
+     * Who hears about a module/quiz/exam review on this course: the owner and
+     * every approved mentor, minus the admin who made the decision.
+     */
+    public function reviewRecipientIds(?string $exceptUserId = null): array
+    {
+        $ids = array_unique(array_filter([(string) $this->instructor_id, ...$this->mentorIds()]));
+
+        return array_values(array_diff($ids, [(string) $exceptUserId]));
+    }
+
+    public function mentorIds(): array
+    {
+        return $this->mentorApplications()
+            ->where('cohort_mentor_applications.status', 'approved')
+            ->distinct()
+            ->pluck('cohort_mentor_applications.instructor_id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+    }
+
     public function category()
     {
         return $this->belongsTo(Category::class, 'category_id');
