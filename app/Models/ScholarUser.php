@@ -62,4 +62,18 @@ class ScholarUser extends Model
     {
         return $this->belongsTo(User::class, 'id', 'id');
     }
+
+    public const ROLES = ['student', 'instructor', 'admin', 'super_admin'];
+
+    /** Staff: admins and super admins. Super admins can do everything an admin can. */
+    public function isAdmin(): bool
+    {
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
+    /** Approves instructors, courses and course content; manages roles. */
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
 }

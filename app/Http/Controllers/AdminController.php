@@ -23,7 +23,7 @@ class AdminController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -81,6 +81,7 @@ class AdminController extends Controller
                         'students' => (int) ($usersByRole['student'] ?? 0),
                         'instructors' => (int) ($usersByRole['instructor'] ?? 0),
                         'admins' => (int) ($usersByRole['admin'] ?? 0),
+                        'super_admins' => (int) ($usersByRole['super_admin'] ?? 0),
                     ],
                     'courses' => [
                         'total' => (int) $coursesByStatus->sum(),

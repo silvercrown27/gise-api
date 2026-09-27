@@ -192,7 +192,7 @@ class CourseMentorController extends Controller
             return false;
         }
 
-        if ($user->role === 'admin') {
+        if ($user->isAdmin()) {
             return true;
         }
 

@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\ScholarUser;
+use Illuminate\Support\Facades\DB;
+use App\Services\NotificationService;
+use App\Models\InstructorProfile;
+use App\Models\AdminAuditLog;
 
 class ScholarUserController extends Controller
 {
@@ -15,7 +19,7 @@ class ScholarUserController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || $user->role !== 'admin') {
+            if (!$user || !$user->isAdmin()) {
                 $query = ScholarUser::where('id', $request->user()->id);
             } else {
                 $query = ScholarUser::query();
@@ -37,7 +41,7 @@ class ScholarUserController extends Controller
                 });
             }
 
-            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+            $results = $query->orderBy('created_at', 'desc')->paginate(min(max((int) $request->input('per_page', 10), 1), 100));
 
             return response()->json([
                 'status' => 200,
@@ -56,7 +60,7 @@ class ScholarUserController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -105,7 +109,7 @@ class ScholarUserController extends Controller
                 ], 404);
             }
 
-            if ((!$user || $user->role !== 'admin') && (string) $scholarUser->id !== (string) $request->user()->id) {
+            if ((!$user || !$user->isAdmin()) && (string) $scholarUser->id !== (string) $request->user()->id) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -148,7 +152,7 @@ class ScholarUserController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isSelf = (string) $scholarUser->id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
@@ -163,11 +167,8 @@ class ScholarUserController extends Controller
             // email is denormalized from users.email and only ever synced by
             // the backend itself (signup, or a future profile-email-change
             // flow) - never writable directly through this endpoint.
-            unset($data['email'], $data['id']);
-
-            if (!$isAdmin) {
-                unset($data['role']);
-            }
+            // Roles only change through setRole() (super admins).
+            unset($data['email'], $data['id'], $data['role']);
 
             $scholarUser->update($data);
 
@@ -190,7 +191,7 @@ class ScholarUserController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || $user->role !== 'admin') {
+            if (!$user || !$user->isAdmin()) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -218,6 +219,86 @@ class ScholarUserController extends Controller
                 'status'  => 500,
                 'message' => 'An error occurred while deleting the scholar user.',
             ], 500);
+        }
+    }
+
+    /**
+     * Super admin only: make someone a student, instructor, admin or super
+     * admin. The last super admin can't be demoted, so the platform always
+     * has someone who can approve content and manage roles.
+     */
+    public function setRole(Request $request, string $id)
+    {
+        $caller = ScholarUser::find($request->user()->id);
+
+        if (!$caller || !$caller->isSuperAdmin()) {
+            return response()->json(['status' => 403, 'message' => 'Only a super admin can change roles.'], 403);
+        }
+
+        $role = $request->input('role');
+
+        if (!in_array($role, ScholarUser::ROLES, true)) {
+            return response()->json([
+                'status'  => 422,
+                'message' => 'Validation failed.',
+                'errors'  => ['role' => ['Choose student, instructor, admin or super admin.']],
+            ], 422);
+        }
+
+        $target = ScholarUser::with('user:id,name')->find($id);
+
+        if (!$target) {
+            return response()->json(['status' => 404, 'message' => 'User not found.'], 404);
+        }
+
+        if ($target->role === $role) {
+            return response()->json(['status' => 200, 'message' => 'No change.', 'data' => $target], 200);
+        }
+
+        if ($target->isSuperAdmin() && ScholarUser::where('role', 'super_admin')->count() <= 1) {
+            return response()->json([
+                'status'  => 422,
+                'message' => 'This is the only super admin. Make someone else a super admin first.',
+                'errors'  => ['role' => ['This is the only super admin. Make someone else a super admin first.']],
+            ], 422);
+        }
+
+        try {
+            $previous = $target->role;
+
+            DB::transaction(function () use ($target, $role, $request) {
+                $target->forceFill(['role' => $role])->save();
+
+                // Choosing someone as an instructor is itself the approval.
+                if ($role === 'instructor') {
+                    $profile = InstructorProfile::firstOrCreate(['user_id' => $target->id]);
+                    $profile->forceFill([
+                        'approval_status' => 'approved',
+                        'approved_at' => $profile->approved_at ?? now(),
+                        'approved_by' => $profile->approved_by ?? $request->user()->id,
+                    ])->save();
+                }
+            });
+
+            AdminAuditLog::create([
+                'admin_id' => $request->user()->id,
+                'action' => 'change_role',
+                'target_type' => 'user',
+                'target_id' => $target->id,
+                'notes' => "{$previous} -> {$role}",
+            ]);
+
+            $labels = ['student' => 'a student', 'instructor' => 'an instructor', 'admin' => 'an admin', 'super_admin' => 'a super admin'];
+            NotificationService::notifyUser($target->id, 'system', "Your account is now {$labels[$role]}. Sign out and back in if menus look out of date.", '/dashboard');
+
+            return response()->json([
+                'status'  => 200,
+                'message' => ($target->user?->name ?? 'User') . " is now {$labels[$role]}.",
+                'data'    => $target->fresh('user'),
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('ScholarUserController@setRole: ' . $e->getMessage());
+            return response()->json(['status' => 500, 'message' => 'An error occurred while changing the role.'], 500);
         }
     }
 }

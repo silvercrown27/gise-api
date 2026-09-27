@@ -26,7 +26,7 @@ class ModuleQuizQuestionController extends Controller
             // while the endpoint stays reachable without a token for everyone else.
             $authUser = $request->user('sanctum');
             $user = $authUser ? ScholarUser::find($authUser->id) : null;
-            $isAdminOrInstructor = $user && in_array($user->role, ['instructor', 'admin']);
+            $isAdminOrInstructor = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
 
             $query = ModuleQuizQuestion::query();
 
@@ -59,7 +59,7 @@ class ModuleQuizQuestionController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -120,7 +120,7 @@ class ModuleQuizQuestionController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -166,7 +166,7 @@ class ModuleQuizQuestionController extends Controller
                 ], 403);
             }
 
-            if ($user->role !== 'admin') {
+            if (!$user->isAdmin()) {
                 unset($data['quiz_id']);
             }
 
@@ -193,7 +193,7 @@ class ModuleQuizQuestionController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -248,7 +248,7 @@ class ModuleQuizQuestionController extends Controller
             return;
         }
 
-        if ($user->role === 'admin') {
+        if ($user->isSuperAdmin()) {
             if ($quiz->admin_approval_status !== 'approved') {
                 $quiz->forceFill(['admin_approval_status' => 'approved', 'admin_rejection_reason' => null])->save();
             }
@@ -257,7 +257,7 @@ class ModuleQuizQuestionController extends Controller
 
         $quiz->forceFill(['admin_approval_status' => 'pending', 'admin_rejection_reason' => null])->save();
 
-        NotificationService::notifyAdmins(
+        NotificationService::notifySuperAdmins(
             'quiz_review',
             "{$user->email} changed a question on the quiz \"{$quiz->title}\", which needs re-review."
         );

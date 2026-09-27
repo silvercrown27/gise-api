@@ -60,7 +60,7 @@ class CourseModuleController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -89,19 +89,15 @@ class CourseModuleController extends Controller
         try {
             $data = $request->all();
 
-            if ($user->role === 'admin') {
-                $data['admin_approval_status'] = 'approved';
-                $data['admin_rejection_reason'] = null;
-            } else {
-                $data['admin_approval_status'] = 'pending';
-                $data['admin_rejection_reason'] = null;
-            }
+            // Super admins publish directly; everyone else's new content waits for them.
+            $data['admin_approval_status'] = $user->isSuperAdmin() ? 'approved' : 'pending';
+            $data['admin_rejection_reason'] = null;
 
             $courseModule = CourseModule::create($data);
             $courseModule->refresh();
 
-            if ($user->role !== 'admin') {
-                NotificationService::notifyAdmins(
+            if (!$user->isSuperAdmin()) {
+                NotificationService::notifySuperAdmins(
                     'module_review',
                     "{$user->email} added a new module \"{$courseModule->title}\" for review."
                 );
@@ -141,7 +137,7 @@ class CourseModuleController extends Controller
             $authUser = $request->user('sanctum');
             $caller = $authUser ? ScholarUser::find($authUser->id) : null;
             $course = Course::find($courseModule->course_id);
-            $canManage = $caller && ($caller->role === 'admin'
+            $canManage = $caller && ($caller->isAdmin()
                 || ($caller->role === 'instructor' && $course?->isManageableBy($authUser->id)));
 
             if ($canManage) {
@@ -167,7 +163,7 @@ class CourseModuleController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -205,21 +201,19 @@ class CourseModuleController extends Controller
 
             $data = $request->all();
 
-            if ($user->role === 'admin') {
-                $data['admin_approval_status'] = 'approved';
-                $data['admin_rejection_reason'] = null;
-            } else {
+            if (!$user->isAdmin()) {
                 unset($data['course_id']);
-                // An instructor's own edit always sends the module back for
-                // re-review, even if it was previously approved.
-                $data['admin_approval_status'] = 'pending';
-                $data['admin_rejection_reason'] = null;
             }
+
+            // Only a super admin's edit stays live; anyone else's (admin or
+            // instructor) sends the module back for super admin review.
+            $data['admin_approval_status'] = $user->isSuperAdmin() ? 'approved' : 'pending';
+            $data['admin_rejection_reason'] = null;
 
             $courseModule->update($data);
 
-            if ($user->role !== 'admin') {
-                NotificationService::notifyAdmins(
+            if (!$user->isSuperAdmin()) {
+                NotificationService::notifySuperAdmins(
                     'module_review',
                     "{$user->email} updated the module \"{$courseModule->title}\", which needs re-review."
                 );
@@ -243,7 +237,7 @@ class CourseModuleController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -286,7 +280,7 @@ class CourseModuleController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -324,7 +318,8 @@ class CourseModuleController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        // Approvals are a super admin decision.
+        if (!$user || !$user->isSuperAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',

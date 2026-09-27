@@ -18,7 +18,8 @@ class EnrollmentController extends Controller
     {
         try {
             $user = ScholarUser::find($request->user()->id);
-            $role = $user->role ?? 'student';
+            // Super admins see everything admins do.
+            $role = $user?->isAdmin() ? 'admin' : ($user->role ?? 'student');
 
             $query = Enrollment::with(['course', 'learner', 'cohort']);
 
@@ -72,7 +73,7 @@ class EnrollmentController extends Controller
     public function store(Request $request)
     {
         $user = ScholarUser::find($request->user()->id);
-        $isAdmin = $user && $user->role === 'admin';
+        $isAdmin = $user && $user->isAdmin();
 
         $data = $request->all();
         // The fee is always worked out here, never taken from the client.
@@ -241,7 +242,7 @@ class EnrollmentController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isMentor = $user && $user->role === 'instructor'
                 && $enrollment->course?->isManageableBy($request->user()->id);
 
@@ -296,7 +297,7 @@ class EnrollmentController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $enrollment->learner_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {
@@ -329,7 +330,7 @@ class EnrollmentController extends Controller
             return true;
         }
 
-        if ($user && $user->role === 'admin') {
+        if ($user && $user->isAdmin()) {
             return true;
         }
 

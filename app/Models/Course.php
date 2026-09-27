@@ -88,7 +88,8 @@ class Course extends Model
      */
     public static function superAdminId(): ?string
     {
-        return ScholarUser::where('role', 'admin')->orderBy('created_at')->value('id');
+        return ScholarUser::where('role', 'super_admin')->orderBy('created_at')->value('id')
+            ?? ScholarUser::where('role', 'admin')->orderBy('created_at')->value('id');
     }
 
     public function mentorApplications()

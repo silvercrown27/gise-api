@@ -36,7 +36,7 @@ class ExamController extends Controller
                     ->whereHas('course.enrollments', function ($q) use ($request) {
                         $q->where('learner_id', $request->user()->id);
                     });
-            } elseif (!$user || $user->role !== 'admin') {
+            } elseif (!$user || !$user->isAdmin()) {
                 $query->where('id', null);
             }
 
@@ -44,7 +44,7 @@ class ExamController extends Controller
                 $query->where('title', 'like', '%' . $q . '%');
             }
 
-            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+            $results = $query->orderBy('created_at', 'desc')->paginate(min(max((int) $request->input('per_page', 10), 1), 100));
 
             return response()->json([
                 'status' => 200,
@@ -92,19 +92,15 @@ class ExamController extends Controller
         try {
             $data = $request->all();
 
-            if ($user->role === 'admin') {
-                $data['admin_approval_status'] = 'approved';
-                $data['admin_rejection_reason'] = null;
-            } else {
-                $data['admin_approval_status'] = 'pending';
-                $data['admin_rejection_reason'] = null;
-            }
+            // Super admins publish directly; everyone else's new content waits for them.
+            $data['admin_approval_status'] = $user->isSuperAdmin() ? 'approved' : 'pending';
+            $data['admin_rejection_reason'] = null;
 
             $exam = Exam::create($data);
             $exam->refresh();
 
-            if ($user->role !== 'admin') {
-                NotificationService::notifyAdmins(
+            if (!$user->isSuperAdmin()) {
+                NotificationService::notifySuperAdmins(
                     'exam_review',
                     "{$user->email} submitted a new exam \"{$exam->title}\" for review."
                 );
@@ -139,7 +135,7 @@ class ExamController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $exam->course
                 && $exam->course->isManageableBy($request->user()->id);
@@ -184,7 +180,7 @@ class ExamController extends Controller
 
             $user = ScholarUser::find($request->user()->id);
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $exam->course
                 && $exam->course->isManageableBy($request->user()->id);
@@ -208,21 +204,19 @@ class ExamController extends Controller
 
             $data = $request->all();
 
-            if ($isAdmin) {
-                $data['admin_approval_status'] = 'approved';
-                $data['admin_rejection_reason'] = null;
-            } else {
+            if (!$user->isAdmin()) {
                 unset($data['course_id']);
-                // An instructor's own edit always sends the exam back for
-                // re-review, even if it was previously approved.
-                $data['admin_approval_status'] = 'pending';
-                $data['admin_rejection_reason'] = null;
             }
+
+            // Only a super admin's edit stays live; anyone else's (admin or
+            // instructor) sends the exam back for super admin review.
+            $data['admin_approval_status'] = $user->isSuperAdmin() ? 'approved' : 'pending';
+            $data['admin_rejection_reason'] = null;
 
             $exam->update($data);
 
-            if (!$isAdmin) {
-                NotificationService::notifyAdmins(
+            if (!$user->isSuperAdmin()) {
+                NotificationService::notifySuperAdmins(
                     'exam_review',
                     "{$user->email} updated the exam \"{$exam->title}\", which needs re-review."
                 );
@@ -256,7 +250,7 @@ class ExamController extends Controller
 
             $user = ScholarUser::find($request->user()->id);
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $exam->course
                 && $exam->course->isManageableBy($request->user()->id);
@@ -287,7 +281,7 @@ class ExamController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -325,7 +319,8 @@ class ExamController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        // Approvals are a super admin decision.
+        if (!$user || !$user->isSuperAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',

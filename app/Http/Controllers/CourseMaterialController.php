@@ -36,7 +36,8 @@ class CourseMaterialController extends Controller
     {
         try {
             $user = ScholarUser::find($request->user()->id);
-            $role = $user->role ?? 'student';
+            // Super admins see everything admins do.
+            $role = $user?->isAdmin() ? 'admin' : ($user->role ?? 'student');
 
             $query = CourseMaterial::with(['course:id,title,code', 'module:id,title,order_index', 'uploader:id,name,email']);
 
@@ -122,7 +123,8 @@ class CourseMaterialController extends Controller
                 return response()->json(['status' => 500, 'message' => $upload['message']], 500);
             }
 
-            $isAdmin = $this->isAdminRequest($request);
+            // A super admin's own upload needs no second pair of eyes.
+            $isAdmin = $this->isSuperAdminRequest($request);
 
             $material = CourseMaterial::create([
                 'course_id' => $course->id,
@@ -133,7 +135,6 @@ class CourseMaterialController extends Controller
                 'file_type' => strtolower($file->getClientOriginalExtension()),
                 'file_size' => $file->getSize(),
                 'uploaded_by' => $request->user()->id,
-                // An admin's own upload needs no second pair of eyes.
                 'status' => $isAdmin ? 'approved' : 'pending',
                 'reviewed_by' => $isAdmin ? $request->user()->id : null,
                 'reviewed_at' => $isAdmin ? now() : null,
@@ -142,7 +143,7 @@ class CourseMaterialController extends Controller
             if ($isAdmin) {
                 $this->syncCourseBrochure($course);
             } else {
-                NotificationService::notifyAdmins(
+                NotificationService::notifySuperAdmins(
                     'course_material',
                     "New {$this->label($material)} uploaded for \"{$course->title}\" - awaiting review.",
                     '/admin/materials'
@@ -151,7 +152,7 @@ class CourseMaterialController extends Controller
 
             return response()->json([
                 'status'  => 201,
-                'message' => $isAdmin ? 'Uploaded.' : 'Uploaded - an admin will review it shortly.',
+                'message' => $isAdmin ? 'Uploaded and live.' : 'Uploaded - a super admin will review it shortly.',
                 'data'    => $material->load(['module:id,title,order_index', 'uploader:id,name,email']),
             ], 201);
         } catch (\Exception $e) {
@@ -162,7 +163,7 @@ class CourseMaterialController extends Controller
 
     public function setStatus(Request $request, string $id)
     {
-        if (!$this->isAdminRequest($request)) {
+        if (!$this->isSuperAdminRequest($request)) {
             return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
         }
 

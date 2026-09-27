@@ -97,7 +97,7 @@ class CourseChangeRequestController extends Controller
                 'status' => 'pending',
             ]);
 
-            NotificationService::notifyAdmins(
+            NotificationService::notifySuperAdmins(
                 'course_change_request',
                 "{$user->email} requested changes to \"{$course->title}\"."
             );
@@ -132,7 +132,7 @@ class CourseChangeRequestController extends Controller
 
     public function setStatus(Request $request, string $id)
     {
-        if (!$this->isAdminRequest($request)) {
+        if (!$this->isSuperAdminRequest($request)) {
             return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
         }
 

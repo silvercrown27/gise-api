@@ -97,7 +97,7 @@ class InstructorPayoutController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isSelf = (string) $instructorPayout->instructor_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
@@ -171,7 +171,7 @@ class InstructorPayoutController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',

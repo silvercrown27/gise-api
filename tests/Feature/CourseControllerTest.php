@@ -786,7 +786,7 @@ class CourseControllerTest extends TestCase
     public function test_set_approval_status_as_admin_approves_course(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $course = Course::factory()->pendingApproval()->create();
         Sanctum::actingAs($admin);
 
@@ -802,7 +802,7 @@ class CourseControllerTest extends TestCase
     public function test_set_approval_status_as_admin_rejects_course_with_reason(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $course = Course::factory()->pendingApproval()->create();
         Sanctum::actingAs($admin);
 
@@ -820,7 +820,7 @@ class CourseControllerTest extends TestCase
     public function test_set_approval_status_writes_admin_audit_log(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $course = Course::factory()->pendingApproval()->create();
         Sanctum::actingAs($admin);
 
@@ -839,7 +839,7 @@ class CourseControllerTest extends TestCase
     public function test_set_approval_status_notifies_instructor_on_approve(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->pendingApproval()->create(['instructor_id' => $instructor->id]);
@@ -858,7 +858,7 @@ class CourseControllerTest extends TestCase
     public function test_set_approval_status_notifies_instructor_on_reject(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->pendingApproval()->create(['instructor_id' => $instructor->id]);
@@ -892,7 +892,7 @@ class CourseControllerTest extends TestCase
     public function test_set_approval_status_rejects_invalid_value(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $course = Course::factory()->pendingApproval()->create();
         Sanctum::actingAs($admin);
 
@@ -906,7 +906,7 @@ class CourseControllerTest extends TestCase
     public function test_set_approval_status_returns_404_for_missing_course(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         Sanctum::actingAs($admin);
 
         $response = $this->patchJson('/api/courses/' . fake()->uuid() . '/approval-status', [

@@ -45,7 +45,7 @@ class ModuleQuizController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -74,19 +74,15 @@ class ModuleQuizController extends Controller
         try {
             $data = $request->all();
 
-            if ($user->role === 'admin') {
-                $data['admin_approval_status'] = 'approved';
-                $data['admin_rejection_reason'] = null;
-            } else {
-                $data['admin_approval_status'] = 'pending';
-                $data['admin_rejection_reason'] = null;
-            }
+            // Super admins publish directly; everyone else's new content waits for them.
+            $data['admin_approval_status'] = $user->isSuperAdmin() ? 'approved' : 'pending';
+            $data['admin_rejection_reason'] = null;
 
             $quiz = ModuleQuiz::create($data);
             $quiz->refresh();
 
-            if ($user->role !== 'admin') {
-                NotificationService::notifyAdmins(
+            if (!$user->isSuperAdmin()) {
+                NotificationService::notifySuperAdmins(
                     'quiz_review',
                     "{$user->email} submitted a new quiz \"{$quiz->title}\" for review."
                 );
@@ -131,7 +127,7 @@ class ModuleQuizController extends Controller
             $authUser = $request->user('sanctum');
             $caller = $authUser ? ScholarUser::find($authUser->id) : null;
 
-            if ($caller && in_array($caller->role, ['instructor', 'admin'])) {
+            if ($caller && in_array($caller->role, ['instructor', 'admin', 'super_admin'])) {
                 $quiz->questions->each->makeVisible('correct_option_key');
             } else {
                 $quiz->questions->each->makeHidden('correct_option_key');
@@ -154,7 +150,7 @@ class ModuleQuizController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -192,21 +188,19 @@ class ModuleQuizController extends Controller
 
             $data = $request->all();
 
-            if ($user->role === 'admin') {
-                $data['admin_approval_status'] = 'approved';
-                $data['admin_rejection_reason'] = null;
-            } else {
+            if (!$user->isAdmin()) {
                 unset($data['module_id']);
-                // An instructor's own edit always sends the quiz back for
-                // re-review, even if it was previously approved.
-                $data['admin_approval_status'] = 'pending';
-                $data['admin_rejection_reason'] = null;
             }
+
+            // Only a super admin's edit stays live; anyone else's (admin or
+            // instructor) sends the quiz back for super admin review.
+            $data['admin_approval_status'] = $user->isSuperAdmin() ? 'approved' : 'pending';
+            $data['admin_rejection_reason'] = null;
 
             $quiz->update($data);
 
-            if ($user->role !== 'admin') {
-                NotificationService::notifyAdmins(
+            if (!$user->isSuperAdmin()) {
+                NotificationService::notifySuperAdmins(
                     'quiz_review',
                     "{$user->email} updated the quiz \"{$quiz->title}\", which needs re-review."
                 );
@@ -230,7 +224,7 @@ class ModuleQuizController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -273,7 +267,7 @@ class ModuleQuizController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -311,7 +305,8 @@ class ModuleQuizController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        // Approvals are a super admin decision.
+        if (!$user || !$user->isSuperAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',

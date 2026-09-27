@@ -39,7 +39,7 @@ class TestimonialController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -104,7 +104,7 @@ class TestimonialController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -151,7 +151,7 @@ class TestimonialController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',

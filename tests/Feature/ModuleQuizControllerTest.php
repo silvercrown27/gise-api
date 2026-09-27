@@ -163,7 +163,7 @@ class ModuleQuizControllerTest extends TestCase
     public function test_store_as_instructor_sets_pending_and_notifies_admins(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -184,7 +184,7 @@ class ModuleQuizControllerTest extends TestCase
     public function test_store_as_admin_sets_approved(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $module = CourseModule::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -251,7 +251,7 @@ class ModuleQuizControllerTest extends TestCase
     public function test_update_as_instructor_resets_to_pending_even_if_previously_approved(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -273,7 +273,7 @@ class ModuleQuizControllerTest extends TestCase
     public function test_update_as_admin_keeps_approved(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $quiz = ModuleQuiz::factory()->create(['admin_approval_status' => 'pending']);
         Sanctum::actingAs($admin);
 
@@ -416,7 +416,7 @@ class ModuleQuizControllerTest extends TestCase
     public function test_set_approval_status_rejects_invalid_value(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $quiz = ModuleQuiz::factory()->create(['admin_approval_status' => 'pending']);
         Sanctum::actingAs($admin);
 
@@ -430,7 +430,7 @@ class ModuleQuizControllerTest extends TestCase
     public function test_set_approval_status_as_admin_approves_and_notifies_instructor(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -457,7 +457,7 @@ class ModuleQuizControllerTest extends TestCase
     public function test_set_approval_status_as_admin_rejects_with_reason_and_notifies_instructor(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -481,7 +481,7 @@ class ModuleQuizControllerTest extends TestCase
     public function test_set_approval_status_reset_to_pending(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $quiz = ModuleQuiz::factory()->create(['admin_approval_status' => 'approved']);
         Sanctum::actingAs($admin);
 

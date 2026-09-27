@@ -55,7 +55,7 @@ class UserSettingsController extends Controller
 
         try {
             $user = ScholarUser::find($request->user()->id);
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
 
             $data = $request->all();
 
@@ -94,7 +94,7 @@ class UserSettingsController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $userSetting->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {
@@ -140,7 +140,7 @@ class UserSettingsController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $userSetting->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {
@@ -185,7 +185,7 @@ class UserSettingsController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $userSetting->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {

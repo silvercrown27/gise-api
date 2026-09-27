@@ -33,7 +33,7 @@ class CourseChangeRequestControllerTest extends TestCase
     private function admin(): User
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         return $admin;
     }

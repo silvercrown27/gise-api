@@ -103,7 +103,7 @@ class InstructorProfileController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isSelf = (string) $instructorProfile->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
@@ -143,7 +143,7 @@ class InstructorProfileController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isSelf = $user && $user->role === 'instructor' && (string) $instructorProfile->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isSelf) {
@@ -197,7 +197,8 @@ class InstructorProfileController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        // Approvals are a super admin decision.
+        if (!$user || !$user->isSuperAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -277,7 +278,7 @@ class InstructorProfileController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || $user->role !== 'admin') {
+            if (!$user || !$user->isAdmin()) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',

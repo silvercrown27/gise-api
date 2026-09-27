@@ -83,7 +83,7 @@ class CohortMentorApplicationControllerTest extends TestCase
     public function test_store_succeeds_for_approved_instructor_and_notifies_admins(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         $instructor = $this->approvedInstructor();
         $cohort = Cohort::factory()->create();
@@ -223,7 +223,7 @@ class CohortMentorApplicationControllerTest extends TestCase
     public function test_set_approval_status_approve_notifies_instructor_and_writes_audit_log(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $instructor = $this->approvedInstructor();
         $application = CohortMentorApplication::factory()->create(['instructor_id' => $instructor->id]);
         Sanctum::actingAs($admin);
@@ -246,7 +246,7 @@ class CohortMentorApplicationControllerTest extends TestCase
     public function test_set_approval_status_reject_notifies_instructor(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $instructor = $this->approvedInstructor();
         $application = CohortMentorApplication::factory()->create(['instructor_id' => $instructor->id]);
         Sanctum::actingAs($admin);
@@ -266,7 +266,7 @@ class CohortMentorApplicationControllerTest extends TestCase
     public function test_set_approval_status_reset_clears_reviewed_fields(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $application = CohortMentorApplication::factory()->approved()->create();
         Sanctum::actingAs($admin);
 

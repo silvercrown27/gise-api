@@ -47,7 +47,7 @@ class CategoryController extends Controller
         $user = ScholarUser::find($request->user()->id);
 
         // Sub-distinctions shape the public catalogue, so only admins manage them.
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -113,7 +113,7 @@ class CategoryController extends Controller
         $user = ScholarUser::find($request->user()->id);
 
         // Sub-distinctions shape the public catalogue, so only admins manage them.
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -173,7 +173,7 @@ class CategoryController extends Controller
         $user = ScholarUser::find($request->user()->id);
 
         // Sub-distinctions shape the public catalogue, so only admins manage them.
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',

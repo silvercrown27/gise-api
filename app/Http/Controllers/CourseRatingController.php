@@ -51,7 +51,7 @@ class CourseRatingController extends Controller
 
         try {
             $user = ScholarUser::find($request->user()->id);
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
 
             $data = $request->all();
 
@@ -125,7 +125,7 @@ class CourseRatingController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $courseRating->learner_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {
@@ -170,7 +170,7 @@ class CourseRatingController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $courseRating->learner_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {

@@ -22,6 +22,7 @@ use App\Helpers\Utilities;
 use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
 use App\Models\SiteUpdate;
+use App\Services\NotificationService;
 use App\Notifications\OtpVerificationNotification;
 use App\Notifications\ResetPasswordNotification;
 use App\Notifications\WelcomeNotification;
@@ -72,6 +73,11 @@ class AuthController extends Controller
 
             if ($role === 'instructor') {
                 InstructorProfile::create(['user_id' => $user->id]);
+                NotificationService::notifySuperAdmins(
+                    'instructor_approval',
+                    "{$fullName} signed up as an instructor and needs approval.",
+                    '/admin/instructors'
+                );
             }
 
             $words = [$request->first_name, $request->last_name];

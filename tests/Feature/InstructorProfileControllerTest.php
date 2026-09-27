@@ -236,7 +236,7 @@ class InstructorProfileControllerTest extends TestCase
     public function test_set_approval_status_as_admin_approves_instructor(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $profile = InstructorProfile::factory()->pending()->create();
         Sanctum::actingAs($admin);
 
@@ -255,7 +255,7 @@ class InstructorProfileControllerTest extends TestCase
     public function test_set_approval_status_as_admin_bans_instructor(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $profile = InstructorProfile::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -273,7 +273,7 @@ class InstructorProfileControllerTest extends TestCase
     public function test_set_approval_status_writes_admin_audit_log(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $profile = InstructorProfile::factory()->pending()->create();
         Sanctum::actingAs($admin);
 
@@ -292,7 +292,7 @@ class InstructorProfileControllerTest extends TestCase
     public function test_set_approval_status_notifies_instructor_on_approve(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $profile = InstructorProfile::factory()->pending()->create();
         Sanctum::actingAs($admin);
 
@@ -309,7 +309,7 @@ class InstructorProfileControllerTest extends TestCase
     public function test_set_approval_status_notifies_instructor_on_ban(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $profile = InstructorProfile::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -326,7 +326,7 @@ class InstructorProfileControllerTest extends TestCase
     public function test_set_approval_status_reset_to_pending_does_not_notify(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $profile = InstructorProfile::factory()->create(['approval_status' => 'approved']);
         Sanctum::actingAs($admin);
 
@@ -363,7 +363,7 @@ class InstructorProfileControllerTest extends TestCase
     public function test_set_approval_status_rejects_invalid_value(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $profile = InstructorProfile::factory()->pending()->create();
         Sanctum::actingAs($admin);
 
@@ -377,7 +377,7 @@ class InstructorProfileControllerTest extends TestCase
     public function test_set_approval_status_returns_404_for_missing_profile(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         Sanctum::actingAs($admin);
 
         $response = $this->patchJson('/api/instructor-profiles/' . fake()->uuid() . '/approval-status', [

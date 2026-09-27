@@ -187,19 +187,17 @@ class ScholarUserControllerTest extends TestCase
         $this->assertDatabaseHas('scholar_users', ['id' => $scholarUser->id, 'role' => 'student']);
     }
 
-    public function test_update_as_admin_can_change_role(): void
+    public function test_profile_update_never_changes_role(): void
     {
+        // Roles only change through PATCH /scholar-users/{id}/role (super admins).
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $target = ScholarUser::factory()->create(['role' => 'student']);
         Sanctum::actingAs($admin);
 
-        $response = $this->patchJson("/api/scholar-users/{$target->id}", [
-            'role' => 'instructor',
-        ]);
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('data.role', 'instructor');
+        $this->patchJson("/api/scholar-users/{$target->id}", ['role' => 'admin', 'phone' => '0712000000'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.role', 'student');
     }
 
     public function test_update_validation_failure_returns_422(): void
@@ -209,7 +207,7 @@ class ScholarUserControllerTest extends TestCase
         Sanctum::actingAs($user);
 
         $response = $this->patchJson("/api/scholar-users/{$scholarUser->id}", [
-            'role' => 'not-a-real-role',
+            'status' => 'not-a-real-status',
         ]);
 
         $response->assertStatus(422);

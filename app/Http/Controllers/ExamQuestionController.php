@@ -41,13 +41,13 @@ class ExamQuestionController extends Controller
                             $q2->where('learner_id', $request->user()->id);
                         });
                 });
-            } elseif (!$user || $user->role !== 'admin') {
+            } elseif (!$user || !$user->isAdmin()) {
                 $query->where('id', null);
             }
 
             $results = $query->orderBy('order_index', 'asc')->paginate(30);
 
-            if ($user && in_array($user->role, ['instructor', 'admin'])) {
+            if ($user && in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 $results->getCollection()->transform(function ($question) {
                     return $question->makeVisible('correct_answer');
                 });
@@ -130,7 +130,7 @@ class ExamQuestionController extends Controller
                 ], 404);
             }
 
-            if ($user && in_array($user->role, ['instructor', 'admin'])) {
+            if ($user && in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 $examQuestion->makeVisible('correct_answer');
             }
 
@@ -187,7 +187,7 @@ class ExamQuestionController extends Controller
 
             $data = $request->all();
 
-            if ($user->role !== 'admin') {
+            if (!$user->isAdmin()) {
                 unset($data['exam_id']);
             }
 
@@ -268,7 +268,7 @@ class ExamQuestionController extends Controller
             return;
         }
 
-        if ($user->role === 'admin') {
+        if ($user->isSuperAdmin()) {
             if ($exam->admin_approval_status !== 'approved') {
                 $exam->forceFill(['admin_approval_status' => 'approved', 'admin_rejection_reason' => null])->save();
             }
@@ -277,7 +277,7 @@ class ExamQuestionController extends Controller
 
         $exam->forceFill(['admin_approval_status' => 'pending', 'admin_rejection_reason' => null])->save();
 
-        NotificationService::notifyAdmins(
+        NotificationService::notifySuperAdmins(
             'exam_review',
             "{$user->email} changed a question on the exam \"{$exam->title}\", which needs re-review."
         );

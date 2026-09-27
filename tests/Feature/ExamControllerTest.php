@@ -77,7 +77,7 @@ class ExamControllerTest extends TestCase
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         Sanctum::actingAs($instructor);
 
@@ -100,7 +100,7 @@ class ExamControllerTest extends TestCase
     public function test_store_as_admin_is_auto_approved(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $course = Course::factory()->create();
         Sanctum::actingAs($admin);
 
@@ -307,7 +307,7 @@ class ExamControllerTest extends TestCase
     public function test_update_as_admin_stays_approved(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $exam = Exam::factory()->create(['admin_approval_status' => 'pending']);
         Sanctum::actingAs($admin);
 
@@ -365,7 +365,7 @@ class ExamControllerTest extends TestCase
     public function test_set_approval_status_approve_notifies_instructor_and_logs_audit(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $instructor = User::factory()->create();
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         $exam = Exam::factory()->create(['course_id' => $course->id, 'admin_approval_status' => 'pending']);
@@ -391,7 +391,7 @@ class ExamControllerTest extends TestCase
     public function test_set_approval_status_reject_stores_reason(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $exam = Exam::factory()->create(['admin_approval_status' => 'pending']);
         Sanctum::actingAs($admin);
 
@@ -408,7 +408,7 @@ class ExamControllerTest extends TestCase
     public function test_set_approval_status_rejects_invalid_status(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $exam = Exam::factory()->create();
         Sanctum::actingAs($admin);
 

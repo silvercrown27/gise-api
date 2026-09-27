@@ -187,6 +187,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/',      [ScholarUserController::class, 'store']);
         Route::get('/{id}',   [ScholarUserController::class, 'show']);
         Route::patch('/{id}', [ScholarUserController::class, 'update']);
+        Route::patch('/{id}/role', [ScholarUserController::class, 'setRole']);
         Route::delete('/{id}', [ScholarUserController::class, 'delete']);
     });
 

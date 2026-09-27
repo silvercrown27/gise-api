@@ -55,7 +55,7 @@ class LessonProgressController extends Controller
 
         try {
             $user = ScholarUser::find($request->user()->id);
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
 
             if (!$isElevated) {
                 $enrollment = Enrollment::find($request->input('enrollment_id'));
@@ -101,7 +101,7 @@ class LessonProgressController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
             $isOwner = $lessonProgress->enrollment && (string) $lessonProgress->enrollment->learner_id === (string) $request->user()->id;
 
             if (!$isElevated && !$isOwner) {
@@ -147,7 +147,7 @@ class LessonProgressController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
             $isOwner = $lessonProgress->enrollment && (string) $lessonProgress->enrollment->learner_id === (string) $request->user()->id;
 
             if (!$isElevated && !$isOwner) {
@@ -180,7 +180,7 @@ class LessonProgressController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+            if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',

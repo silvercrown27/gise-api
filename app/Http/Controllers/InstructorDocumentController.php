@@ -118,7 +118,7 @@ class InstructorDocumentController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $document->instructor_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {
@@ -154,7 +154,7 @@ class InstructorDocumentController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $document->instructor_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {

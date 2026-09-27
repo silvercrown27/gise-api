@@ -100,7 +100,7 @@ class CohortMentorApplicationController extends Controller
             ]);
             $application->load(['cohort.course', 'instructor:id,name,email']);
 
-            NotificationService::notifyAdmins(
+            NotificationService::notifySuperAdmins(
                 'mentor_application',
                 "{$user->email} applied to mentor \"{$application->cohort->label}\" ({$application->cohort->course->title})."
             );
@@ -132,7 +132,7 @@ class CohortMentorApplicationController extends Controller
             }
 
             $user = ScholarUser::find($request->user()->id);
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isApplicant = (string) $application->instructor_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isApplicant) {
@@ -163,7 +163,8 @@ class CohortMentorApplicationController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        // Approvals are a super admin decision.
+        if (!$user || !$user->isSuperAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -252,7 +253,7 @@ class CohortMentorApplicationController extends Controller
             }
 
             $user = ScholarUser::find($request->user()->id);
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isApplicant = (string) $application->instructor_id === (string) $request->user()->id;
 
             if ($isAdmin) {

@@ -50,7 +50,7 @@ class CourseLessonController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -141,7 +141,7 @@ class CourseLessonController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -193,7 +193,7 @@ class CourseLessonController extends Controller
                 ], 403);
             }
 
-            if ($user->role !== 'admin') {
+            if (!$user->isAdmin()) {
                 unset($data['module_id']);
             }
 
@@ -219,7 +219,7 @@ class CourseLessonController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -274,7 +274,7 @@ class CourseLessonController extends Controller
             return;
         }
 
-        if ($user->role === 'admin') {
+        if ($user->isSuperAdmin()) {
             if ($module->admin_approval_status !== 'approved') {
                 $module->forceFill(['admin_approval_status' => 'approved', 'admin_rejection_reason' => null])->save();
             }
@@ -283,7 +283,7 @@ class CourseLessonController extends Controller
 
         $module->forceFill(['admin_approval_status' => 'pending', 'admin_rejection_reason' => null])->save();
 
-        NotificationService::notifyAdmins(
+        NotificationService::notifySuperAdmins(
             'module_review',
             "{$user->email} changed a lesson in the module \"{$module->title}\", which needs re-review."
         );

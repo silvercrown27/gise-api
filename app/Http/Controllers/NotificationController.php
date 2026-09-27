@@ -41,7 +41,7 @@ class NotificationController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -90,7 +90,7 @@ class NotificationController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $notification->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {
@@ -126,7 +126,7 @@ class NotificationController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $notification->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {
@@ -171,7 +171,7 @@ class NotificationController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $notification->user_id === (string) $request->user()->id;
 
             if (!$isAdmin && !$isOwner) {

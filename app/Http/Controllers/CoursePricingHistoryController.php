@@ -99,7 +99,7 @@ class CoursePricingHistoryController extends Controller
                 ], 404);
             }
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $coursePricingHistory->course
                 && $coursePricingHistory->course->isManageableBy($request->user()->id);

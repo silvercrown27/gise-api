@@ -114,7 +114,7 @@ class ModuleQuizQuestionControllerTest extends TestCase
     public function test_store_as_instructor_flips_parent_quiz_to_pending_and_notifies_admins(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -137,7 +137,7 @@ class ModuleQuizQuestionControllerTest extends TestCase
     public function test_store_as_admin_on_pending_quiz_reapproves_it(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         $quiz = ModuleQuiz::factory()->create(['admin_approval_status' => 'pending']);
         Sanctum::actingAs($admin);
 

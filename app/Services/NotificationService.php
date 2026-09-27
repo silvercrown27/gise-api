@@ -55,10 +55,21 @@ class NotificationService
     }
 
     /**
-     * Sugar for notifying every admin.
+     * Every staff member - admins and super admins. For operational events
+     * (brochure requests, new enrollments) anyone on staff can handle.
      */
     public static function notifyAdmins(string $type, string $message, ?string $link = null): void
     {
         self::notifyRole('admin', $type, $message, $link);
+        self::notifyRole('super_admin', $type, $message, $link);
+    }
+
+    /**
+     * Only super admins - for things only they can approve (instructors,
+     * courses, course content, mentor applications, change requests).
+     */
+    public static function notifySuperAdmins(string $type, string $message, ?string $link = null): void
+    {
+        self::notifyRole('super_admin', $type, $message, $link);
     }
 }

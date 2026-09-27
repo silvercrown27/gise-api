@@ -251,7 +251,7 @@ class CourseController extends Controller
             $userId = $request->user()->id;
             $user = ScholarUser::find($userId);
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $course->isManageableBy($userId);
 
@@ -371,7 +371,7 @@ class CourseController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -439,7 +439,7 @@ class CourseController extends Controller
 
         // Courses are centrally managed by the super admin. Instructors take
         // part by applying to mentor a cohort, not by creating courses.
-        if (!$user || $user->role !== 'admin') {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Only an admin can create courses. Instructors can apply to mentor a cohort instead.',
@@ -480,7 +480,18 @@ class CourseController extends Controller
 
         try {
             $course = Course::create($data);
+            // A super admin's course goes live; an admin's waits for one to approve it.
+            $isSuperAdmin = $user->isSuperAdmin();
+            $course->forceFill(['admin_approval_status' => $isSuperAdmin ? 'approved' : 'pending'])->save();
             $course->refresh();
+
+            if (!$isSuperAdmin) {
+                NotificationService::notifySuperAdmins(
+                    'course_review',
+                    "{$user->email} created the course \"{$course->title}\" - it needs approval before it goes live.",
+                    '/admin/courses'
+                );
+            }
 
             return response()->json([
                 'status'  => 201,
@@ -517,7 +528,7 @@ class CourseController extends Controller
             $authUser = $request->user('sanctum');
             $user = $authUser ? ScholarUser::find($authUser->id) : null;
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             $isOwningInstructor = $user && $user->role === 'instructor'
                 && $course->isManageableBy($authUser->id);
 
@@ -563,7 +574,7 @@ class CourseController extends Controller
 
             $user = ScholarUser::find($request->user()->id);
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             if (!$isAdmin) {
                 return response()->json([
                     'status'  => 403,
@@ -627,7 +638,8 @@ class CourseController extends Controller
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || $user->role !== 'admin') {
+        // Approvals are a super admin decision.
+        if (!$user || !$user->isSuperAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -715,7 +727,7 @@ class CourseController extends Controller
 
             $user = ScholarUser::find($request->user()->id);
 
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $user && $user->isAdmin();
             if (!$isAdmin) {
                 return response()->json([
                     'status'  => 403,

@@ -67,7 +67,7 @@ class ExamSubmissionController extends Controller
 
         try {
             $user = ScholarUser::find($request->user()->id);
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
 
             $data = $request->all();
             $exam = Exam::find($data['exam_id'] ?? null);
@@ -149,7 +149,7 @@ class ExamSubmissionController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
             $isOwner = (string) $examSubmission->learner_id === (string) $request->user()->id;
 
             if (!$isElevated && !$isOwner) {
@@ -195,7 +195,7 @@ class ExamSubmissionController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
             $isOwner = (string) $examSubmission->learner_id === (string) $request->user()->id;
 
             if (!$isElevated && !$isOwner) {
@@ -232,7 +232,7 @@ class ExamSubmissionController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+            if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',

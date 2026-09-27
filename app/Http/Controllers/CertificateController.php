@@ -58,7 +58,7 @@ class CertificateController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+            if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -96,7 +96,7 @@ class CertificateController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin']);
+            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
             $isOwner = $certificate->enrollment && (string) $certificate->enrollment->learner_id === (string) $request->user()->id;
 
             if (!$isElevated && !$isOwner) {
@@ -134,7 +134,7 @@ class CertificateController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || !in_array($user->role, ['instructor', 'admin'])) {
+            if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -171,7 +171,7 @@ class CertificateController extends Controller
         try {
             $user = ScholarUser::find($request->user()->id);
 
-            if (!$user || $user->role !== 'admin') {
+            if (!$user || !$user->isAdmin()) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',

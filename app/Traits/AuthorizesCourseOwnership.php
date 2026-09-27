@@ -26,7 +26,7 @@ trait AuthorizesCourseOwnership
             return false;
         }
 
-        if ($user->role === 'admin') {
+        if ($user->isAdmin()) {
             return true;
         }
 
@@ -37,6 +37,17 @@ trait AuthorizesCourseOwnership
     {
         $user = $request->user() ? ScholarUser::find($request->user()->id) : null;
 
-        return $user && $user->role === 'admin';
+        return $user && $user->isAdmin();
+    }
+
+    /**
+     * Super admins approve content and publish directly; everyone else's
+     * content changes wait for their review.
+     */
+    protected function isSuperAdminRequest(Request $request): bool
+    {
+        $user = $request->user() ? ScholarUser::find($request->user()->id) : null;
+
+        return $user && $user->isSuperAdmin();
     }
 }
