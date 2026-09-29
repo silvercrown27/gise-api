@@ -1,10 +1,10 @@
 @extends('emails.layout')
 
-@section('title', 'Welcome to GISE')
+@section('title', 'Welcome to GISE Africa')
 
 @section('content')
     <p style="margin:0 0 16px;">Hi {{ $name }},</p>
-    <p style="margin:0 0 16px;">Welcome to the Global Institute for Skills Excellence. Your account is ready.</p>
+    <p style="margin:0 0 16px;">Welcome to the Global Institute For Skills And Excellence Africa. Your account is ready.</p>
     <p style="margin:0 0 24px;">Browse O-Level, A-Level and professional courses, pick a physical or virtual cohort, and register when you're ready.</p>
     <p style="margin:0;">
         <a href="{{ rtrim(config('app.frontend_url'), '/') }}/courses"

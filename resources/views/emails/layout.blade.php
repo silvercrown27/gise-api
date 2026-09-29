@@ -1,4 +1,4 @@
-{{-- Shared shell for GISE emails. Table layout + inline styles so it renders in every mail client. --}}
+{{-- Shared shell for GISE Africa emails. Table layout + inline styles so it renders in every mail client. --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,8 +13,8 @@
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;border:1px solid #dfe7e1;">
                     <tr>
                         <td style="padding:28px 32px 0;">
-                            <p style="margin:0;font-size:18px;font-weight:700;color:#0c6b44;">GISE</p>
-                            <p style="margin:2px 0 0;font-size:12px;color:#6b7a72;">Global Institute for Skills Excellence</p>
+                            <p style="margin:0;font-size:18px;font-weight:700;color:#0c6b44;">GISE Africa</p>
+                            <p style="margin:2px 0 0;font-size:12px;color:#6b7a72;">Global Institute For Skills And Excellence Africa</p>
                         </td>
                     </tr>
                     <tr>
@@ -23,8 +23,10 @@
                         </td>
                     </tr>
                 </table>
-                <p style="margin:16px 0 0;font-size:12px;color:#6b7a72;">
-                    You're receiving this because of activity on your GISE account.
+                <p style="margin:16px 0 0;font-size:12px;line-height:1.6;color:#6b7a72;">
+                    You're receiving this because of activity on your GISE Africa account.<br>
+                    <a href="mailto:info@giseafrica.com" style="color:#6b7a72;">info@giseafrica.com</a> &middot; +254 727 427839<br>
+                    Bimz Plaza, CFSK road, Utawala, Nairobi, Kenya
                 </p>
             </td>
         </tr>
