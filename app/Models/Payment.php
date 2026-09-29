@@ -26,6 +26,7 @@ class Payment extends Model
         'payment_method',
         'payment_gateway',
         'reference',
+        'invoice_number',
         'channel',
         'gateway_transaction_id',
         'gateway_response',

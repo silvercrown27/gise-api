@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\Payment;
 use App\Models\ScholarUser;
+use App\Services\PaymentInvoice;
 
 class PaymentController extends Controller
 {
@@ -110,6 +111,38 @@ class PaymentController extends Controller
             return response()->json([
                 'status'  => 500,
                 'message' => 'An error occurred while retrieving the payment.',
+            ], 500);
+        }
+    }
+
+    /** The payment's invoice as a PDF download - for the payer or an admin, once paid. */
+    public function invoice(Request $request, string $id)
+    {
+        try {
+            $user = ScholarUser::find($request->user()->id);
+            $payment = Payment::find($id);
+
+            // Someone else's payment reads as missing rather than forbidden.
+            if (!$payment || (!$user?->isAdmin() && (string) $payment->learner_id !== (string) $request->user()->id)) {
+                return response()->json([
+                    'status'  => 404,
+                    'message' => 'Payment not found.',
+                ], 404);
+            }
+
+            if (!PaymentInvoice::isInvoiceable($payment)) {
+                return response()->json([
+                    'status'  => 409,
+                    'message' => 'An invoice is available once the payment is complete.',
+                ], 409);
+            }
+
+            return PaymentInvoice::pdf($payment)->download(PaymentInvoice::filename($payment));
+        } catch (\Exception $e) {
+            Log::error('PaymentController@invoice: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while generating the invoice.',
             ], 500);
         }
     }

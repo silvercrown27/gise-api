@@ -254,6 +254,7 @@ class PaystackCheckoutTest extends TestCase
         $this->assertSame('4099260516', $payment->gateway_transaction_id);
         $this->assertSame('card', $payment->payment_method);
         $this->assertNotNull($payment->paid_at);
+        $this->assertSame('INV-2026-00001', $payment->invoice_number);
 
         $enrollment = Enrollment::where('learner_id', $learner->id)->firstOrFail();
         $this->assertSame((string) $cohort->id, $enrollment->cohort_id);

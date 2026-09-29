@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\ScholarUser;
 use App\Services\CourseRegistration;
 use App\Services\NotificationService;
+use App\Services\PaymentInvoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -258,6 +259,8 @@ class PaystackController extends Controller
                 'payment_method'         => in_array($channel, ['card', 'mobile_money'], true) ? $channel : null,
                 'gateway_response'       => Paystack::receipt($transaction),
             ]);
+
+            PaymentInvoice::assignNumber($payment);
 
             $course = Course::find($payment->course_id);
             $existing = CourseRegistration::existingEnrollment($payment->learner_id, $course);
