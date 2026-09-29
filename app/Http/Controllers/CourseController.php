@@ -71,7 +71,7 @@ class CourseController extends Controller
 
             return response()->json([
                 'status' => 200,
-                'data'   => $catalogue->facets(),
+                'data'   => $catalogue->facets($request->boolean('include_empty')),
             ], 200);
         } catch (\Exception $e) {
             Log::error('CourseController@facets: ' . $e->getMessage());

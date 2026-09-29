@@ -90,6 +90,23 @@ class CourseCatalogueTest extends TestCase
         $this->assertSame([(string) $nairobi->id], $ids('licences=without'));
     }
 
+    public function test_facets_hide_empty_categories_unless_asked_to_include_them(): void
+    {
+        $used = Category::factory()->create(['name' => 'Data', 'slug' => 'data', 'classification' => 'skills_professional']);
+        Category::factory()->create(['name' => 'Brand New', 'slug' => 'brand-new', 'classification' => 'skills_professional']);
+        $this->publishedCourse(['category_id' => $used->id]);
+
+        // Filters on the courses page: a category with no courses would be a dead end.
+        $names = collect($this->getJson('/api/courses/facets')->json('data.categories'))->pluck('name');
+        $this->assertSame(['Data'], $names->all());
+
+        // The footer lists everything the admin has created.
+        $all = collect($this->getJson('/api/courses/facets?include_empty=1')->json('data.categories'))->keyBy('name');
+        $this->assertSame(['Brand New', 'Data'], $all->keys()->sort()->values()->all());
+        $this->assertSame(0, $all['Brand New']['count']);
+        $this->assertSame(1, $all['Data']['count']);
+    }
+
     public function test_facets_count_each_group_without_its_own_selection(): void
     {
         $maths = Category::factory()->create(['slug' => 'maths', 'name' => 'Mathematics', 'classification' => 'a_level']);

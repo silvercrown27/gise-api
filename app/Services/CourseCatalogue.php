@@ -160,8 +160,12 @@ class CourseCatalogue
     /**
      * Counts for every filter group, each computed without its own selection
      * so options stay switchable.
+     *
+     * Categories with no matching courses are left out, since selecting one
+     * would only show an empty page - unless $includeEmpty is set, which the
+     * site footer uses to list every category the admin has created.
      */
-    public function facets(): array
+    public function facets(bool $includeEmpty = false): array
     {
         $classifications = $this->query(['classification', 'category'])
             ->select('courses.classification', DB::raw('count(*) as total'))
@@ -185,7 +189,7 @@ class CourseCatalogue
                 'classification' => $category->classification,
                 'count' => (int) ($categoryCounts[$category->id] ?? 0),
             ])
-            ->filter(fn ($category) => $category['count'] > 0 || $category['slug'] === ($this->filters['category'] ?? null))
+            ->filter(fn ($category) => $includeEmpty || $category['count'] > 0 || $category['slug'] === ($this->filters['category'] ?? null))
             ->values();
 
         $cohortsFor = fn (array $except) => self::upcoming(
