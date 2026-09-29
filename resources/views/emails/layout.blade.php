@@ -13,8 +13,8 @@
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;border:1px solid #dfe7e1;">
                     <tr>
                         <td style="padding:28px 32px 0;">
-                            <p style="margin:0;font-size:18px;font-weight:700;color:#0c6b44;">GISE Africa</p>
-                            <p style="margin:2px 0 0;font-size:12px;color:#6b7a72;">Global Institute For Skills And Excellence Africa</p>
+                            {{-- Hosted by the website (public/brand); alt text stands in when images are blocked. --}}
+                            <img src="{{ rtrim(config('app.frontend_url'), '/') }}/brand/logo-email.png" width="111" height="44" alt="GISE Africa - Global Institute For Skills And Excellence Africa" style="display:block;border:0;outline:none;height:44px;width:111px;color:#0c6b44;font-size:16px;font-weight:700;">
                         </td>
                     </tr>
                     <tr>

@@ -9,7 +9,6 @@
         body { font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #0b1310; line-height: 1.5; }
         table { width: 100%; border-collapse: collapse; }
         .muted { color: #6b7a72; }
-        .brand { font-size: 20px; font-weight: bold; color: #0c6b44; }
         .title { font-size: 24px; font-weight: bold; text-align: right; }
         .label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6b7a72; margin-bottom: 4px; }
         .box { border: 1px solid #dfe7e1; border-radius: 8px; padding: 12px 14px; vertical-align: top; }
@@ -26,9 +25,8 @@
     <table>
         <tr>
             <td style="vertical-align: top;">
-                <div class="brand">GISE Africa</div>
-                <div class="muted">Global Institute For Skills And Excellence Africa</div>
-                <div class="muted" style="margin-top: 6px;">
+                <img src="data:image/png;base64,{{ base64_encode(file_get_contents(resource_path('brand/logo.png'))) }}" alt="GISE Africa" style="height: 56px;">
+                <div class="muted" style="margin-top: 8px;">
                     Bimz Plaza, CFSK road, Utawala<br>
                     Nairobi, Kenya<br>
                     info@giseafrica.com · +254 727 427839
