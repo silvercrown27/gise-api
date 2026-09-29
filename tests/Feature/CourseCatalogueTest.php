@@ -164,9 +164,14 @@ class CourseCatalogueTest extends TestCase
         $cohort = Cohort::factory()->physical()->create(['course_id' => $course->id, 'price' => 650, 'start_date' => now()->addWeek(), 'status' => 'open']);
         CourseTool::factory()->create(['course_id' => $course->id, 'licence_price' => 120]);
 
+        // Learners pay through Paystack first; an admin placing them directly
+        // gets the same server-side quote.
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        Sanctum::actingAs($admin);
+
         $withLicences = User::factory()->create();
         ScholarUser::factory()->create(['id' => $withLicences->id, 'role' => 'student']);
-        Sanctum::actingAs($withLicences);
         $this->postJson('/api/enrollments', [
             'learner_id' => $withLicences->id,
             'course_id' => $course->id,
@@ -179,7 +184,6 @@ class CourseCatalogueTest extends TestCase
 
         $without = User::factory()->create();
         ScholarUser::factory()->create(['id' => $without->id, 'role' => 'student']);
-        Sanctum::actingAs($without);
         $this->postJson('/api/enrollments', [
             'learner_id' => $without->id,
             'course_id' => $course->id,

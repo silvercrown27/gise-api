@@ -19,19 +19,29 @@ class Payment extends Model
     protected $fillable = [
         'learner_id',
         'course_id',
+        'cohort_id',
+        'with_licences',
         'amount',
         'currency',
         'payment_method',
         'payment_gateway',
+        'reference',
+        'channel',
         'gateway_transaction_id',
+        'gateway_response',
         'status',
         'paid_at',
     ];
 
     protected $casts = [
         'amount' => 'integer',
+        'with_licences' => 'boolean',
+        'gateway_response' => 'array',
         'paid_at' => 'datetime',
     ];
+
+    // Raw Paystack payloads are for support staff, not for API responses.
+    protected $hidden = ['gateway_response'];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
 
@@ -63,6 +73,11 @@ class Payment extends Model
     public function course()
     {
         return $this->belongsTo(Course::class, 'course_id');
+    }
+
+    public function cohort()
+    {
+        return $this->belongsTo(Cohort::class, 'cohort_id');
     }
 
     public function refunds()

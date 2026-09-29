@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\Cohort;
 use App\Models\Enrollment;
+use App\Services\CourseRegistration;
 use App\Models\ScholarUser;
 use App\Models\Course;
 
@@ -99,74 +99,28 @@ class EnrollmentController extends Controller
             $course = Course::find($data['course_id']);
             $cohort = !empty($data['cohort_id']) ? Cohort::find($data['cohort_id']) : null;
 
-            if ($cohort && (string) $cohort->course_id !== (string) $course->id) {
-                return $this->unprocessable('The selected cohort does not belong to this course.', 'cohort_id');
+            if ($blocked = CourseRegistration::blockedReason($data['learner_id'], $course, $cohort, $isAdmin)) {
+                return $this->unprocessable(...$blocked);
             }
 
-            if (!$cohort && !$isAdmin && $course->cohorts()->exists()) {
-                return $this->unprocessable('Please choose a cohort to join.', 'cohort_id');
+            $withLicences = filter_var($data['with_licences'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+            // Paid places are only granted once Paystack confirms the charge
+            // (PaystackController); learners enroll directly only when it's free.
+            if (!$isAdmin && CourseRegistration::quote($course, $cohort, $withLicences)['fee'] > 0) {
+                return response()->json([
+                    'status'  => 402,
+                    'message' => 'Please complete payment to register for this course.',
+                ], 402);
             }
 
-            // Admins can place a learner in any cohort (e.g. a late joiner after
-            // the start date); everyone else must respect the registration rules.
-            if ($cohort && !$isAdmin && ($reason = $cohort->registrationClosedReason())) {
-                return $this->unprocessable($reason, 'cohort_id');
-            }
-
-            $existing = Enrollment::withTrashed()
-                ->where('learner_id', $data['learner_id'])
-                ->where('course_id', $course->id)
-                ->first();
-
-            if ($existing && !$existing->trashed() && $existing->enrollment_status !== 'dropped') {
-                return $this->unprocessable(
-                    $isAdmin ? 'This learner is already enrolled in this course.' : 'You are already enrolled in this course.',
-                    'course_id'
-                );
-            }
-
-            if ($course->max_students !== null) {
-                $activeEnrollments = Enrollment::where('course_id', $course->id)
-                    ->where('enrollment_status', '!=', 'dropped')
-                    ->count();
-
-                if ($activeEnrollments >= $course->max_students) {
-                    return $this->unprocessable('This course has reached its maximum number of students.');
-                }
-            }
-
-            // Licences only apply to courses that actually use tools.
-            $withLicences = filter_var($data['with_licences'] ?? false, FILTER_VALIDATE_BOOLEAN)
-                && $course->tools()->exists();
-
-            $attributes = array_merge([
-                'enrollment_status' => 'active',
-                'enrolled_at' => now(),
-            ], array_intersect_key($data, array_flip((new Enrollment)->getFillable())), [
-                'with_licences' => $withLicences,
-                'quoted_fee' => ($cohort ? $cohort->effectiveFee() : (int) $course->price)
-                    + ($withLicences ? $course->licenceTotal() : 0),
-                'currency' => $course->currency ?? 'USD',
-            ]);
-
-            // The (learner, course) pair is unique at the database level, soft
-            // deletes included, so a learner coming back after being dropped or
-            // removed re-activates their old row rather than hitting a 500.
-            $enrollment = DB::transaction(function () use ($existing, $attributes) {
-                if (!$existing) {
-                    return Enrollment::create($attributes);
-                }
-
-                if ($existing->trashed()) {
-                    $existing->restore();
-                }
-
-                $existing->update(array_merge(['completed_at' => null, 'failed_module_id' => null], $attributes));
-
-                return $existing;
-            });
-
-            $enrollment->refresh();
+            $enrollment = CourseRegistration::enroll(
+                $data['learner_id'],
+                $course,
+                $cohort,
+                $withLicences,
+                array_intersect_key($data, array_flip((new Enrollment)->getFillable()))
+            );
 
             return response()->json([
                 'status'  => 201,

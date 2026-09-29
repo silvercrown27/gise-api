@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Course;
 use App\Models\Payment;
+use App\Models\ScholarUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -61,11 +62,10 @@ class PaymentControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_store_strips_status_and_gateway_transaction_id_for_non_elevated_callers(): void
+    public function test_store_forbids_learners_from_recording_payments(): void
     {
-        // Fixed: status/gateway_transaction_id/paid_at are stripped from the payload
-        // unless the caller resolves as instructor/admin, so a learner cannot fabricate
-        // a "completed" payment record without a real gateway interaction.
+        // Payments are only recorded by the Paystack checkout, so a learner can't
+        // fabricate one - not even a "pending" one with a made-up amount.
         $attacker = User::factory()->create();
         $victim = User::factory()->create();
         $course = Course::factory()->create();
@@ -79,14 +79,14 @@ class PaymentControllerTest extends TestCase
             'gateway_transaction_id' => 'FORGED-TXN',
         ]);
 
-        $response->assertStatus(201);
-        $response->assertJsonPath('data.status', 'pending');
-        $response->assertJsonPath('data.gateway_transaction_id', null);
+        $response->assertStatus(403);
+        $this->assertDatabaseCount('payments', 0);
     }
 
     public function test_store_validation_failure_returns_422(): void
     {
         $user = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $user->id, 'role' => 'admin']);
         Sanctum::actingAs($user);
 
         $response = $this->postJson('/api/payments', []);
@@ -155,10 +155,9 @@ class PaymentControllerTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_update_strips_status_for_owner(): void
+    public function test_update_forbids_owner_from_changing_their_payment(): void
     {
-        // Fixed: even the payment's own learner cannot self-mark it completed --
-        // status is stripped from the payload for non-elevated callers.
+        // Only Paystack (or an admin) settles a payment - the learner can't mark it paid.
         $learner = User::factory()->create();
         $payment = Payment::factory()->create(['learner_id' => $learner->id, 'status' => 'pending']);
         Sanctum::actingAs($learner);
@@ -170,8 +169,8 @@ class PaymentControllerTest extends TestCase
             'status' => 'completed',
         ]);
 
-        $response->assertStatus(200);
-        $response->assertJsonPath('data.status', 'pending');
+        $response->assertStatus(403);
+        $this->assertSame('pending', $payment->fresh()->status);
     }
 
     public function test_update_requires_authentication(): void

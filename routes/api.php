@@ -35,6 +35,7 @@ use App\Http\Controllers\ExamQuestionController;
 use App\Http\Controllers\ExamSubmissionController;
 use App\Http\Controllers\ExamAnswerController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaystackController;
 use App\Http\Controllers\RefundController;
 use App\Http\Controllers\CouponController;
 use App\Http\Controllers\InstructorPayoutController;
@@ -160,6 +161,10 @@ Route::get('/tools', [ToolController::class, 'index']);
 
 // Public brochure requests - stored as leads, rate-limited per visitor.
 Route::middleware('throttle:6,1')->post('/courses/{id}/brochure-requests', [CourseLeadController::class, 'requestBrochure']);
+
+// Paystack server-to-server notifications. Public, but every request must
+// carry a valid HMAC signature (see PaystackController@webhook).
+Route::post('/paystack/webhook', [PaystackController::class, 'webhook']);
 
 // Public contact form submission - no login required, matches the frontend /contact page.
 Route::post('/contact-messages', [ContactMessageController::class, 'store']);
@@ -385,6 +390,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Payments
     Route::prefix('payments')->group(function () {
+        // Registration checkout - see PaystackController.
+        Route::middleware('throttle:10,1')->post('/paystack/initialize', [PaystackController::class, 'initialize']);
+        Route::get('/paystack/verify/{reference}', [PaystackController::class, 'verify']);
+
         Route::get('/',       [PaymentController::class, 'index']);
         Route::post('/',      [PaymentController::class, 'store']);
         Route::get('/{id}',   [PaymentController::class, 'show']);

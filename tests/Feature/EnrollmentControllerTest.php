@@ -50,7 +50,7 @@ class EnrollmentControllerTest extends TestCase
         // still requires a valid Sanctum token though.
         $response = $this->postJson('/api/enrollments', [
             'learner_id' => User::factory()->create()->id,
-            'course_id' => Course::factory()->create()->id,
+            'course_id' => Course::factory()->create(['price' => 0, 'price' => 0])->id,
         ]);
 
         $response->assertStatus(401);
@@ -61,7 +61,7 @@ class EnrollmentControllerTest extends TestCase
         $attacker = User::factory()->create();
         ScholarUser::factory()->create(['id' => $attacker->id, 'role' => 'student']);
         $victim = User::factory()->create();
-        $course = Course::factory()->create();
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]);
         Sanctum::actingAs($attacker);
 
         $response = $this->postJson('/api/enrollments', [
@@ -86,7 +86,7 @@ class EnrollmentControllerTest extends TestCase
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $learner = User::factory()->create();
-        $course = Course::factory()->create();
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]);
         Sanctum::actingAs($admin);
 
         $response = $this->postJson('/api/enrollments', [
@@ -103,7 +103,7 @@ class EnrollmentControllerTest extends TestCase
 
     public function test_store_rejects_enrollment_when_course_is_full(): void
     {
-        $course = Course::factory()->create(['max_students' => 1]);
+        $course = Course::factory()->create(['price' => 0, 'max_students' => 1]);
         $existingLearner = User::factory()->create();
         Enrollment::factory()->create([
             'course_id' => $course->id,
@@ -124,7 +124,7 @@ class EnrollmentControllerTest extends TestCase
 
     public function test_store_allows_enrollment_when_dropped_seats_free_up_capacity(): void
     {
-        $course = Course::factory()->create(['max_students' => 1]);
+        $course = Course::factory()->create(['price' => 0, 'max_students' => 1]);
         $droppedLearner = User::factory()->create();
         Enrollment::factory()->create([
             'course_id' => $course->id,
@@ -145,7 +145,7 @@ class EnrollmentControllerTest extends TestCase
 
     public function test_store_allows_enrollment_when_course_has_no_max_students(): void
     {
-        $course = Course::factory()->create(['max_students' => null]);
+        $course = Course::factory()->create(['price' => 0, 'max_students' => null]);
         Enrollment::factory()->count(5)->create(['course_id' => $course->id, 'enrollment_status' => 'active']);
 
         $newLearner = User::factory()->create();
@@ -161,8 +161,8 @@ class EnrollmentControllerTest extends TestCase
 
     public function test_store_rejects_enrollment_outside_cohort_registration_window(): void
     {
-        $course = Course::factory()->create();
-        $cohort = Cohort::factory()->create([
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]);
+        $cohort = Cohort::factory()->create(['price' => 0, 
             'course_id' => $course->id,
             'registration_opens_at' => now()->addDays(5)->toDateString(),
             'registration_closes_at' => now()->addDays(10)->toDateString(),
@@ -181,8 +181,8 @@ class EnrollmentControllerTest extends TestCase
 
     public function test_store_allows_enrollment_inside_cohort_registration_window(): void
     {
-        $course = Course::factory()->create();
-        $cohort = Cohort::factory()->create([
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]);
+        $cohort = Cohort::factory()->create(['price' => 0, 
             'course_id' => $course->id,
             'registration_opens_at' => now()->subDays(2)->toDateString(),
             'registration_closes_at' => now()->addDays(5)->toDateString(),
@@ -203,7 +203,7 @@ class EnrollmentControllerTest extends TestCase
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $course = Course::factory()->create(['price' => 0, 'instructor_id' => $instructor->id]);
         $matching = Enrollment::factory()->create(['course_id' => $course->id]);
         Enrollment::factory()->create(); // different course
         Sanctum::actingAs($instructor);
@@ -238,7 +238,7 @@ class EnrollmentControllerTest extends TestCase
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
 
-        $mentoredCohort = Cohort::factory()->create();
+        $mentoredCohort = Cohort::factory()->create(['price' => 0, 'price' => 0]);
         CohortMentorApplication::factory()->create([
             'cohort_id' => $mentoredCohort->id,
             'instructor_id' => $instructor->id,
@@ -261,7 +261,7 @@ class EnrollmentControllerTest extends TestCase
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $course = Course::factory()->create(['price' => 0, 'instructor_id' => $instructor->id]);
         $learner = User::factory()->create(['name' => 'Jane Student']);
         Enrollment::factory()->create(['course_id' => $course->id, 'learner_id' => $learner->id]);
         Sanctum::actingAs($instructor);
@@ -276,7 +276,7 @@ class EnrollmentControllerTest extends TestCase
     {
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
-        $course = Course::factory()->create(); // owned by someone else
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]); // owned by someone else
         Sanctum::actingAs($instructor);
 
         $response = $this->getJson("/api/enrollments?course_id={$course->id}");
@@ -289,7 +289,7 @@ class EnrollmentControllerTest extends TestCase
         // Fixed: enrollment_status/progress_percent/completed_at are stripped from
         // the payload unless the caller resolves as instructor/admin.
         $learner = User::factory()->create();
-        $course = Course::factory()->create();
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]);
         Sanctum::actingAs($learner);
 
         $response = $this->postJson('/api/enrollments', [
@@ -417,9 +417,9 @@ class EnrollmentControllerTest extends TestCase
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
-        $course = Course::factory()->create();
-        $from = Cohort::factory()->create(['course_id' => $course->id, 'seats_taken' => 0]);
-        $to = Cohort::factory()->create(['course_id' => $course->id, 'seats_taken' => 0]);
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]);
+        $from = Cohort::factory()->create(['price' => 0, 'course_id' => $course->id, 'seats_taken' => 0]);
+        $to = Cohort::factory()->create(['price' => 0, 'course_id' => $course->id, 'seats_taken' => 0]);
         $enrollment = Enrollment::factory()->create([
             'course_id' => $course->id,
             'cohort_id' => $from->id,
@@ -446,7 +446,7 @@ class EnrollmentControllerTest extends TestCase
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $enrollment = Enrollment::factory()->create();
-        $foreignCohort = Cohort::factory()->create();
+        $foreignCohort = Cohort::factory()->create(['price' => 0, 'price' => 0]);
         Sanctum::actingAs($admin);
 
         $response = $this->patchJson("/api/enrollments/{$enrollment->id}", ['cohort_id' => $foreignCohort->id]);
@@ -458,7 +458,7 @@ class EnrollmentControllerTest extends TestCase
     {
         $learner = User::factory()->create();
         ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
-        $course = Course::factory()->create();
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]);
         Enrollment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id, 'cohort_id' => null, 'enrollment_status' => 'active']);
         Sanctum::actingAs($learner);
 
@@ -475,8 +475,8 @@ class EnrollmentControllerTest extends TestCase
     {
         $learner = User::factory()->create();
         ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
-        $course = Course::factory()->create();
-        $cohort = Cohort::factory()->create(['course_id' => $course->id, 'start_date' => now()->addWeek(), 'status' => 'open']);
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]);
+        $cohort = Cohort::factory()->create(['price' => 0, 'course_id' => $course->id, 'start_date' => now()->addWeek(), 'status' => 'open']);
         $old = Enrollment::factory()->create(['learner_id' => $learner->id, 'course_id' => $course->id]);
         $old->delete();
         Sanctum::actingAs($learner);
@@ -498,7 +498,7 @@ class EnrollmentControllerTest extends TestCase
     {
         $learner = User::factory()->create();
         ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
-        $cohort = Cohort::factory()->create([
+        $cohort = Cohort::factory()->create(['price' => 0, 
             'start_date' => now()->subWeek(),
             'registration_opens_at' => null,
             'registration_closes_at' => null,
@@ -520,7 +520,7 @@ class EnrollmentControllerTest extends TestCase
     {
         $learner = User::factory()->create();
         ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
-        $cohort = Cohort::factory()->create(['start_date' => now()->addWeek(), 'status' => 'open', 'capacity' => 1]);
+        $cohort = Cohort::factory()->create(['price' => 0, 'start_date' => now()->addWeek(), 'status' => 'open', 'capacity' => 1]);
         Enrollment::factory()->create(['course_id' => $cohort->course_id, 'cohort_id' => $cohort->id, 'enrollment_status' => 'active']);
         Sanctum::actingAs($learner);
 
@@ -538,8 +538,8 @@ class EnrollmentControllerTest extends TestCase
     {
         $learner = User::factory()->create();
         ScholarUser::factory()->create(['id' => $learner->id, 'role' => 'student']);
-        $course = Course::factory()->create();
-        $foreignCohort = Cohort::factory()->create(['start_date' => now()->addWeek(), 'status' => 'open']);
+        $course = Course::factory()->create(['price' => 0, 'price' => 0]);
+        $foreignCohort = Cohort::factory()->create(['price' => 0, 'start_date' => now()->addWeek(), 'status' => 'open']);
         Sanctum::actingAs($learner);
 
         $response = $this->postJson('/api/enrollments', [
@@ -556,7 +556,7 @@ class EnrollmentControllerTest extends TestCase
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
         $learner = User::factory()->create();
-        $cohort = Cohort::factory()->create(['start_date' => now()->subWeek(), 'status' => 'open']);
+        $cohort = Cohort::factory()->create(['price' => 0, 'start_date' => now()->subWeek(), 'status' => 'open']);
         Sanctum::actingAs($admin);
 
         $response = $this->postJson('/api/enrollments', [
@@ -575,7 +575,7 @@ class EnrollmentControllerTest extends TestCase
 
         $response = $this->patchJson('/api/enrollments/' . fake()->uuid(), [
             'learner_id' => $user->id,
-            'course_id' => Course::factory()->create()->id,
+            'course_id' => Course::factory()->create(['price' => 0, 'price' => 0])->id,
         ]);
 
         $response->assertStatus(404);

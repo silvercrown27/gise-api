@@ -18,7 +18,7 @@ class PaymentController extends Controller
 
             $query = Payment::with('course');
 
-            if (!$user || $user->role === 'student') {
+            if (!$user || !$user->isAdmin()) {
                 $query->where('learner_id', $request->user()->id);
             }
 
@@ -39,6 +39,17 @@ class PaymentController extends Controller
 
     public function store(Request $request)
     {
+        $user = ScholarUser::find($request->user()->id);
+
+        // Payments are recorded by the Paystack checkout (PaystackController);
+        // only admins may add or correct records by hand.
+        if (!$user || !$user->isAdmin()) {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         $validator = Validations::validatePayment($request->all());
 
         if ($validator->fails()) {
@@ -50,16 +61,7 @@ class PaymentController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
-
-            $data = $request->all();
-
-            if (!$isElevated) {
-                unset($data['status'], $data['gateway_transaction_id'], $data['paid_at']);
-            }
-
-            $payment = Payment::create($data);
+            $payment = Payment::create($request->all());
 
             $payment->refresh();
 
@@ -90,10 +92,9 @@ class PaymentController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
             $isOwner = (string) $payment->learner_id === (string) $request->user()->id;
 
-            if (!$isElevated && !$isOwner) {
+            if (!$user?->isAdmin() && !$isOwner) {
                 return response()->json([
                     'status'  => 403,
                     'message' => 'Forbidden.',
@@ -115,6 +116,17 @@ class PaymentController extends Controller
 
     public function update(Request $request, string $id)
     {
+        $user = ScholarUser::find($request->user()->id);
+
+        // Payments are recorded by the Paystack checkout (PaystackController);
+        // only admins may add or correct records by hand.
+        if (!$user || !$user->isAdmin()) {
+            return response()->json([
+                'status'  => 403,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
         $validator = Validations::validatePayment($request->all());
 
         if ($validator->fails()) {
@@ -126,7 +138,6 @@ class PaymentController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
             $payment = Payment::find($id);
 
             if (!$payment) {
@@ -136,23 +147,7 @@ class PaymentController extends Controller
                 ], 404);
             }
 
-            $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
-            $isOwner = (string) $payment->learner_id === (string) $request->user()->id;
-
-            if (!$isElevated && !$isOwner) {
-                return response()->json([
-                    'status'  => 403,
-                    'message' => 'Forbidden.',
-                ], 403);
-            }
-
-            $data = $request->all();
-
-            if (!$isElevated) {
-                unset($data['status'], $data['gateway_transaction_id'], $data['paid_at']);
-            }
-
-            $payment->update($data);
+            $payment->update($request->all());
 
             return response()->json([
                 'status'  => 200,
