@@ -19,7 +19,7 @@ class ModuleProgressService
     public static function forCohort(Cohort $cohort): array
     {
         $modules = CourseModule::where('course_id', $cohort->course_id)
-            ->with(['lessons:id,module_id', 'quiz:id,module_id'])
+            ->with(['lessons' => fn ($lessons) => $lessons->approved()->select('course_lessons.id', 'course_lessons.module_id'), 'quiz:id,module_id'])
             ->orderBy('order_index')
             ->get();
 

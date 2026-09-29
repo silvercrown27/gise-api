@@ -27,6 +27,10 @@ class CourseLesson extends Model
         'unlock_after_days',
     ];
 
+    // admin_approval_status / admin_rejection_reason are deliberately not
+    // fillable: only the approval endpoints (and the controller's own
+    // "pending" marking) may change them, never a request payload.
+
     protected $casts = [
         'duration_minutes' => 'integer',
         'order_index' => 'integer',
@@ -54,6 +58,12 @@ class CourseLesson extends Model
     protected function serializeDate(\DateTimeInterface $date)
     {
         return $date->format('Y-m-d H:i:s');
+    }
+
+    /** Lessons a learner may see: approved by a super admin. */
+    public function scopeApproved($query)
+    {
+        return $query->where('course_lessons.admin_approval_status', 'approved');
     }
 
     public function module()

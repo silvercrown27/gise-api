@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\AdminAuditLog;
 use App\Models\Course;
+use App\Models\CourseLesson;
 use App\Models\CourseModule;
 use App\Models\ScholarUser;
 use App\Services\NotificationService;
@@ -20,13 +21,19 @@ class CourseModuleController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = CourseModule::withCount('lessons')
+            // Learners and visitors only see (and count) approved lessons.
+            $sees = $this->canSeeUnapprovedLessons($request);
+
+            $query = CourseModule::withCount(['lessons' => fn ($lessons) => $sees ? $lessons : $lessons->approved()])
                 ->with(['quiz' => function ($quiz) {
                     $quiz->withCount('questions');
                 }]);
 
             if ($request->boolean('with_lessons')) {
-                $query->with(['lessons' => function ($lessons) {
+                $query->with(['lessons' => function ($lessons) use ($sees) {
+                    if (!$sees) {
+                        $lessons->approved();
+                    }
                     $lessons->select(['id', 'module_id', 'title', 'duration_minutes', 'order_index'])
                         ->orderBy('order_index', 'asc');
                 }]);
@@ -120,7 +127,7 @@ class CourseModuleController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $courseModule = CourseModule::withCount('lessons')->find($id);
+            $courseModule = CourseModule::withCount(['lessons' => fn ($lessons) => $this->canSeeUnapprovedLessons($request) ? $lessons : $lessons->approved()])->find($id);
 
             if (!$courseModule) {
                 return response()->json([
@@ -395,5 +402,70 @@ class CourseModuleController extends Controller
                 'message' => 'An error occurred while updating the approval status.',
             ], 500);
         }
+    }
+
+    /**
+     * Approve every module of a course that isn't approved yet, together with
+     * their lessons. Super admin only. Quizzes keep their own review.
+     */
+    public function approveAllForCourse(Request $request, string $courseId)
+    {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || !$user->isSuperAdmin()) {
+            return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
+        }
+
+        try {
+            $course = Course::find($courseId);
+
+            if (!$course) {
+                return response()->json(['status' => 404, 'message' => 'Course not found.'], 404);
+            }
+
+            $modules = CourseModule::where('course_id', $course->id)->where('admin_approval_status', '!=', 'approved')->get();
+            $moduleIds = CourseModule::where('course_id', $course->id)->pluck('id');
+
+            $lessons = CourseLesson::whereIn('module_id', $moduleIds)->where('admin_approval_status', '!=', 'approved')->get();
+
+            foreach ($modules as $module) {
+                $module->forceFill(['admin_approval_status' => 'approved', 'admin_rejection_reason' => null])->save();
+            }
+            foreach ($lessons as $lesson) {
+                $lesson->forceFill(['admin_approval_status' => 'approved', 'admin_rejection_reason' => null])->save();
+            }
+
+            if ($modules->isNotEmpty() || $lessons->isNotEmpty()) {
+                AdminAuditLog::create([
+                    'admin_id' => $request->user()->id,
+                    'action' => 'approve_module',
+                    'target_type' => 'course',
+                    'target_id' => $course->id,
+                    'notes' => "Approved all modules ({$modules->count()}) and lessons ({$lessons->count()}) of \"{$course->title}\".",
+                ]);
+            }
+
+            return response()->json([
+                'status'  => 200,
+                'message' => "Approved {$modules->count()} module(s) and {$lessons->count()} lesson(s).",
+                'data'    => ['modules' => $modules->count(), 'lessons' => $lessons->count()],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseModuleController@approveAllForCourse: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while approving the modules.',
+            ], 500);
+        }
+    }
+
+    /** Admins and instructors see lessons in every review state; everyone else, approved only. */
+    private function canSeeUnapprovedLessons(Request $request): bool
+    {
+        // These routes are public, so resolve the token by hand.
+        $authUser = $request->user('sanctum');
+        $user = $authUser ? ScholarUser::find($authUser->id) : null;
+
+        return $user && in_array($user->role, ['instructor', 'admin', 'super_admin'], true);
     }
 }

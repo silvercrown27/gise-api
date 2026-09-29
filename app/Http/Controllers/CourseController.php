@@ -275,7 +275,11 @@ class CourseController extends Controller
 
             $modules = $course->modules()
                 ->with([
-                    'lessons' => function ($query) {
+                    'lessons' => function ($query) use ($isAdmin, $isOwningInstructor) {
+                        // Reviewers see every lesson; learners only approved ones.
+                        if (!$isAdmin && !$isOwningInstructor) {
+                            $query->approved();
+                        }
                         $query->orderBy('order_index', 'asc')->with('resources');
                     },
                     'quiz' => function ($query) {
@@ -617,6 +621,10 @@ class CourseController extends Controller
                 ], 422);
             }
 
+            // Going live for the first time is timestamped, like approval-driven publishing.
+            if (($data['status'] ?? null) === 'published' && !$course->published_at) {
+                $data['published_at'] = now();
+            }
 
             $course->update($data);
 
@@ -670,6 +678,13 @@ class CourseController extends Controller
                 'admin_approval_status' => $status,
                 'admin_rejection_reason' => $status === 'rejected' ? $request->input('admin_rejection_reason') : null,
             ])->save();
+
+            // The public catalogue lists published AND approved courses, so an
+            // approved draft would stay invisible forever. Approving a draft
+            // puts it live; archived courses stay archived.
+            if ($status === 'approved' && $course->status === 'draft') {
+                $course->forceFill(['status' => 'published', 'published_at' => $course->published_at ?? now()])->save();
+            }
 
             $actionByStatus = [
                 'approved' => 'approve_course',

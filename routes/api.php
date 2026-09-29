@@ -255,6 +255,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Courses - write actions only (index/show/mine are above)
     Route::prefix('courses')->group(function () {
         Route::put('/{id}/tools', [CourseController::class, 'syncTools']);
+        Route::post('/{id}/approve-modules', [CourseModuleController::class, 'approveAllForCourse']);
         Route::post('/',      [CourseController::class, 'store']);
         Route::patch('/{id}', [CourseController::class, 'update']);
         Route::delete('/{id}', [CourseController::class, 'delete']);
@@ -280,6 +281,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/',      [CourseModuleController::class, 'store']);
         Route::patch('/{id}', [CourseModuleController::class, 'update']);
         Route::patch('/{id}/approval-status', [CourseModuleController::class, 'setApprovalStatus']);
+        Route::post('/{id}/approve-lessons', [CourseLessonController::class, 'approveAllInModule']);
         Route::delete('/{id}', [CourseModuleController::class, 'delete']);
     });
 
@@ -287,6 +289,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('course-lessons')->group(function () {
         Route::post('/',      [CourseLessonController::class, 'store']);
         Route::patch('/{id}', [CourseLessonController::class, 'update']);
+        Route::patch('/{id}/approval-status', [CourseLessonController::class, 'setApprovalStatus']);
         Route::delete('/{id}', [CourseLessonController::class, 'delete']);
     });
 

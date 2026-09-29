@@ -222,7 +222,7 @@ class LessonProgressController extends Controller
             return;
         }
 
-        $totalLessons = CourseLesson::whereHas('module', function ($q) use ($enrollment) {
+        $totalLessons = CourseLesson::approved()->whereHas('module', function ($q) use ($enrollment) {
             $q->where('course_id', $enrollment->course_id);
         })->count();
 

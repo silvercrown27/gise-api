@@ -12,6 +12,7 @@ use App\Models\CourseLesson;
 use App\Models\CourseModule;
 use App\Models\ScholarUser;
 use App\Services\NotificationService;
+use App\Models\AdminAuditLog;
 use App\Traits\AuthorizesCourseOwnership;
 
 class CourseLessonController extends Controller
@@ -31,7 +32,13 @@ class CourseLessonController extends Controller
                 $query->where('module_id', $moduleId);
             }
 
-            $results = $query->orderBy('order_index', 'asc')->paginate(10);
+            // Learners (and anonymous visitors) only ever see approved lessons.
+            if (!$this->canSeeUnapproved($request)) {
+                $query->approved();
+            }
+
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 100);
+            $results = $query->orderBy('order_index', 'asc')->paginate($perPage);
 
             return response()->json([
                 'status' => 200,
@@ -94,6 +101,7 @@ class CourseLessonController extends Controller
 
         try {
             $courseLesson = CourseLesson::create($data);
+            $this->markReviewStatus($user, $courseLesson);
             $courseLesson->refresh();
 
             $this->syncModuleApprovalAfterLessonChange($user, $module);
@@ -112,10 +120,14 @@ class CourseLessonController extends Controller
         }
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         try {
             $courseLesson = CourseLesson::withCount('resources')->find($id);
+
+            if ($courseLesson && $courseLesson->admin_approval_status !== 'approved' && !$this->canSeeUnapproved($request)) {
+                $courseLesson = null;
+            }
 
             if (!$courseLesson) {
                 return response()->json([
@@ -198,6 +210,7 @@ class CourseLessonController extends Controller
             }
 
             $courseLesson->update($data);
+            $this->markReviewStatus($user, $courseLesson);
 
             $this->syncModuleApprovalAfterLessonChange($user, $module);
 
@@ -260,6 +273,139 @@ class CourseLessonController extends Controller
                 'message' => 'An error occurred while deleting the course lesson.',
             ], 500);
         }
+    }
+
+    /**
+     * Approve, reject or reset one lesson. Super admin only.
+     */
+    public function setApprovalStatus(Request $request, string $id)
+    {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || !$user->isSuperAdmin()) {
+            return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
+        }
+
+        $status = $request->input('admin_approval_status');
+
+        if (!in_array($status, ['pending', 'approved', 'rejected'], true)) {
+            return response()->json([
+                'status'  => 422,
+                'message' => 'Validation failed.',
+                'errors'  => ['admin_approval_status' => ['Must be one of: pending, approved, rejected.']],
+            ], 422);
+        }
+
+        try {
+            $lesson = CourseLesson::find($id);
+
+            if (!$lesson) {
+                return response()->json(['status' => 404, 'message' => 'Course lesson not found.'], 404);
+            }
+
+            $lesson->forceFill([
+                'admin_approval_status' => $status,
+                'admin_rejection_reason' => $status === 'rejected' ? $request->input('admin_rejection_reason') : null,
+            ])->save();
+
+            AdminAuditLog::create([
+                'admin_id' => $request->user()->id,
+                'action' => ['approved' => 'approve_lesson', 'rejected' => 'reject_lesson', 'pending' => 'reset_lesson_approval'][$status],
+                'target_type' => 'course_lesson',
+                'target_id' => $lesson->id,
+                'notes' => $status === 'rejected' ? $lesson->admin_rejection_reason : null,
+            ]);
+
+            if ($status === 'rejected') {
+                $module = $lesson->module;
+                foreach ($module?->course?->reviewRecipientIds($request->user()->id) ?? [] as $recipientId) {
+                    NotificationService::notifyUser(
+                        $recipientId,
+                        'module_review',
+                        "Your lesson \"{$lesson->title}\" was rejected." . ($lesson->admin_rejection_reason ? " Reason: {$lesson->admin_rejection_reason}" : '')
+                    );
+                }
+            }
+
+            return response()->json([
+                'status'  => 200,
+                'message' => 'Lesson approval status updated successfully.',
+                'data'    => $lesson,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseLessonController@setApprovalStatus: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while updating the lesson approval status.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Approve every lesson in a module that isn't approved yet. Super admin only.
+     */
+    public function approveAllInModule(Request $request, string $moduleId)
+    {
+        $user = ScholarUser::find($request->user()->id);
+
+        if (!$user || !$user->isSuperAdmin()) {
+            return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
+        }
+
+        try {
+            $module = CourseModule::find($moduleId);
+
+            if (!$module) {
+                return response()->json(['status' => 404, 'message' => 'Course module not found.'], 404);
+            }
+
+            $lessons = CourseLesson::where('module_id', $module->id)->where('admin_approval_status', '!=', 'approved')->get();
+
+            foreach ($lessons as $lesson) {
+                $lesson->forceFill(['admin_approval_status' => 'approved', 'admin_rejection_reason' => null])->save();
+            }
+
+            if ($lessons->isNotEmpty()) {
+                AdminAuditLog::create([
+                    'admin_id' => $request->user()->id,
+                    'action' => 'approve_lesson',
+                    'target_type' => 'course_module',
+                    'target_id' => $module->id,
+                    'notes' => "Approved all lessons ({$lessons->count()}) in \"{$module->title}\".",
+                ]);
+            }
+
+            return response()->json([
+                'status'  => 200,
+                'message' => $lessons->count() === 1 ? '1 lesson approved.' : "{$lessons->count()} lessons approved.",
+                'data'    => ['approved' => $lessons->count()],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseLessonController@approveAllInModule: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while approving the lessons.',
+            ], 500);
+        }
+    }
+
+    /** Admins and instructors see lessons in every review state; everyone else, approved only. */
+    private function canSeeUnapproved(Request $request): bool
+    {
+        // These routes are public, so resolve the token by hand (see ModuleQuizQuestionController@index).
+        $authUser = $request->user('sanctum');
+        $user = $authUser ? ScholarUser::find($authUser->id) : null;
+
+        return $user && in_array($user->role, ['instructor', 'admin', 'super_admin'], true);
+    }
+
+    /** A super admin's own lesson is live at once; anyone else's waits for review. */
+    private function markReviewStatus(ScholarUser $user, CourseLesson $lesson): void
+    {
+        $lesson->forceFill([
+            'admin_approval_status' => $user->isSuperAdmin() ? 'approved' : 'pending',
+            'admin_rejection_reason' => null,
+        ])->save();
     }
 
     /**
