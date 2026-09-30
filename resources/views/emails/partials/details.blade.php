@@ -3,7 +3,7 @@
     @foreach (array_filter($rows, fn ($value) => filled($value)) as $label => $value)
         <tr>
             <td style="padding:9px 16px;font-size:13px;color:#6b7a72;width:38%;vertical-align:top;{{ $loop->first ? 'padding-top:14px;' : '' }}{{ $loop->last ? 'padding-bottom:14px;' : '' }}">{{ $label }}</td>
-            <td style="padding:9px 16px;font-size:14px;color:#0b1310;font-weight:600;vertical-align:top;{{ $loop->first ? 'padding-top:14px;' : '' }}{{ $loop->last ? 'padding-bottom:14px;' : '' }}">{{ $value }}</td>
+            <td style="padding:9px 16px;font-size:14px;color:#0b1310;font-weight:600;vertical-align:top;word-break:break-word;overflow-wrap:anywhere;{{ $loop->first ? 'padding-top:14px;' : '' }}{{ $loop->last ? 'padding-bottom:14px;' : '' }}">{{ $value }}</td>
         </tr>
     @endforeach
 </table>
