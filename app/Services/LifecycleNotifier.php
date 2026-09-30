@@ -4,11 +4,14 @@ namespace App\Services;
 
 use App\Models\Cohort;
 use App\Models\CohortMentorApplication;
+use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Payment;
+use App\Models\ScholarUser;
 use App\Notifications\CourseRegistrationNotification;
 use App\Notifications\NewPaymentAdminNotification;
 use App\Notifications\PaymentReceivedNotification;
+use App\Notifications\RoleChangedNotification;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -105,6 +108,90 @@ class LifecycleNotifier
                 '/students/courses'
             );
             NotificationService::notifyUsers(self::mentorIds($cohort->id), 'mentor_application', $message, '/mentors/cohorts');
+        });
+    }
+
+    private const ROLE_LABELS = [
+        'student' => 'a student',
+        'instructor' => 'an instructor',
+        'admin' => 'an admin',
+        'super_admin' => 'a super admin',
+    ];
+
+    /** Friendly names for the fields shown in "course updated" notices. */
+    private const COURSE_FIELDS = [
+        'title' => 'title', 'code' => 'code', 'slug' => 'web address', 'tagline' => 'tagline',
+        'short_description' => 'short description', 'full_description' => 'description',
+        'price' => 'price', 'currency' => 'currency', 'duration_weeks' => 'duration', 'level' => 'difficulty',
+        'mode' => 'delivery', 'status' => 'status', 'category_id' => 'subject/category',
+        'classification' => 'level', 'thumbnail_url' => 'image', 'pace_id' => 'pace',
+        'max_students' => 'maximum students', 'tools' => 'software licences', 'certificate_kind' => 'certificate type', 'recognized_body' => 'recognising body',
+    ];
+
+    /**
+     * A super admin changed someone's role. The person affected and the admin
+     * who made the change both get a record, and the person affected is emailed.
+     */
+    public static function roleChanged(ScholarUser $target, string $previousRole, string $newRole, ScholarUser $actor): void
+    {
+        self::guard(function () use ($target, $previousRole, $newRole, $actor) {
+            $target->loadMissing('user:id,name,email');
+            $name = $target->user?->name ?? 'this user';
+            $now = self::ROLE_LABELS[$newRole] ?? $newRole;
+
+            NotificationService::notifyUser(
+                $target->id,
+                'system',
+                "Your account is now {$now}. Sign out and back in if menus look out of date.",
+                '/dashboard'
+            );
+
+            // Changing your own role is one event, not two.
+            if ((string) $actor->id !== (string) $target->id) {
+                NotificationService::notifyUser(
+                    $actor->id,
+                    'system',
+                    "You changed {$name}'s role from " . (self::ROLE_LABELS[$previousRole] ?? $previousRole) . " to {$now}.",
+                    '/admin/users'
+                );
+            }
+
+            if ($target->user) {
+                Mailer::send($target->user, new RoleChangedNotification($name, $previousRole, $newRole));
+            }
+        });
+    }
+
+    /**
+     * A course's details were edited. Super admins get an in-app notice of what
+     * changed (no email - they'd get one for every edit), except the person who
+     * made the edit.
+     *
+     * @param  array<int,string>  $changedFields  database column names that changed
+     */
+    public static function courseUpdated(Course $course, ScholarUser $actor, array $changedFields): void
+    {
+        self::guard(function () use ($course, $actor, $changedFields) {
+            $labels = collect($changedFields)
+                ->map(fn ($field) => self::COURSE_FIELDS[$field] ?? null)
+                ->filter()
+                ->unique()
+                ->values();
+
+            // Only the fields people would recognise; bookkeeping columns alone aren't news.
+            if ($labels->isEmpty()) {
+                return;
+            }
+
+            $who = $actor->user?->name ?? $actor->email;
+            $summary = $labels->count() > 4 ? $labels->take(4)->implode(', ') . ' and more' : $labels->implode(', ');
+
+            NotificationService::notifyUsers(
+                ScholarUser::where('role', 'super_admin')->where('id', '!=', $actor->id)->pluck('id'),
+                'course_review',
+                "{$who} updated the course \"{$course->title}\" ({$summary}).",
+                '/admin/courses/' . $course->id
+            );
         });
     }
 

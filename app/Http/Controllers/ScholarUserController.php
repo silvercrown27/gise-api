@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\ScholarUser;
 use Illuminate\Support\Facades\DB;
+use App\Services\LifecycleNotifier;
 use App\Services\NotificationService;
 use App\Models\InstructorProfile;
 use App\Models\AdminAuditLog;
@@ -289,7 +290,7 @@ class ScholarUserController extends Controller
             ]);
 
             $labels = ['student' => 'a student', 'instructor' => 'an instructor', 'admin' => 'an admin', 'super_admin' => 'a super admin'];
-            NotificationService::notifyUser($target->id, 'system', "Your account is now {$labels[$role]}. Sign out and back in if menus look out of date.", '/dashboard');
+            LifecycleNotifier::roleChanged($target, $previous, $role, ScholarUser::findOrFail($request->user()->id));
 
             return response()->json([
                 'status'  => 200,

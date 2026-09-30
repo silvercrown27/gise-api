@@ -22,6 +22,7 @@ use App\Notifications\NewBrochureRequestAdminNotification;
 use App\Notifications\NewPaymentAdminNotification;
 use App\Notifications\OtpVerificationNotification;
 use App\Notifications\PaymentReceivedNotification;
+use App\Notifications\RoleChangedNotification;
 use App\Notifications\ResetPasswordNotification;
 use App\Notifications\WelcomeNotification;
 use Ichtrojan\Otp\Models\Otp as OtpRow;
@@ -366,6 +367,7 @@ class NotificationsAndEmailsTest extends TestCase
             'admin payment' => new NewPaymentAdminNotification($payment),
             'admin brochure' => new NewBrochureRequestAdminNotification($lead),
             'brochure' => new CourseBrochureNotification($cohort->course, 'Amina', 'https://giseafrica.test/b.pdf'),
+            'role changed' => new RoleChangedNotification('Amina', 'student', 'admin'),
         ];
 
         foreach ($emails as $name => $notification) {
@@ -393,6 +395,131 @@ class NotificationsAndEmailsTest extends TestCase
         $this->assertStringStartsWith('%PDF', $attachment['data']);
         $this->assertMatchesRegularExpression('/^GISE-Africa-INV-\d{4}-\d{5}\.pdf$/', $attachment['name']);
         $this->assertStringContainsString('USD 650', (string) $mail->render());
+    }
+
+    // ── role changes ──────────────────────────────────────────────────────────
+
+    public function test_changing_someones_role_notifies_them_and_the_admin_who_did_it_and_emails_them(): void
+    {
+        NotificationFacade::fake();
+        $actor = $this->person('super_admin');
+        $bystander = $this->person('super_admin');
+        $target = $this->person('student', ['name' => 'Amina Otieno']);
+        Sanctum::actingAs($actor);
+
+        $this->patchJson("/api/scholar-users/{$target->id}/role", ['role' => 'admin'])->assertStatus(200);
+
+        $this->assertSame('admin', ScholarUser::find($target->id)->role);
+        $this->assertSame(1, $this->inApp($target, 'system'));
+        $this->assertStringContainsString('an admin', InApp::where('user_id', $target->id)->value('message'));
+        $this->assertSame(1, $this->inApp($actor, 'system'));
+        $this->assertStringContainsString("Amina Otieno's role from a student to an admin", InApp::where('user_id', $actor->id)->value('message'));
+        $this->assertSame(0, $this->inApp($bystander), 'other super admins are not pinged');
+
+        NotificationFacade::assertSentTo($target, RoleChangedNotification::class, fn ($n) => $n->previousRole === 'student' && $n->newRole === 'admin');
+        NotificationFacade::assertNotSentTo($actor, RoleChangedNotification::class);
+    }
+
+    public function test_changing_your_own_role_is_one_notification_and_an_unchanged_role_is_none(): void
+    {
+        NotificationFacade::fake();
+        $actor = $this->person('super_admin');
+        $other = $this->person('super_admin');
+        Sanctum::actingAs($actor);
+
+        $this->patchJson("/api/scholar-users/{$other->id}/role", ['role' => 'super_admin'])->assertStatus(200)->assertJsonPath('message', 'No change.');
+        $this->assertSame(0, $this->inApp($other));
+        NotificationFacade::assertNotSentTo($other, RoleChangedNotification::class);
+
+        // Stepping down yourself (allowed while another super admin exists) is one event, not two.
+        $this->patchJson("/api/scholar-users/{$actor->id}/role", ['role' => 'admin'])->assertStatus(200);
+        $this->assertSame(1, $this->inApp($actor), 'you are told once, not as both parties');
+    }
+
+    public function test_a_role_change_is_saved_even_if_the_email_cannot_be_sent(): void
+    {
+        $this->breakMail();
+        $actor = $this->person('super_admin');
+        $target = $this->person('student');
+        Sanctum::actingAs($actor);
+
+        $this->patchJson("/api/scholar-users/{$target->id}/role", ['role' => 'instructor'])->assertStatus(200);
+
+        $this->assertSame('instructor', ScholarUser::find($target->id)->role);
+        $this->assertSame(1, $this->inApp($target), 'the in-app notice does not depend on email');
+        $this->assertSame(1, $this->inApp($actor));
+    }
+
+    // ── course updates ────────────────────────────────────────────────────────
+
+    private function courseEdit(Course $course, array $changes): array
+    {
+        return array_merge($course->only(['title', 'code', 'slug', 'price']), $changes);
+    }
+
+    public function test_updating_a_course_notifies_the_other_super_admins_in_app_only(): void
+    {
+        NotificationFacade::fake();
+        $editor = $this->person('admin', ['name' => 'Edwin Editor']);
+        $superOne = $this->person('super_admin');
+        $superTwo = $this->person('super_admin');
+        $mentor = $this->person('instructor');
+        $course = Course::factory()->create(['price' => 100, 'title' => 'Data Basics']);
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/courses/{$course->id}", $this->courseEdit($course, ['price' => 250]))->assertStatus(200);
+
+        foreach ([$superOne, $superTwo] as $superAdmin) {
+            $this->assertSame(1, $this->inApp($superAdmin, 'course_review'));
+        }
+        $message = InApp::where('user_id', $superOne->id)->value('message');
+        $this->assertStringContainsString('Edwin Editor updated the course "Data Basics" (price)', $message);
+        $this->assertSame("/admin/courses/{$course->id}", InApp::where('user_id', $superOne->id)->value('link'));
+
+        $this->assertSame(0, $this->inApp($editor), 'the editor is not told about their own edit');
+        $this->assertSame(0, $this->inApp($mentor));
+        NotificationFacade::assertNothingSent(); // no email for course updates
+    }
+
+    public function test_a_super_admins_own_edit_tells_only_the_other_super_admins(): void
+    {
+        $editor = $this->person('super_admin');
+        $other = $this->person('super_admin');
+        $course = Course::factory()->create(['price' => 100]);
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/courses/{$course->id}", $this->courseEdit($course, ['price' => 120]))->assertStatus(200);
+
+        $this->assertSame(1, $this->inApp($other, 'course_review'));
+        $this->assertSame(0, $this->inApp($editor));
+    }
+
+    public function test_saving_a_course_without_changing_anything_creates_no_notification(): void
+    {
+        $editor = $this->person('admin');
+        $superAdmin = $this->person('super_admin');
+        $course = Course::factory()->create();
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/courses/{$course->id}", $this->courseEdit($course, []))->assertStatus(200);
+
+        $this->assertSame(0, $this->inApp($superAdmin));
+    }
+
+    public function test_the_notice_lists_what_changed_in_plain_words(): void
+    {
+        $editor = $this->person('admin');
+        $superAdmin = $this->person('super_admin');
+        $course = Course::factory()->create(['price' => 100, 'status' => 'draft', 'tagline' => 'Old']);
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/courses/{$course->id}", $this->courseEdit($course, ['price' => 300, 'status' => 'published', 'tagline' => 'New']))->assertStatus(200);
+
+        $message = InApp::where('user_id', $superAdmin->id)->value('message');
+        foreach (['price', 'status', 'tagline'] as $field) {
+            $this->assertStringContainsString($field, $message);
+        }
+        $this->assertStringNotContainsString('published_at', $message, 'bookkeeping columns are not listed');
     }
 
     // ── a broken mail server breaks nothing and falsifies nothing ─────────────

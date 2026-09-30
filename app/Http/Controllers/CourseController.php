@@ -22,6 +22,7 @@ use App\Models\LessonProgress;
 use App\Models\ScholarUser;
 use App\Services\ModuleAccessService;
 use App\Services\CourseCatalogue;
+use App\Services\LifecycleNotifier;
 use App\Services\NotificationService;
 use App\Traits\AuthorizesCourseOwnership;
 
@@ -120,6 +121,8 @@ class CourseController extends Controller
             });
 
             $course->load('tools');
+
+            LifecycleNotifier::courseUpdated($course, ScholarUser::findOrFail($request->user()->id), ['tools']);
 
             return response()->json([
                 'status'  => 200,
@@ -627,6 +630,9 @@ class CourseController extends Controller
             }
 
             $course->update($data);
+
+            // Tell the other super admins what changed (in-app only).
+            LifecycleNotifier::courseUpdated($course, $user, array_keys($course->getChanges()));
 
             return response()->json([
                 'status'  => 200,
