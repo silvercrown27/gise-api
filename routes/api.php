@@ -169,7 +169,7 @@ Route::middleware('throttle:brochure')->post('/courses/{id}/brochure-requests', 
 Route::post('/paystack/webhook', [PaystackController::class, 'webhook']);
 
 // Public contact form submission - no login required, matches the frontend /contact page.
-Route::post('/contact-messages', [ContactMessageController::class, 'store']);
+Route::middleware('throttle:contact')->post('/contact-messages', [ContactMessageController::class, 'store']);
 
 // ── Authenticated user routes ─────────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {

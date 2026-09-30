@@ -8,6 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\ContactMessage;
 use App\Models\ScholarUser;
+use App\Services\NotificationService;
+use Illuminate\Support\Str;
 
 class ContactMessageController extends Controller
 {
@@ -26,10 +28,18 @@ class ContactMessageController extends Controller
             $query = ContactMessage::query();
 
             if ($q = trim($request->input('q', ''))) {
-                $query->where('subject', 'like', '%' . $q . '%');
+                $query->where(fn ($match) => $match
+                    ->where('subject', 'like', '%' . $q . '%')
+                    ->orWhere('full_name', 'like', '%' . $q . '%')
+                    ->orWhere('email', 'like', '%' . $q . '%'));
             }
 
-            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+            if (in_array($status = $request->input('status'), ['new', 'read', 'replied'], true)) {
+                $query->where('status', $status);
+            }
+
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 50);
+            $results = $query->orderBy('created_at', 'desc')->orderBy('id')->paginate($perPage);
 
             return response()->json([
                 'status' => 200,
@@ -44,9 +54,20 @@ class ContactMessageController extends Controller
         }
     }
 
+    /**
+     * The public contact form. Only the four form fields are read (a visitor
+     * can't set a status or anything else), spam bots that fill the hidden
+     * "website" field are quietly ignored, and every super admin is notified.
+     */
     public function store(Request $request)
     {
-        $validator = Validations::validateContactMessage($request->all());
+        // Real visitors never see this field; bots fill in everything. Look successful, save nothing.
+        if (filled($request->input('website'))) {
+            return response()->json(['status' => 201, 'message' => 'Message received.'], 201);
+        }
+
+        $data = array_map(fn ($value) => is_string($value) ? trim($value) : $value, $request->only(['full_name', 'email', 'subject', 'message']));
+        $validator = Validations::validateContactMessage($data);
 
         if ($validator->fails()) {
             return response()->json([
@@ -57,20 +78,24 @@ class ContactMessageController extends Controller
         }
 
         try {
-            $data = $request->all();
-            $contactMessage = ContactMessage::create($data);
-            $contactMessage->refresh();
+            $contactMessage = ContactMessage::create($data + ['status' => 'new']);
+
+            // Never throws: telling staff can't undo or fail the visitor's message.
+            NotificationService::notifySuperAdmins(
+                'contact_message',
+                "{$contactMessage->full_name} sent a message: \"" . Str::limit($contactMessage->subject, 80) . '"',
+                '/admin/messages'
+            );
 
             return response()->json([
                 'status'  => 201,
-                'message' => 'Contact message created successfully.',
-                'data'    => $contactMessage,
+                'message' => 'Message received.',
             ], 201);
         } catch (\Exception $e) {
             Log::error('ContactMessageController@store: ' . $e->getMessage());
             return response()->json([
                 'status'  => 500,
-                'message' => 'An error occurred while creating the contact message.',
+                'message' => 'We could not send your message right now. Please try again.',
             ], 500);
         }
     }
@@ -120,7 +145,10 @@ class ContactMessageController extends Controller
             ], 403);
         }
 
-        $validator = Validations::validateContactMessage($request->all());
+        // Staff triage messages (new / read / replied); what the visitor wrote is never edited.
+        $validator = \Illuminate\Support\Facades\Validator::make($request->only('status'), [
+            'status' => 'required|in:new,read,replied',
+        ]);
 
         if ($validator->fails()) {
             return response()->json([
@@ -140,7 +168,7 @@ class ContactMessageController extends Controller
                 ], 404);
             }
 
-            $contactMessage->update($request->all());
+            $contactMessage->update(['status' => $request->input('status')]);
 
             return response()->json([
                 'status'  => 200,

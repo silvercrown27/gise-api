@@ -38,5 +38,11 @@ class AppServiceProvider extends ServiceProvider
         foreach (self::LIMITS as $name => $perMinute) {
             RateLimiter::for($name, fn (Request $request) => Limit::perMinute($perMinute)->by($request->user()?->id ?: $request->ip()));
         }
+
+        // The public contact form: a few a minute, and a cap per hour against spam.
+        RateLimiter::for('contact', fn (Request $request) => [
+            Limit::perMinute(3)->by('contact-m:' . $request->ip()),
+            Limit::perHour(15)->by('contact-h:' . $request->ip()),
+        ]);
     }
 }

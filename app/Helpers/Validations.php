@@ -659,7 +659,7 @@ class Validations
     {
         return Validator::make($data, [
             'user_id'  => 'required|uuid|exists:users,id',
-            'type'     => 'required|string|in:payment,enrollment,certificate,rating,system,quiz_review,mentor_application,instructor_approval,course_review,exam_review,module_review',
+            'type'     => 'required|string|in:payment,enrollment,certificate,rating,system,quiz_review,mentor_application,instructor_approval,course_review,exam_review,module_review,course_change_request,course_material,brochure_request,contact_message',
             'message'  => 'required|string',
             'is_read'  => 'nullable|boolean',
         ]);
