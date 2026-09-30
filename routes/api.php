@@ -56,13 +56,15 @@ use App\Models\ScholarUser;
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 Route::prefix('auth')->group(function () {
-    Route::post('/signup',          [AuthController::class, 'signup']);
-    Route::post('/login',           [AuthController::class, 'login']);
-    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('/verify-otp',      [AuthController::class, 'verifyOtp']);
-    Route::post('/reset-password',  [AuthController::class, 'resetPassword']);
-    Route::post('/validate/email',  [AuthController::class, 'validateEmail']);
-    Route::post('/verify-email',    [AuthController::class, 'sendVerificationOTP']);
+    // Every public entry point is rate limited per IP. The reset-code endpoints
+    // also count wrong guesses and resends per email (see AuthController).
+    Route::middleware('throttle:auth-signup')->post('/signup',          [AuthController::class, 'signup']);
+    Route::middleware('throttle:auth-login')->post('/login',           [AuthController::class, 'login']);
+    Route::middleware('throttle:auth-forgot')->post('/forgot-password',  [AuthController::class, 'forgotPassword']);
+    Route::middleware('throttle:auth-verify')->post('/verify-otp',      [AuthController::class, 'verifyOtp']);
+    Route::middleware('throttle:auth-reset')->post('/reset-password',  [AuthController::class, 'resetPassword']);
+    Route::middleware('throttle:auth-lookup')->post('/validate/email',   [AuthController::class, 'validateEmail']);
+    Route::middleware('throttle:auth-verify-email')->post('/verify-email',     [AuthController::class, 'sendVerificationOTP']);
     Route::post('/verify-recaptcha', [AuthController::class, 'verifyRecaptcha']);
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -160,7 +162,7 @@ Route::prefix('platform-stats')->group(function () {
 Route::get('/tools', [ToolController::class, 'index']);
 
 // Public brochure requests - stored as leads, rate-limited per visitor.
-Route::middleware('throttle:6,1')->post('/courses/{id}/brochure-requests', [CourseLeadController::class, 'requestBrochure']);
+Route::middleware('throttle:brochure')->post('/courses/{id}/brochure-requests', [CourseLeadController::class, 'requestBrochure']);
 
 // Paystack server-to-server notifications. Public, but every request must
 // carry a valid HMAC signature (see PaystackController@webhook).
@@ -209,7 +211,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Instructor documents
     Route::prefix('instructor-documents')->group(function () {
         Route::get('/',       [InstructorDocumentController::class, 'index']);
-        Route::middleware('throttle:30,1')->post('/', [InstructorDocumentController::class, 'store']);
+        Route::middleware('throttle:documents')->post('/', [InstructorDocumentController::class, 'store']);
         Route::get('/{id}/download', [InstructorDocumentController::class, 'download']);
         Route::get('/{id}',   [InstructorDocumentController::class, 'show']);
         Route::delete('/{id}', [InstructorDocumentController::class, 'delete']);
@@ -395,7 +397,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Payments
     Route::prefix('payments')->group(function () {
         // Registration checkout - see PaystackController.
-        Route::middleware('throttle:10,1')->post('/paystack/initialize', [PaystackController::class, 'initialize']);
+        Route::middleware('throttle:checkout')->post('/paystack/initialize', [PaystackController::class, 'initialize']);
         Route::get('/paystack/verify/{reference}', [PaystackController::class, 'verify']);
 
         Route::get('/',       [PaymentController::class, 'index']);

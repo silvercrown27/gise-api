@@ -26,7 +26,8 @@ class ForgotPasswordRequest extends FormRequest
     public function rules()
     {
         return [
-            'email' => ['required', 'email', 'exists:users,email']
+            // No exists: rule - the answer must be the same for every address.
+            'email' => ['required', 'email:rfc', 'max:255']
         ];
     }
 

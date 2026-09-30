@@ -27,9 +27,10 @@ class PasswordResetRequest extends FormRequest
     public function rules()
     {
         return [
-            'email' => ['required', 'email', 'exists:users,email'],
-            'token' => ['required', 'string'],
-            'password' => ['required', 'confirmed', Password::min(8)],
+            'email' => ['required', 'email:rfc', 'max:255'],
+            'token' => ['required', 'digits:6'],
+            // As strict as signup: 8+ characters with a letter, a number and a symbol.
+            'password' => ['required', 'confirmed', 'max:128', Password::min(8)->letters()->numbers()->symbols()],
             'password_confirmation' => ['required', 'same:password']
         ];
     }

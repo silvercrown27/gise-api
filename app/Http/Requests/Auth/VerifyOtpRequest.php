@@ -26,8 +26,8 @@ class VerifyOtpRequest extends FormRequest
     public function rules()
     {
         return [
-            'email' => ['required', 'email', 'exists:users,email'],
-            'token' => ['required', 'string', 'min:6'],
+            'email' => ['required', 'email:rfc', 'max:255'],
+            'token' => ['required', 'digits:6'],
         ];
     }
 

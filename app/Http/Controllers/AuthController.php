@@ -29,6 +29,8 @@ use App\Notifications\ResetPasswordNotification;
 use App\Notifications\WelcomeNotification;
 use Ichtrojan\Otp\Models\Otp as OtpModel;
 use Ichtrojan\Otp\Otp;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AuthController extends Controller
 {
@@ -168,138 +170,211 @@ class AuthController extends Controller
         return response()->json(['message' => 'Email exists.', 'status' => 200], 200);
     }
 
+    /** How long a reset / verification code lives, and how the guessing and resending limits are counted. */
+    private const CODE_MINUTES = 15;
+    private const MAX_CODES_PER_WINDOW = 3;   // codes that can be requested per email
+    private const MAX_WRONG_GUESSES = 5;      // wrong codes before the current code is thrown away
+
+    /** Emails a verification code. The answer is the same whether or not the address has an account. */
     public function sendVerificationOTP(Request $request)
     {
-        try {
-            $user = User::where("id", ($request->user()->id ?? null))
-                ->orWhere("email", $request->get('email'))->first();
-            
-            if (!$user) {
-                return response()->json(['message' => 'User not found.'], 404);
-            }
-            
-            return $this->sendCode($user, new OtpVerificationNotification($user->email), 'Email verification otp sent successfully.');
-        } catch (Exception $e) {
-            Log::error('Failed to send verification email: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to send the verification email. Please try again later.'], 500);
+        $email = strtolower(trim((string) ($request->user()?->email ?? $request->input('email'))));
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json(['message' => 'Enter a valid email address.'], 422);
         }
+
+        return $this->issueCode(
+            $email,
+            fn (User $user) => new OtpVerificationNotification($user->email),
+            'If an account exists for that address, we have emailed it a verification code.'
+        );
     }
 
+    /** Step 1 of a password reset: email a code. Never reveals whether the address is registered. */
     public function forgotPassword(ForgotPasswordRequest $request)
     {
-        try {
-            $data = $request->validated();
-            $user = User::where("email", $data['email'])->first();
+        $email = strtolower($request->validated()['email']);
 
-            if (!$user) {
-                return response()->json(['message' => 'User with this email does not exist.'], 404);
-            }
-
-            return $this->sendCode($user, new ResetPasswordNotification($user->email), 'Password reset email sent successfully.');
-        } catch (Exception $e) {
-            Log::error('Failed to send password reset email: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to send password reset email. Please try again later.'], 500);
-        }
+        return $this->issueCode(
+            $email,
+            fn (User $user) => new ResetPasswordNotification($user->email),
+            "If an account exists for that email, we've sent a 6-digit code. It expires in " . self::CODE_MINUTES . ' minutes.'
+        );
     }
 
-    /**
-     * Emails a one-time code right away and reports honestly whether it went out.
-     * If it didn't, the code is discarded (so no valid code exists that nobody
-     * received) and the caller gets a clear retry message instead of a crash.
-     */
-    private function sendCode(User $user, OtpVerificationNotification|ResetPasswordNotification $notification, string $successMessage)
-    {
-        if (!Mailer::sendNow($user, $notification)) {
-            $notification->discardCode();
-
-            return response()->json([
-                'message' => "We couldn't send the email right now. Please try again in a few minutes.",
-            ], 503);
-        }
-
-        return response()->json(['message' => $successMessage], 200);
-    }
-
+    /** Step 2: check the code. */
     public function verifyOtp(VerifyOtpRequest $request)
     {
+        $data = $request->validated();
+        $email = strtolower($data['email']);
+
+        if ($blocked = $this->guessesExhausted($email)) {
+            return $blocked;
+        }
+
         try {
-            $data = $request->validated();
-            $user = User::where("email", $data['email'])->first();
+            $user = User::where('email', $email)->first();
+            $valid = $user && (new Otp())->validate($email, $data['token'])->status;
 
-            if (!$user) {
-                return response()->json(['message' => 'User with this email does not exist.'], 404);
+            if (!$valid) {
+                $this->countWrongGuess($email);
+
+                return response()->json(['message' => 'That code is incorrect or has expired.'], 400);
             }
 
-            $otp = new Otp();
-            $validationResult = $otp->validate($data['email'], $data['token']);
-
-            if (!$validationResult->status) {
-                return response()->json(['message' => $validationResult->message], 400);
-            }
-
-            // A valid OTP proves the user controls this inbox. Verification is
+            // A valid code proves the user controls this inbox. Verification is
             // optional, but record it so admins can see who has confirmed.
             if (!$user->email_verified_at) {
                 $user->forceFill(['email_verified_at' => now()])->save();
             }
 
-            return response()->json([
-                'message' => 'OTP is valid.',
-                'status' => 200
-            ], 200);
+            return response()->json(['message' => 'Code verified.', 'status' => 200], 200);
         } catch (Exception $e) {
             Log::error('Failed to verify otp: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to verify otp. Please try again later.'], 500);
+            return response()->json(['message' => 'Failed to verify the code. Please try again later.'], 500);
         }
     }
 
+    /**
+     * Step 3: set the new password. The code is sent again with it and must
+     * be one issued to THIS email address, still in date, and is single-use.
+     */
     public function resetPassword(PasswordResetRequest $request)
     {
+        $data = $request->validated();
+        $email = strtolower($data['email']);
+
+        if ($blocked = $this->guessesExhausted($email)) {
+            return $blocked;
+        }
+
         try {
-            $data = $request->validated();
+            // Bound to the email: a code issued to one account can never reset another.
+            $otp = OtpModel::where('identifier', $email)->where('token', $data['token'])->first();
+            $user = User::where('email', $email)->first();
 
-            $otp = OtpModel::where('token', $data['token'])->first();
+            if (!$otp || !$user) {
+                $this->countWrongGuess($email);
+                Log::warning('Password reset rejected: bad code', ['ip' => $request->ip()]);
 
-            if (!$otp) {
-                Log::warning('Password reset attempted with non-existent OTP', [
-                    'email' => $data['email'],
-                    'ip' => $request->ip(),
-                ]);
-                return response()->json([
-                    'message' => 'Invalid or expired reset code.'
-                ], 404);
+                return response()->json(['message' => 'That code is incorrect or has expired. Request a new one.'], 400);
             }
 
-            $now = Carbon::now();
-            $duration = $otp->validity;
-            $validity = $otp->created_at->addMinutes($duration);
+            if ($otp->created_at->addMinutes($otp->validity)->isPast()) {
+                $otp->delete();
 
-            if (strtotime($validity) < strtotime($now)) {
-                Log::warning('Password reset attempted with expired OTP', [
-                    'email' => $data['email'],
-                    'expired_at' => $validity->toDateTimeString(),
-                ]);
-                return response()->json([
-                    'message' => 'Reset code has expired. Please request a new one.'
-                ], 403);
+                return response()->json(['message' => 'That code has expired. Please request a new one.'], 400);
             }
 
-            $user = User::where('email', $data['email'])->firstOrFail();
+            DB::transaction(function () use ($user, $email, $data) {
+                // The 'hashed' cast on User hashes this.
+                $user->forceFill(['password' => $data['password']])->save();
+                OtpModel::where('identifier', $email)->delete();
+                // Signed-in devices (including any an attacker holds) must log in again.
+                $user->tokens()->delete();
+            });
 
-            $user->forceFill([
-                'password' => bcrypt($data['password']),
-            ])->save();
+            RateLimiter::clear($this->limiterKey('guess', $email));
+            RateLimiter::clear($this->limiterKey('send', $email));
 
-            $otp->delete();
+            NotificationService::notifyUser($user->id, 'system', "Your password was changed. If this wasn't you, contact support straight away.");
+            Log::info('Password reset completed', ['user_id' => $user->id, 'ip' => $request->ip()]);
 
             return response()->json([
-                'message' => 'Password reset successful. You can now login with your new password.'
+                'message' => 'Password reset successful. You can now log in with your new password.',
+                'status' => 200,
             ], 200);
         } catch (Exception $e) {
-            return response()->json([
-                'message' => 'Unable to reset password. Please try again later.'
-            ], 500);
+            Log::error('Failed to reset password: ' . $e->getMessage());
+
+            return response()->json(['message' => 'Unable to reset password. Please try again later.'], 500);
         }
+    }
+
+    /**
+     * Emails a one-time code and reports honestly whether it went out. The
+     * reply is identical for registered and unknown addresses, so this can't be
+     * used to find out who has an account. If sending fails the code is
+     * discarded, so no valid code exists that nobody received.
+     */
+    private function issueCode(string $email, callable $makeNotification, string $successMessage)
+    {
+        $sendKey = $this->limiterKey('send', $email);
+
+        // Counted for every address, real or not, so the limit itself gives nothing away.
+        if (RateLimiter::tooManyAttempts($sendKey, self::MAX_CODES_PER_WINDOW)) {
+            return $this->tooManyAttempts(RateLimiter::availableIn($sendKey));
+        }
+        RateLimiter::hit($sendKey, self::CODE_MINUTES * 60);
+
+        try {
+            $user = User::where('email', $email)->first();
+
+            if ($user) {
+                // A new code starts a new set of guesses.
+                RateLimiter::clear($this->limiterKey('guess', $email));
+
+                $notification = $makeNotification($user);
+
+                if (!Mailer::sendNow($user, $notification)) {
+                    $notification->discardCode();
+
+                    return response()->json([
+                        'message' => "We couldn't send the email right now. Please try again in a few minutes.",
+                    ], 503);
+                }
+            }
+
+            return response()->json(['message' => $successMessage, 'status' => 200], 200);
+        } catch (Exception $e) {
+            Log::error('Failed to issue a code: ' . $e->getMessage());
+
+            return response()->json(['message' => 'Something went wrong. Please try again later.'], 500);
+        }
+    }
+
+    /** Wrong codes are counted per email. After a few, the code is thrown away and a new one must be requested. */
+    private function countWrongGuess(string $email): void
+    {
+        $key = $this->limiterKey('guess', $email);
+        RateLimiter::hit($key, self::CODE_MINUTES * 60);
+
+        if (RateLimiter::tooManyAttempts($key, self::MAX_WRONG_GUESSES)) {
+            OtpModel::where('identifier', $email)->delete();
+        }
+    }
+
+    private function guessesExhausted(string $email)
+    {
+        $key = $this->limiterKey('guess', $email);
+
+        if (!RateLimiter::tooManyAttempts($key, self::MAX_WRONG_GUESSES)) {
+            return null;
+        }
+
+        OtpModel::where('identifier', $email)->delete();
+
+        return response()->json([
+            'message' => 'Too many incorrect codes. Please request a new code.',
+            'retry_after' => RateLimiter::availableIn($key),
+        ], 429);
+    }
+
+    private function tooManyAttempts(int $seconds)
+    {
+        $minutes = max((int) ceil($seconds / 60), 1);
+
+        return response()->json([
+            'message' => "Too many requests. Please wait {$minutes} minute" . ($minutes === 1 ? '' : 's') . ' and try again.',
+            'retry_after' => $seconds,
+        ], 429)->header('Retry-After', $seconds);
+    }
+
+    /** Hashed so an email address never sits in the cache key. */
+    private function limiterKey(string $kind, string $email): string
+    {
+        return "auth-code:{$kind}:" . sha1($email);
     }
 
     public function verifyRecaptcha(Request $request)
