@@ -63,6 +63,14 @@ class PaymentInvoice
         self::assignNumber($payment);
         $payment->loadMissing(['course', 'cohort', 'learner']);
 
+        // dompdf caches font metrics here; a fresh deploy has no such folder
+        // and rendering fails without it.
+        foreach ([config('dompdf.options.font_dir'), config('dompdf.options.font_cache')] as $dir) {
+            if ($dir && !is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+        }
+
         return Pdf::loadView('invoices.payment', self::viewData($payment))->setPaper('a4');
     }
 
