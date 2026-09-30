@@ -101,6 +101,21 @@ class PaymentInvoiceTest extends TestCase
         $this->assertNull($payment->fresh()->invoice_number);
     }
 
+    public function test_the_invoice_does_not_mention_the_refund_policy(): void
+    {
+        $payment = $this->paid($this->learner());
+        $html = view('invoices.payment', [
+            'payment' => $payment, 'number' => 'INV-2026-00001', 'issuedAt' => now(),
+            'learner' => ['name' => 'Amina', 'email' => 'a@example.com', 'phone' => null],
+            'item' => ['title' => 'Course', 'cohort' => null, 'licences' => false],
+            'amount' => 'USD 330.00', 'method' => 'Visa', 'refunded' => false,
+        ])->render();
+
+        $this->assertStringNotContainsString('refund-policy', $html);
+        $this->assertStringNotContainsString('Refund Policy', $html);
+        $this->assertStringContainsString('info@giseafrica.com', $html);
+    }
+
     public function test_admins_can_download_any_invoice(): void
     {
         $payment = $this->paid($this->learner());

@@ -100,7 +100,6 @@
 
     <p class="muted" style="margin-top: 40px; font-size: 9px;">
         This invoice was generated automatically for a course registration paid through Paystack and is valid without a signature.
-        Refunds follow our Payments &amp; Refund Policy at giseafrica.com/policies/payments-refund-policy.
         Questions? Email info@giseafrica.com and quote {{ $number }}.
     </p>
 </body>
