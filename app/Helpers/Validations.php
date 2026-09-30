@@ -64,11 +64,19 @@ class Validations
     public static function validateInstructorDocument(array $data)
     {
         return Validator::make($data, [
-            'instructor_id'  => 'required|uuid|exists:users,id',
-            'document_type'  => 'nullable|string|in:' . implode(',', \App\Models\InstructorDocument::TYPES),
-            'title'          => 'required|string|max:255',
-            'file_url'       => 'required|string',
-            'file_type'      => 'nullable|string|max:50',
+            'document_type' => 'required|string|in:' . implode(',', \App\Models\InstructorDocument::TYPES),
+            'title'         => 'required|string|max:255',
+            // Checked by content (mimes), not by the name the browser reports.
+            'file'          => [
+                'required', 'file',
+                'max:' . \App\Models\InstructorDocument::MAX_UPLOAD_KB,
+                'mimes:' . implode(',', \App\Models\InstructorDocument::ALLOWED_EXTENSIONS),
+            ],
+        ], [
+            'file.required' => 'Choose a file to upload.',
+            'file.max'      => 'That file is too large. The limit is ' . (\App\Models\InstructorDocument::MAX_UPLOAD_KB / 1024) . ' MB.',
+            'file.mimes'    => 'Upload a PDF, JPG, PNG, DOC or DOCX file.',
+            'file.uploaded' => 'The upload failed - the file may be larger than the server allows. Try a smaller file.',
         ]);
     }
 

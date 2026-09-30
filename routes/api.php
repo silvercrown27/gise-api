@@ -209,7 +209,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Instructor documents
     Route::prefix('instructor-documents')->group(function () {
         Route::get('/',       [InstructorDocumentController::class, 'index']);
-        Route::post('/',      [InstructorDocumentController::class, 'store']);
+        Route::middleware('throttle:30,1')->post('/', [InstructorDocumentController::class, 'store']);
+        Route::get('/{id}/download', [InstructorDocumentController::class, 'download']);
         Route::get('/{id}',   [InstructorDocumentController::class, 'show']);
         Route::delete('/{id}', [InstructorDocumentController::class, 'delete']);
     });

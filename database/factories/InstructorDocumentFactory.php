@@ -18,7 +18,10 @@ class InstructorDocumentFactory extends Factory
         return [
             'instructor_id' => User::factory(),
             'title' => fake()->randomElement(['Teaching Certificate', 'Degree Transcript', 'ID Verification', 'Professional License']),
-            'file_url' => '/storage/instructor-documents/' . fake()->uuid() . '.pdf',
+            'path' => 'instructor-documents/' . fake()->uuid() . '/' . fake()->uuid() . '.pdf',
+            'original_name' => 'document.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 12345,
             'file_type' => 'pdf',
         ];
     }

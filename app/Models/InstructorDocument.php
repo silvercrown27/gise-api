@@ -28,12 +28,36 @@ class InstructorDocument extends Model
 
     public const TYPES = ['national_id', 'cv', 'academic_certificate', 'other'];
 
+    /** Largest single upload, in kilobytes (10 MB). Keep in step with the frontend and server limits. */
+    public const MAX_UPLOAD_KB = 10240;
+
+    /** File types accepted; checked against the file's real contents, not its name. */
+    public const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+
+    /** A mentor can hold this many documents in total, and this many files of each required type. */
+    public const MAX_DOCUMENTS = 20;
+    public const MAX_PER_REQUIRED_TYPE = 3;
+
     protected $fillable = [
         'instructor_id',
         'document_type',
         'title',
-        'file_url',
+        'path',
+        'original_name',
+        'mime_type',
+        'size_bytes',
         'file_type',
+    ];
+
+    // The storage path (and any legacy public URL) never leaves the server:
+    // files are only reachable through the authorised download endpoint.
+    protected $hidden = ['path', 'file_url'];
+
+    // Lets the UI tell a real upload from an old row whose file couldn't be found.
+    protected $appends = ['has_file'];
+
+    protected $casts = [
+        'size_bytes' => 'integer',
     ];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
@@ -51,6 +75,11 @@ class InstructorDocument extends Model
         static::updating(function ($model) {
             $model->updated_at = $model->getDateTime();
         });
+    }
+
+    public function getHasFileAttribute(): bool
+    {
+        return !empty($this->attributes['path']);
     }
 
     protected function serializeDate(\DateTimeInterface $date)
