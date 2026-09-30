@@ -523,6 +523,53 @@ class NotificationsAndEmailsTest extends TestCase
         $this->assertStringNotContainsString('published_at', $message, 'bookkeeping columns are not listed');
     }
 
+    // ── deliverability ────────────────────────────────────────────────────────
+
+    public function test_every_email_also_goes_out_with_a_plain_text_version(): void
+    {
+        $user = $this->person('student', ['name' => 'Amina Otieno']);
+        app('mail.manager')->purge('array');
+
+        $user->notifyNow(new WelcomeNotification('Amina'));
+        $user->notifyNow(new OtpVerificationNotification('amina@example.com'));
+
+        $sent = app('mail.manager')->mailer('array')->getSymfonyTransport()->messages();
+        $this->assertCount(2, $sent);
+
+        foreach ($sent as $delivery) {
+            $email = $delivery->getOriginalMessage();
+            $text = $email->getTextBody();
+
+            $this->assertNotEmpty($email->getHtmlBody(), 'the branded HTML is still sent');
+            $this->assertNotEmpty($text, 'and now a plain-text version alongside it');
+            $this->assertStringNotContainsString('<', $text, 'no markup leaks into the text');
+            $this->assertStringNotContainsString('display:none', $text);
+            $this->assertStringContainsString('info@giseafrica.com', $text);
+            $this->assertStringContainsString('https://giseafrica.test/policies/privacy-policy', $text, 'links keep their address');
+        }
+
+        // The code itself is readable in the text version.
+        $otpText = $sent[1]->getOriginalMessage()->getTextBody();
+        $this->assertMatchesRegularExpression('/\b\d{6}\b/', $otpText);
+    }
+
+    public function test_the_text_converter_keeps_links_and_drops_hidden_preview_text(): void
+    {
+        $text = \App\Listeners\AddPlainTextAlternative::toText(
+            '<html><head><style>p{color:red}</style></head><body><div style="display:none;">Hidden preview</div>'
+            . '<p>Hello &amp; welcome</p><p><a href="https://giseafrica.com/courses">Browse courses</a> or '
+            . '<a href="mailto:info@giseafrica.com">email us</a></p><table><tr><td>Course</td><td>GIS</td></tr></table></body></html>'
+        );
+
+        $this->assertStringContainsString('Hello & welcome', $text);
+        $this->assertStringContainsString('Browse courses (https://giseafrica.com/courses)', $text);
+        $this->assertStringContainsString('email us', $text);
+        $this->assertStringNotContainsString('mailto:', $text);
+        $this->assertStringNotContainsString('Hidden preview', $text);
+        $this->assertStringNotContainsString('color:red', $text);
+        $this->assertStringContainsString('Course: GIS', $text);
+    }
+
     // ── a broken mail server breaks nothing and falsifies nothing ─────────────
 
     public function test_signup_still_succeeds_when_the_mail_server_is_down(): void
