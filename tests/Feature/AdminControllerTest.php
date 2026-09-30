@@ -39,7 +39,7 @@ class AdminControllerTest extends TestCase
     public function test_dashboard_returns_expected_structure_for_admin(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
         Sanctum::actingAs($admin);
 
         $response = $this->getJson('/api/admin/dashboard');
@@ -60,6 +60,22 @@ class AdminControllerTest extends TestCase
                 'recent_audit_logs',
             ],
         ]);
+    }
+
+    public function test_dashboard_hides_revenue_and_review_queues_from_plain_admins(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $data = $this->getJson('/api/admin/dashboard')->assertStatus(200)->json('data');
+
+        foreach (['revenue', 'pending_instructors', 'pending_courses', 'pending_quizzes', 'pending_mentor_applications', 'pending_exams', 'pending_modules'] as $key) {
+            $this->assertArrayNotHasKey($key, $data);
+        }
+        foreach (['users', 'courses', 'cohorts', 'enrollments', 'recent_audit_logs'] as $key) {
+            $this->assertArrayHasKey($key, $data);
+        }
     }
 
     public function test_dashboard_reports_correct_user_role_counts(): void
@@ -89,7 +105,7 @@ class AdminControllerTest extends TestCase
     public function test_dashboard_reports_correct_course_and_pending_counts(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         Course::factory()->create(['status' => 'published']);
         Course::factory()->create(['status' => 'published']);
@@ -113,7 +129,7 @@ class AdminControllerTest extends TestCase
     public function test_dashboard_reports_correct_pending_quiz_and_mentor_application_counts(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         \App\Models\ModuleQuiz::factory()->create(['admin_approval_status' => 'pending']);
         \App\Models\ModuleQuiz::factory()->create(['admin_approval_status' => 'approved']);
@@ -133,7 +149,7 @@ class AdminControllerTest extends TestCase
     public function test_dashboard_computes_revenue_from_completed_payments_only(): void
     {
         $admin = User::factory()->create();
-        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'admin']);
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
 
         Payment::factory()->create(['status' => 'completed', 'amount' => 10000, 'paid_at' => now()]);
         Payment::factory()->create(['status' => 'completed', 'amount' => 5000, 'paid_at' => now()]);

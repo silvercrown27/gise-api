@@ -56,17 +56,26 @@ class AdminController extends Controller
             $totalEnrollments = Enrollment::count();
             $enrollmentsLast30Days = Enrollment::where('enrolled_at', '>=', now()->subDays(30))->count();
 
-            $totalRevenue = Payment::where('status', 'completed')->sum('amount');
-            $revenueLast30Days = Payment::where('status', 'completed')
-                ->where('paid_at', '>=', now()->subDays(30))
-                ->sum('amount');
+            // Revenue and the review queues are super-admin only; admins get
+            // neither in the response, not just a hidden card.
+            $superOnly = [];
 
-            $pendingInstructors = InstructorProfile::where('approval_status', 'pending')->count();
-            $pendingCourses = Course::where('admin_approval_status', 'pending')->count();
-            $pendingQuizzes = ModuleQuiz::where('admin_approval_status', 'pending')->count();
-            $pendingMentorApplications = CohortMentorApplication::where('status', 'pending')->count();
-            $pendingExams = Exam::where('admin_approval_status', 'pending')->count();
-            $pendingModules = CourseModule::where('admin_approval_status', 'pending')->count();
+            if ($user->isSuperAdmin()) {
+                $superOnly = [
+                    'revenue' => [
+                        'total' => (int) Payment::where('status', 'completed')->sum('amount'),
+                        'last_30_days' => (int) Payment::where('status', 'completed')
+                            ->where('paid_at', '>=', now()->subDays(30))
+                            ->sum('amount'),
+                    ],
+                    'pending_instructors' => InstructorProfile::where('approval_status', 'pending')->count(),
+                    'pending_courses' => Course::where('admin_approval_status', 'pending')->count(),
+                    'pending_quizzes' => ModuleQuiz::where('admin_approval_status', 'pending')->count(),
+                    'pending_mentor_applications' => CohortMentorApplication::where('status', 'pending')->count(),
+                    'pending_exams' => Exam::where('admin_approval_status', 'pending')->count(),
+                    'pending_modules' => CourseModule::where('admin_approval_status', 'pending')->count(),
+                ];
+            }
 
             $recentAuditLogs = AdminAuditLog::with('admin:id,name')
                 ->orderBy('created_at', 'desc')
@@ -96,18 +105,8 @@ class AdminController extends Controller
                         'total' => $totalEnrollments,
                         'last_30_days' => $enrollmentsLast30Days,
                     ],
-                    'revenue' => [
-                        'total' => (int) $totalRevenue,
-                        'last_30_days' => (int) $revenueLast30Days,
-                    ],
-                    'pending_instructors' => $pendingInstructors,
-                    'pending_courses' => $pendingCourses,
-                    'pending_quizzes' => $pendingQuizzes,
-                    'pending_mentor_applications' => $pendingMentorApplications,
-                    'pending_exams' => $pendingExams,
-                    'pending_modules' => $pendingModules,
                     'recent_audit_logs' => $recentAuditLogs,
-                ],
+                ] + $superOnly,
             ], 200);
         } catch (\Exception $e) {
             Log::error('AdminController@dashboard: ' . $e->getMessage());

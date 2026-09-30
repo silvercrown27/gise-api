@@ -202,7 +202,13 @@ class CourseController extends Controller
                 ->where('status', 'published')
                 ->count();
 
-            $totalRegistrations = Enrollment::whereIn('course_id', $courseIds)->count();
+            // Student counts are only for cohorts the instructor is an approved
+            // mentor of; owning a course alone does not reveal them.
+            $mentoredCohortIds = CohortMentorApplication::where('instructor_id', $instructorId)
+                ->where('status', 'approved')
+                ->pluck('cohort_id');
+
+            $totalRegistrations = Enrollment::whereIn('cohort_id', $mentoredCohortIds)->count();
 
             $averageRating = CourseRating::whereIn('course_id', $courseIds)->avg('rating');
 
@@ -211,10 +217,15 @@ class CourseController extends Controller
                 ->where('start_date', '>=', now()->toDateString())
                 ->orderBy('start_date', 'asc')
                 ->limit(3)
-                ->get(['id', 'course_id', 'label', 'start_date', 'capacity', 'seats_taken']);
+                ->get(['id', 'course_id', 'label', 'start_date', 'capacity', 'seats_taken'])
+                ->each(function ($cohort) use ($mentoredCohortIds) {
+                    if (!$mentoredCohortIds->contains($cohort->id)) {
+                        $cohort->seats_taken = null;
+                    }
+                });
 
             $topCourses = Course::manageableBy($instructorId)
-                ->withCount('enrollments')
+                ->withCount(['enrollments' => fn ($q) => $q->whereIn('cohort_id', $mentoredCohortIds)])
                 ->orderBy('enrollments_count', 'desc')
                 ->limit(3)
                 ->get(['id', 'title', 'slug']);

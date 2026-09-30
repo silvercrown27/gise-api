@@ -168,7 +168,15 @@ class CourseControllerTest extends TestCase
         ]);
         Course::factory()->create(['instructor_id' => $instructor->id, 'status' => 'draft']);
 
-        \App\Models\Enrollment::factory()->count(3)->create(['course_id' => $publishedCourse->id]);
+        $mentored = \App\Models\Cohort::factory()->create(['course_id' => $publishedCourse->id]);
+        $other = \App\Models\Cohort::factory()->create(['course_id' => $publishedCourse->id]);
+        \App\Models\CohortMentorApplication::factory()->create([
+            'cohort_id' => $mentored->id,
+            'instructor_id' => $instructor->id,
+            'status' => 'approved',
+        ]);
+        \App\Models\Enrollment::factory()->count(3)->create(['course_id' => $publishedCourse->id, 'cohort_id' => $mentored->id]);
+        \App\Models\Enrollment::factory()->count(2)->create(['course_id' => $publishedCourse->id, 'cohort_id' => $other->id]);
 
         Sanctum::actingAs($instructor);
 
@@ -177,7 +185,30 @@ class CourseControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('data.total_courses', 2);
         $response->assertJsonPath('data.published_courses', 1);
+        // Only students in the cohort they are an approved mentor of.
         $response->assertJsonPath('data.total_registrations', 3);
+    }
+
+    public function test_summary_shows_no_students_without_an_approved_mentor_application(): void
+    {
+        $instructor = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
+
+        $course = Course::factory()->create(['instructor_id' => $instructor->id]);
+        $cohort = \App\Models\Cohort::factory()->create(['course_id' => $course->id]);
+        \App\Models\CohortMentorApplication::factory()->create([
+            'cohort_id' => $cohort->id,
+            'instructor_id' => $instructor->id,
+            'status' => 'pending',
+        ]);
+        \App\Models\Enrollment::factory()->count(4)->create(['course_id' => $course->id, 'cohort_id' => $cohort->id]);
+
+        Sanctum::actingAs($instructor);
+
+        $response = $this->getJson('/api/courses/summary');
+
+        $response->assertJsonPath('data.total_registrations', 0);
+        $response->assertJsonPath('data.top_courses.0.enrollments_count', 0);
     }
 
     public function test_summary_response_does_not_include_earnings_fields(): void
@@ -265,8 +296,15 @@ class CourseControllerTest extends TestCase
         $midCourse = Course::factory()->create(['instructor_id' => $instructor->id]);
         Course::factory()->create(['instructor_id' => $instructor->id]); // no enrollments
 
-        \App\Models\Enrollment::factory()->count(5)->create(['course_id' => $topCourse->id]);
-        \App\Models\Enrollment::factory()->count(2)->create(['course_id' => $midCourse->id]);
+        foreach ([[$topCourse, 5], [$midCourse, 2]] as [$c, $n]) {
+            $cohort = \App\Models\Cohort::factory()->create(['course_id' => $c->id]);
+            \App\Models\CohortMentorApplication::factory()->create([
+                'cohort_id' => $cohort->id,
+                'instructor_id' => $instructor->id,
+                'status' => 'approved',
+            ]);
+            \App\Models\Enrollment::factory()->count($n)->create(['course_id' => $c->id, 'cohort_id' => $cohort->id]);
+        }
 
         Sanctum::actingAs($instructor);
 
