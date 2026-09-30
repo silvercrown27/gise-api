@@ -318,13 +318,12 @@ class CourseLessonController extends Controller
 
             if ($status === 'rejected') {
                 $module = $lesson->module;
-                foreach ($module?->course?->reviewRecipientIds($request->user()->id) ?? [] as $recipientId) {
-                    NotificationService::notifyUser(
-                        $recipientId,
-                        'module_review',
-                        "Your lesson \"{$lesson->title}\" was rejected." . ($lesson->admin_rejection_reason ? " Reason: {$lesson->admin_rejection_reason}" : '')
-                    );
-                }
+                NotificationService::notifyReviewOutcome(
+                    'module_review',
+                    "The lesson \"{$lesson->title}\" was rejected." . ($lesson->admin_rejection_reason ? " Reason: {$lesson->admin_rejection_reason}" : ''),
+                    '/admin/content/lessons?course=' . $module?->course_id . '&module=' . $lesson->module_id,
+                    $request->user()->id
+                );
             }
 
             return response()->json([

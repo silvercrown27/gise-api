@@ -2,6 +2,9 @@
 
 @section('title', 'Welcome to GISE Africa')
 
+@section('preheader', "Your GISE Africa account is ready.")
+@section('reason', "You're receiving this because you created an account on giseafrica.com.")
+
 @section('content')
     <p style="margin:0 0 16px;">Hi {{ $name }},</p>
     <p style="margin:0 0 16px;">Welcome to the Global Institute For Skills And Excellence Africa. Your account is ready.</p>

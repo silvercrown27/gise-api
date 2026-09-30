@@ -9,6 +9,8 @@ use App\Helpers\Validations;
 use App\Models\AdminAuditLog;
 use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
+use App\Notifications\InstructorAccountDecisionNotification;
+use App\Services\Mailer;
 use App\Services\NotificationService;
 
 class InstructorProfileController extends Controller
@@ -249,14 +251,17 @@ class InstructorProfileController extends Controller
                 NotificationService::notifyUser(
                     $instructorProfile->user_id,
                     'instructor_approval',
-                    'Your instructor account has been approved. You can now create and publish courses.'
+                    'Your mentor account has been approved. You can now apply to mentor cohorts.',
+                    '/mentors/cohorts'
                 );
+                $this->emailDecision($instructorProfile->user_id, true);
             } elseif ($status === 'banned') {
                 NotificationService::notifyUser(
                     $instructorProfile->user_id,
                     'instructor_approval',
-                    'Your instructor account has been banned. Contact support if you believe this is a mistake.'
+                    'Your mentor application was not approved. Contact support if you believe this is a mistake.'
                 );
+                $this->emailDecision($instructorProfile->user_id, false);
             }
 
             return response()->json([
@@ -306,6 +311,16 @@ class InstructorProfileController extends Controller
                 'status'  => 500,
                 'message' => 'An error occurred while deleting the instructor profile.',
             ], 500);
+        }
+    }
+
+    /** Email the outcome of the account review. A mail problem never affects the decision itself. */
+    private function emailDecision(string $userId, bool $approved): void
+    {
+        $user = \App\Models\User::find($userId);
+
+        if ($user) {
+            Mailer::send($user, new InstructorAccountDecisionNotification($user->name, $approved));
         }
     }
 }

@@ -2,6 +2,9 @@
 
 @section('title', 'Reset your password')
 
+@section('preheader', "Your password reset code.")
+@section('reason', "You're receiving this because someone asked to reset the password for this account on giseafrica.com.")
+
 @section('content')
     <p style="margin:0 0 16px;">We received a request to reset the password for {{ $email }}. Your reset code is:</p>
     <p style="margin:0 0 16px;font-size:30px;font-weight:700;letter-spacing:8px;color:#0b1310;">{{ $otp }}</p>

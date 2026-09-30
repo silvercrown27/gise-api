@@ -9,6 +9,7 @@ use App\Models\Enrollment;
 use App\Models\Payment;
 use App\Models\ScholarUser;
 use App\Services\CourseRegistration;
+use App\Services\LifecycleNotifier;
 use App\Services\NotificationService;
 use App\Services\PaymentInvoice;
 use Illuminate\Http\Request;
@@ -63,6 +64,7 @@ class PaystackController extends Controller
 
             if ($quote['fee'] <= 0) {
                 $enrollment = CourseRegistration::enroll($user->id, $course, $cohort, $withLicences);
+                LifecycleNotifier::registered($enrollment);
 
                 return response()->json([
                     'status'  => 201,
@@ -267,6 +269,8 @@ class PaystackController extends Controller
 
             // The money is in, so enroll even if the cohort has since closed
             // or filled up; admins can move the learner if needed.
+            $enrollment = null;
+
             if ($existing && !$existing->trashed() && $existing->enrollment_status !== 'dropped') {
                 NotificationService::notifyAdmins('payment', "Paystack payment {$payment->reference} was received for a course the learner is already enrolled in.");
             } else {
@@ -278,14 +282,10 @@ class PaystackController extends Controller
                 );
                 // Record what was actually paid, even if the fee has changed since.
                 $enrollment->update(['quoted_fee' => $payment->amount, 'currency' => $payment->currency]);
-
-                NotificationService::notifyUser(
-                    $payment->learner_id,
-                    'payment',
-                    "Payment received - you're registered for {$course->title}.",
-                    '/students/courses'
-                );
             }
+
+            // The learner paid either way, so they get their confirmation and invoice.
+            LifecycleNotifier::paid($payment, $enrollment);
 
             return $payment;
         });

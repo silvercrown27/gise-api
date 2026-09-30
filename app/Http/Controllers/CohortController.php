@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\Cohort;
+use App\Services\LifecycleNotifier;
 use App\Models\CohortMentorApplication;
 use App\Models\Course;
 use App\Models\ScholarUser;
@@ -175,8 +176,14 @@ class CohortController extends Controller
                 ], 404);
             }
 
+            $before = $this->scheduleSnapshot($cohort);
             $cohort->update($request->all());
+            $scheduleChanged = $before !== $this->scheduleSnapshot($cohort->fresh());
             $cohort->syncSeatsTaken();
+
+            if ($scheduleChanged) {
+                LifecycleNotifier::cohortChanged($cohort);
+            }
 
             return response()->json([
                 'status'  => 200,
@@ -273,5 +280,17 @@ class CohortController extends Controller
             ->where('instructor_id', $request->user()->id)
             ->where('status', 'approved')
             ->exists();
+    }
+
+    /** What learners and mentors would notice changing: when and where the cohort runs. Dates compare as calendar days. */
+    private function scheduleSnapshot(Cohort $cohort): array
+    {
+        return [
+            $cohort->start_date?->toDateString(),
+            $cohort->end_date?->toDateString(),
+            $cohort->mode,
+            $cohort->location_city,
+            $cohort->location_country,
+        ];
     }
 }

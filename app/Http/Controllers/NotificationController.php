@@ -9,24 +9,34 @@ use App\Helpers\Validations;
 use App\Models\Notification;
 use App\Models\ScholarUser;
 
+/**
+ * In-app notifications. Every account - learner, mentor, admin or super admin -
+ * has its own inbox: nobody can read, change or delete anyone else's, staff
+ * included. What each role receives is decided where the events happen
+ * (see NotificationService and LifecycleNotifier).
+ */
 class NotificationController extends Controller
 {
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $mine = Notification::where('user_id', $request->user()->id);
 
-            $query = Notification::query();
+            // Several notifications are often created in the same second, so a second sort
+            // key keeps their order identical from one page to the next.
+            $query = (clone $mine)->orderBy('created_at', 'desc')->orderBy('id');
 
-            if (!$user || $user->role === 'student') {
-                $query->where('user_id', $request->user()->id);
+            if ($request->boolean('unread')) {
+                $query->where('is_read', false);
             }
 
-            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 30);
 
             return response()->json([
                 'status' => 200,
-                'data'   => $results,
+                'data'   => $query->paginate($perPage),
+                // The bell badge needs the real total, not just what fits on one page.
+                'unread_count' => (clone $mine)->where('is_read', false)->count(),
             ], 200);
         } catch (\Exception $e) {
             Log::error('NotificationController@index: ' . $e->getMessage());
@@ -37,11 +47,37 @@ class NotificationController extends Controller
         }
     }
 
+    /** Marks every unread notification in the caller's own inbox as read. */
+    public function markAllRead(Request $request)
+    {
+        try {
+            $updated = Notification::where('user_id', $request->user()->id)
+                ->where('is_read', false)
+                ->update(['is_read' => true, 'updated_at' => now()]);
+
+            return response()->json([
+                'status'  => 200,
+                'message' => $updated === 1 ? '1 notification marked as read.' : "{$updated} notifications marked as read.",
+                'data'    => ['updated' => $updated],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('NotificationController@markAllRead: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while updating notifications.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Staff-only: hand-written notices. Everything else on the platform is
+     * created by the events themselves, so nobody else can send one.
+     */
     public function store(Request $request)
     {
         $user = ScholarUser::find($request->user()->id);
 
-        if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
+        if (!$user || !$user->isAdmin()) {
             return response()->json([
                 'status'  => 403,
                 'message' => 'Forbidden.',
@@ -59,8 +95,7 @@ class NotificationController extends Controller
         }
 
         try {
-            $data = $request->all();
-            $notification = Notification::create($data);
+            $notification = Notification::create($request->only(['user_id', 'type', 'message', 'link', 'is_read']));
             $notification->refresh();
 
             return response()->json([
@@ -80,24 +115,10 @@ class NotificationController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
-            $notification = Notification::find($id);
+            $notification = $this->findOwn($request, $id);
 
             if (!$notification) {
-                return response()->json([
-                    'status'  => 404,
-                    'message' => 'Notification not found.',
-                ], 404);
-            }
-
-            $isAdmin = $user && $user->isAdmin();
-            $isOwner = (string) $notification->user_id === (string) $request->user()->id;
-
-            if (!$isAdmin && !$isOwner) {
-                return response()->json([
-                    'status'  => 403,
-                    'message' => 'Forbidden.',
-                ], 403);
+                return $this->notFound();
             }
 
             return response()->json([
@@ -113,36 +134,17 @@ class NotificationController extends Controller
         }
     }
 
+    /** The only thing anyone can change about a notification is whether it has been read. */
     public function update(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
-            $notification = Notification::find($id);
+            $notification = $this->findOwn($request, $id);
 
             if (!$notification) {
-                return response()->json([
-                    'status'  => 404,
-                    'message' => 'Notification not found.',
-                ], 404);
+                return $this->notFound();
             }
 
-            $isAdmin = $user && $user->isAdmin();
-            $isOwner = (string) $notification->user_id === (string) $request->user()->id;
-
-            if (!$isAdmin && !$isOwner) {
-                return response()->json([
-                    'status'  => 403,
-                    'message' => 'Forbidden.',
-                ], 403);
-            }
-
-            $data = $request->all();
-
-            if (!$isAdmin) {
-                $data = array_intersect_key($data, ['is_read' => true]);
-            }
-
-            $notification->update($data);
+            $notification->update($request->only('is_read'));
 
             return response()->json([
                 'status'  => 200,
@@ -161,24 +163,10 @@ class NotificationController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
-            $notification = Notification::find($id);
+            $notification = $this->findOwn($request, $id);
 
             if (!$notification) {
-                return response()->json([
-                    'status'  => 404,
-                    'message' => 'Notification not found.',
-                ], 404);
-            }
-
-            $isAdmin = $user && $user->isAdmin();
-            $isOwner = (string) $notification->user_id === (string) $request->user()->id;
-
-            if (!$isAdmin && !$isOwner) {
-                return response()->json([
-                    'status'  => 403,
-                    'message' => 'Forbidden.',
-                ], 403);
+                return $this->notFound();
             }
 
             $notification->delete();
@@ -194,5 +182,19 @@ class NotificationController extends Controller
                 'message' => 'An error occurred while deleting the notification.',
             ], 500);
         }
+    }
+
+    /** Someone else's notification reads as missing, not forbidden, so ids can't be probed. */
+    private function findOwn(Request $request, string $id): ?Notification
+    {
+        return Notification::where('user_id', $request->user()->id)->find($id);
+    }
+
+    private function notFound()
+    {
+        return response()->json([
+            'status'  => 404,
+            'message' => 'Notification not found.',
+        ], 404);
     }
 }

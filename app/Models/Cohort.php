@@ -147,6 +147,25 @@ class Cohort extends Model
     /**
      * Recount seats from live enrollments. Dropped learners give their seat back.
      */
+    /**
+     * Label => value rows describing this cohort in an email: name, dates and
+     * where it is taught.
+     *
+     * @return array<string,string|null>
+     */
+    public function emailDetails(): array
+    {
+        $dates = $this->start_date
+            ? $this->start_date->format('j M Y') . ($this->end_date ? ' - ' . $this->end_date->format('j M Y') : '')
+            : null;
+
+        $where = $this->mode === 'physical'
+            ? (trim(implode(', ', array_filter([$this->location_city, $this->location_country]))) ?: 'In person')
+            : 'Online (virtual)';
+
+        return ['Cohort' => $this->label, 'Dates' => $dates, 'Format' => $where];
+    }
+
     public function syncSeatsTaken(): void
     {
         $this->forceFill([

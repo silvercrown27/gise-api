@@ -11,6 +11,9 @@ use App\Models\CohortMentorApplication;
 use App\Models\InstructorDocument;
 use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
+use App\Models\User;
+use App\Notifications\MentorApplicationApprovedNotification;
+use App\Services\Mailer;
 use App\Services\NotificationService;
 
 class CohortMentorApplicationController extends Controller
@@ -216,8 +219,12 @@ class CohortMentorApplicationController extends Controller
                 NotificationService::notifyUser(
                     $application->instructor_id,
                     'mentor_application',
-                    "You've been approved to mentor \"{$application->cohort->label}\" ({$application->cohort->course->title})."
+                    "You've been approved to mentor \"{$application->cohort->label}\" ({$application->cohort->course->title}).",
+                    '/mentors/cohorts'
                 );
+                if ($instructor = User::find($application->instructor_id)) {
+                    Mailer::send($instructor, new MentorApplicationApprovedNotification($application));
+                }
             } elseif ($status === 'rejected') {
                 NotificationService::notifyUser(
                     $application->instructor_id,

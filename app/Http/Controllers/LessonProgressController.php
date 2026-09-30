@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\CourseLesson;
 use App\Models\Enrollment;
+use App\Services\LifecycleNotifier;
 use App\Models\LessonProgress;
 use App\Models\ScholarUser;
 
@@ -235,8 +236,10 @@ class LessonProgressController extends Controller
             : 0;
 
         $update = ['progress_percent' => $progressPercent];
+        $justCompleted = false;
 
         if ($totalLessons > 0 && $completedLessons >= $totalLessons) {
+            $justCompleted = $enrollment->enrollment_status !== 'completed';
             $update['enrollment_status'] = 'completed';
             $update['completed_at'] = $enrollment->completed_at ?? now();
         } elseif ($enrollment->enrollment_status === 'completed' && $completedLessons < $totalLessons) {
@@ -245,5 +248,10 @@ class LessonProgressController extends Controller
         }
 
         $enrollment->update($update);
+
+        // Only the moment it flips to completed, not every later recalculation.
+        if ($justCompleted) {
+            LifecycleNotifier::completed($enrollment);
+        }
     }
 }

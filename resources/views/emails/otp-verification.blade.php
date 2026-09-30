@@ -2,6 +2,9 @@
 
 @section('title', 'Verify your email')
 
+@section('preheader', "Your verification code.")
+@section('reason', "You're receiving this because someone asked to verify this email address on giseafrica.com.")
+
 @section('content')
     <p style="margin:0 0 16px;">Use this code to verify {{ $email }}:</p>
     <p style="margin:0 0 16px;font-size:30px;font-weight:700;letter-spacing:8px;color:#0b1310;">{{ $otp }}</p>

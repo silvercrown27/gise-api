@@ -700,18 +700,11 @@ class CourseController extends Controller
                 'notes' => $status === 'rejected' ? $course->admin_rejection_reason : null,
             ]);
 
+            $link = '/admin/courses/' . $course->id;
             if ($status === 'approved') {
-                NotificationService::notifyUser(
-                    $course->instructor_id,
-                    'course_review',
-                    "Your course \"{$course->title}\" has been approved and is now live."
-                );
+                NotificationService::notifyReviewOutcome('course_review', "The course \"{$course->title}\" was approved" . ($course->status === 'published' ? ' and is now live.' : '.'), $link, $request->user()->id);
             } elseif ($status === 'rejected') {
-                NotificationService::notifyUser(
-                    $course->instructor_id,
-                    'course_review',
-                    "Your course \"{$course->title}\" was rejected." . ($course->admin_rejection_reason ? " Reason: {$course->admin_rejection_reason}" : '')
-                );
+                NotificationService::notifyReviewOutcome('course_review', "The course \"{$course->title}\" was rejected." . ($course->admin_rejection_reason ? " Reason: {$course->admin_rejection_reason}" : ''), $link, $request->user()->id);
             }
 
             return response()->json([

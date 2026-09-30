@@ -22,6 +22,7 @@ use App\Helpers\Utilities;
 use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
 use App\Models\SiteUpdate;
+use App\Services\Mailer;
 use App\Services\NotificationService;
 use App\Notifications\OtpVerificationNotification;
 use App\Notifications\ResetPasswordNotification;
@@ -100,8 +101,10 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('main')->plainTextToken;
-        $user->notify(new OtpVerificationNotification($user->email));
-        $user->notify(new WelcomeNotification($user->name));
+        // One welcome email. (No verification code is sent here: verifying the
+        // address is optional and the code is emailed on request instead.)
+        // Mailer never throws, so a mail problem can't undo or fail a signup.
+        Mailer::send($user, new WelcomeNotification($user->name));
 
         SiteUpdate::create([
             'type' => 'signup',
@@ -175,12 +178,10 @@ class AuthController extends Controller
                 return response()->json(['message' => 'User not found.'], 404);
             }
             
-            $user->notify(new OtpVerificationNotification($user->email));
-
-            return response()->json(['message' => 'Email verification otp sent successfully.'], 200);
+            return $this->sendCode($user, new OtpVerificationNotification($user->email), 'Email verification otp sent successfully.');
         } catch (Exception $e) {
-            Log::error('Failed to send password reset email: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to send password reset email. Please try again later.'], 500);
+            Log::error('Failed to send verification email: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to send the verification email. Please try again later.'], 500);
         }
     }
 
@@ -194,13 +195,29 @@ class AuthController extends Controller
                 return response()->json(['message' => 'User with this email does not exist.'], 404);
             }
 
-            $user->notify(new ResetPasswordNotification($user->email));
-
-            return response()->json(['message' => 'Password reset email sent successfully.'], 200);
+            return $this->sendCode($user, new ResetPasswordNotification($user->email), 'Password reset email sent successfully.');
         } catch (Exception $e) {
             Log::error('Failed to send password reset email: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to send password reset email. Please try again later.'], 500);
         }
+    }
+
+    /**
+     * Emails a one-time code right away and reports honestly whether it went out.
+     * If it didn't, the code is discarded (so no valid code exists that nobody
+     * received) and the caller gets a clear retry message instead of a crash.
+     */
+    private function sendCode(User $user, OtpVerificationNotification|ResetPasswordNotification $notification, string $successMessage)
+    {
+        if (!Mailer::sendNow($user, $notification)) {
+            $notification->discardCode();
+
+            return response()->json([
+                'message' => "We couldn't send the email right now. Please try again in a few minutes.",
+            ], 503);
+        }
+
+        return response()->json(['message' => $successMessage], 200);
     }
 
     public function verifyOtp(VerifyOtpRequest $request)

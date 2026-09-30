@@ -836,10 +836,12 @@ class CourseControllerTest extends TestCase
         ]);
     }
 
-    public function test_set_approval_status_notifies_instructor_on_approve(): void
+    public function test_set_approval_status_notifies_the_admins_who_write_content_on_approve(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
+        $author = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $author->id, 'role' => 'admin']);
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->pendingApproval()->create(['instructor_id' => $instructor->id]);
@@ -849,16 +851,17 @@ class CourseControllerTest extends TestCase
             'admin_approval_status' => 'approved',
         ])->assertStatus(200);
 
-        $this->assertDatabaseHas('notifications', [
-            'user_id' => $instructor->id,
-            'type' => 'course_review',
-        ]);
+        $this->assertDatabaseHas('notifications', ['user_id' => $author->id, 'type' => 'course_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $instructor->id, 'type' => 'course_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $admin->id, 'type' => 'course_review']);
     }
 
-    public function test_set_approval_status_notifies_instructor_on_reject(): void
+    public function test_set_approval_status_notifies_the_admins_who_write_content_on_reject(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
+        $author = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $author->id, 'role' => 'admin']);
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
         $course = Course::factory()->pendingApproval()->create(['instructor_id' => $instructor->id]);
@@ -869,10 +872,9 @@ class CourseControllerTest extends TestCase
             'admin_rejection_reason' => 'Needs more detail.',
         ])->assertStatus(200);
 
-        $this->assertDatabaseHas('notifications', [
-            'user_id' => $instructor->id,
-            'type' => 'course_review',
-        ]);
+        $this->assertDatabaseHas('notifications', ['user_id' => $author->id, 'type' => 'course_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $instructor->id, 'type' => 'course_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $admin->id, 'type' => 'course_review']);
     }
 
     public function test_set_approval_status_as_instructor_is_forbidden(): void

@@ -154,7 +154,7 @@ class NotificationControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_show_forbids_viewing_another_users_notification(): void
+    public function test_show_hides_viewing_another_users_notification(): void
     {
         // Fixed: show() now checks ownership.
         $attacker = User::factory()->create();
@@ -163,7 +163,7 @@ class NotificationControllerTest extends TestCase
 
         $response = $this->getJson("/api/notifications/{$notification->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(404);
     }
 
     public function test_show_lets_owner_view_own_notification(): void
@@ -177,7 +177,7 @@ class NotificationControllerTest extends TestCase
         $response->assertStatus(200);
     }
 
-    public function test_update_forbids_modifying_another_users_notification(): void
+    public function test_update_hides_modifying_another_users_notification(): void
     {
         // Fixed: update() now checks ownership.
         $attacker = User::factory()->create();
@@ -188,7 +188,7 @@ class NotificationControllerTest extends TestCase
             'is_read' => true,
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(404);
     }
 
     public function test_update_lets_owner_mark_own_notification_read(): void
@@ -214,7 +214,7 @@ class NotificationControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_delete_forbids_deleting_another_users_notification(): void
+    public function test_delete_hides_deleting_another_users_notification(): void
     {
         // Fixed: delete() now checks ownership.
         $attacker = User::factory()->create();
@@ -223,7 +223,7 @@ class NotificationControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/notifications/{$notification->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(404);
     }
 
     public function test_delete_lets_owner_delete_own_notification(): void
@@ -245,5 +245,99 @@ class NotificationControllerTest extends TestCase
         $response = $this->deleteJson("/api/notifications/{$notification->id}");
 
         $response->assertStatus(401);
+    }
+
+    // ── every account has its own inbox ───────────────────────────────────────
+
+    private function account(string $role): User
+    {
+        $user = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $user->id, 'role' => $role]);
+
+        return $user;
+    }
+
+    public function test_every_role_sees_only_their_own_notifications(): void
+    {
+        foreach (['student', 'instructor', 'admin', 'super_admin'] as $role) {
+            $me = $this->account($role);
+            $mine = Notification::factory()->create(['user_id' => $me->id]);
+            Notification::factory()->create(['user_id' => $this->account('student')->id]);
+            Notification::factory()->create(['user_id' => $this->account('instructor')->id]);
+            Sanctum::actingAs($me);
+
+            $ids = collect($this->getJson('/api/notifications')->assertStatus(200)->json('data.data'))->pluck('id')->map(fn ($id) => (string) $id);
+
+            $this->assertSame([(string) $mine->id], $ids->all(), "{$role} must only see their own notifications");
+        }
+    }
+
+    public function test_staff_cannot_read_change_or_delete_other_peoples_notifications(): void
+    {
+        $student = $this->account('student');
+        $notification = Notification::factory()->create(['user_id' => $student->id, 'is_read' => false]);
+
+        foreach (['admin', 'super_admin'] as $role) {
+            Sanctum::actingAs($this->account($role));
+            $this->getJson("/api/notifications/{$notification->id}")->assertStatus(404);
+            $this->patchJson("/api/notifications/{$notification->id}", ['is_read' => true])->assertStatus(404);
+            $this->deleteJson("/api/notifications/{$notification->id}")->assertStatus(404);
+        }
+
+        $notification->refresh();
+        $this->assertFalse($notification->is_read);
+        $this->assertNull($notification->deleted_at);
+    }
+
+    public function test_index_reports_the_real_unread_total_and_can_filter_to_unread(): void
+    {
+        $me = $this->account('instructor');
+        Notification::factory()->count(12)->create(['user_id' => $me->id, 'is_read' => false]);
+        Notification::factory()->count(3)->create(['user_id' => $me->id, 'is_read' => true]);
+        Notification::factory()->count(5)->create(['user_id' => $this->account('student')->id, 'is_read' => false]);
+        Sanctum::actingAs($me);
+
+        $page = $this->getJson('/api/notifications?per_page=5')->assertStatus(200);
+        $this->assertCount(5, $page->json('data.data'));
+        $this->assertSame(12, $page->json('unread_count'), 'the badge counts all unread, not just the page');
+
+        $this->assertSame(12, $this->getJson('/api/notifications?unread=1&per_page=30')->json('data.total'));
+    }
+
+    public function test_mark_all_read_only_touches_the_callers_own_notifications(): void
+    {
+        $me = $this->account('admin');
+        $other = $this->account('super_admin');
+        Notification::factory()->count(4)->create(['user_id' => $me->id, 'is_read' => false]);
+        Notification::factory()->count(2)->create(['user_id' => $other->id, 'is_read' => false]);
+        Sanctum::actingAs($me);
+
+        $this->postJson('/api/notifications/read-all')->assertStatus(200)->assertJsonPath('data.updated', 4);
+
+        $this->assertSame(0, Notification::where('user_id', $me->id)->where('is_read', false)->count());
+        $this->assertSame(2, Notification::where('user_id', $other->id)->where('is_read', false)->count());
+        $this->assertSame(0, $this->getJson('/api/notifications')->json('unread_count'));
+
+        // Nothing left to mark is fine.
+        $this->postJson('/api/notifications/read-all')->assertStatus(200)->assertJsonPath('data.updated', 0);
+    }
+
+    public function test_mark_all_read_requires_authentication(): void
+    {
+        $this->postJson('/api/notifications/read-all')->assertStatus(401);
+    }
+
+    public function test_only_staff_can_write_notifications_by_hand(): void
+    {
+        $target = $this->account('student');
+        $payload = ['user_id' => $target->id, 'type' => 'system', 'message' => 'Hello'];
+
+        foreach (['student', 'instructor'] as $role) {
+            Sanctum::actingAs($this->account($role));
+            $this->postJson('/api/notifications', $payload)->assertStatus(403);
+        }
+
+        Sanctum::actingAs($this->account('admin'));
+        $this->postJson('/api/notifications', $payload)->assertStatus(201);
     }
 }

@@ -366,22 +366,11 @@ class ExamController extends Controller
                 'notes' => $status === 'rejected' ? $exam->admin_rejection_reason : null,
             ]);
 
-            $recipientIds = $exam->course?->reviewRecipientIds($request->user()->id) ?? [];
-
-            foreach ($recipientIds as $recipientId) {
-                if ($status === 'approved') {
-                    NotificationService::notifyUser(
-                        $recipientId,
-                        'exam_review',
-                        "Your exam \"{$exam->title}\" has been approved and is now live."
-                    );
-                } elseif ($status === 'rejected') {
-                    NotificationService::notifyUser(
-                        $recipientId,
-                        'exam_review',
-                        "Your exam \"{$exam->title}\" was rejected." . ($exam->admin_rejection_reason ? " Reason: {$exam->admin_rejection_reason}" : '')
-                    );
-                }
+            $link = '/admin/content/exams/' . $exam->id;
+            if ($status === 'approved') {
+                NotificationService::notifyReviewOutcome('exam_review', "The exam \"{$exam->title}\" was approved and is now live.", $link, $request->user()->id);
+            } elseif ($status === 'rejected') {
+                NotificationService::notifyReviewOutcome('exam_review', "The exam \"{$exam->title}\" was rejected." . ($exam->admin_rejection_reason ? " Reason: {$exam->admin_rejection_reason}" : ''), $link, $request->user()->id);
             }
 
             return response()->json([

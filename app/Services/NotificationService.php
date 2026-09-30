@@ -72,4 +72,23 @@ class NotificationService
     {
         self::notifyRole('super_admin', $type, $message, $link);
     }
+
+    /**
+     * The outcome of a review (approved / rejected), for the plain admins who
+     * write and edit content. Super admins made the decision so they are left
+     * out; mentors don't author course content, so they aren't told either.
+     */
+    public static function notifyReviewOutcome(string $type, string $message, ?string $link = null, ?string $exceptUserId = null): void
+    {
+        try {
+            $userIds = ScholarUser::where('role', 'admin')
+                ->when($exceptUserId, fn ($query) => $query->where('id', '!=', $exceptUserId))
+                ->pluck('id');
+        } catch (\Exception $e) {
+            Log::error('NotificationService@notifyReviewOutcome: ' . $e->getMessage());
+            return;
+        }
+
+        self::notifyUsers($userIds, $type, $message, $link);
+    }
 }

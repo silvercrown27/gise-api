@@ -427,10 +427,12 @@ class ModuleQuizControllerTest extends TestCase
         $response->assertStatus(422);
     }
 
-    public function test_set_approval_status_as_admin_approves_and_notifies_instructor(): void
+    public function test_set_approval_status_as_admin_approves_and_notifies_the_admins_who_write_content(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
+        $author = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $author->id, 'role' => 'admin']);
 
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -451,13 +453,17 @@ class ModuleQuizControllerTest extends TestCase
             'target_type' => 'module_quiz',
             'target_id' => $quiz->id,
         ]);
-        $this->assertDatabaseHas('notifications', ['user_id' => $instructor->id, 'type' => 'quiz_review']);
+        $this->assertDatabaseHas('notifications', ['user_id' => $author->id, 'type' => 'quiz_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $instructor->id, 'type' => 'quiz_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $admin->id, 'type' => 'quiz_review']);
     }
 
-    public function test_set_approval_status_as_admin_rejects_with_reason_and_notifies_instructor(): void
+    public function test_set_approval_status_as_admin_rejects_with_reason_and_notifies_the_admins_who_write_content(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
+        $author = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $author->id, 'role' => 'admin']);
 
         $instructor = User::factory()->create();
         ScholarUser::factory()->create(['id' => $instructor->id, 'role' => 'instructor']);
@@ -475,7 +481,9 @@ class ModuleQuizControllerTest extends TestCase
         $quiz->refresh();
         $this->assertSame('rejected', $quiz->admin_approval_status);
         $this->assertSame('Question 2 has no correct answer marked.', $quiz->admin_rejection_reason);
-        $this->assertDatabaseHas('notifications', ['user_id' => $instructor->id, 'type' => 'quiz_review']);
+        $this->assertDatabaseHas('notifications', ['user_id' => $author->id, 'type' => 'quiz_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $instructor->id, 'type' => 'quiz_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $admin->id, 'type' => 'quiz_review']);
     }
 
     public function test_set_approval_status_reset_to_pending(): void

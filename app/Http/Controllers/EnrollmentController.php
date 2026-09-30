@@ -9,6 +9,7 @@ use App\Helpers\Validations;
 use App\Models\Cohort;
 use App\Models\Enrollment;
 use App\Services\CourseRegistration;
+use App\Services\LifecycleNotifier;
 use App\Models\ScholarUser;
 use App\Models\Course;
 
@@ -121,6 +122,8 @@ class EnrollmentController extends Controller
                 $withLicences,
                 array_intersect_key($data, array_flip((new Enrollment)->getFillable()))
             );
+
+            LifecycleNotifier::registered($enrollment);
 
             return response()->json([
                 'status'  => 201,

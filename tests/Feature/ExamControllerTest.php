@@ -362,10 +362,12 @@ class ExamControllerTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_set_approval_status_approve_notifies_instructor_and_logs_audit(): void
+    public function test_set_approval_status_approve_notifies_the_admins_who_write_content_and_logs_audit(): void
     {
         $admin = User::factory()->create();
         ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
+        $author = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $author->id, 'role' => 'admin']);
         $instructor = User::factory()->create();
         $course = Course::factory()->create(['instructor_id' => $instructor->id]);
         $exam = Exam::factory()->create(['course_id' => $course->id, 'admin_approval_status' => 'pending']);
@@ -382,10 +384,9 @@ class ExamControllerTest extends TestCase
             'target_type' => 'exam',
             'target_id' => $exam->id,
         ]);
-        $this->assertDatabaseHas('notifications', [
-            'user_id' => $instructor->id,
-            'type' => 'exam_review',
-        ]);
+        $this->assertDatabaseHas('notifications', ['user_id' => $author->id, 'type' => 'exam_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $instructor->id, 'type' => 'exam_review']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $admin->id, 'type' => 'exam_review']);
     }
 
     public function test_set_approval_status_reject_stores_reason(): void

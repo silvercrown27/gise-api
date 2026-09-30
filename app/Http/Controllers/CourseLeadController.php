@@ -10,8 +10,9 @@ use App\Models\AdminAuditLog;
 use App\Models\Course;
 use App\Models\CourseLead;
 use App\Notifications\CourseBrochureNotification;
+use App\Notifications\NewBrochureRequestAdminNotification;
+use App\Services\Mailer;
 use App\Services\NotificationService;
-use Illuminate\Support\Facades\Notification;
 use App\Models\ScholarUser;
 
 class CourseLeadController extends Controller
@@ -246,6 +247,7 @@ class CourseLeadController extends Controller
                 "{$lead->full_name} ({$lead->email}) requested the \"{$course->title}\" brochure.",
                 '/admin/brochure-requests'
             );
+            Mailer::toSuperAdmins(new NewBrochureRequestAdminNotification($lead));
 
             return response()->json([
                 'status'  => 201,
@@ -296,9 +298,17 @@ class CourseLeadController extends Controller
         }
 
         try {
-            if ($decision === 'sent') {
-                Notification::route('mail', $lead->email)
-                    ->notify(new CourseBrochureNotification($lead->course, $lead->full_name, url($lead->course->brochure_url)));
+            // Send first, and only record "sent" if it really went out. If the
+            // mail server is down the request stays pending, so nobody is
+            // shown as having received a brochure they never got.
+            if ($decision === 'sent' && !Mailer::sendNow(
+                $lead->email,
+                new CourseBrochureNotification($lead->course, $lead->full_name, url($lead->course->brochure_url))
+            )) {
+                return response()->json([
+                    'status'  => 502,
+                    'message' => "We couldn't email the brochure just now. The request is still pending, so please try again in a few minutes.",
+                ], 502);
             }
 
             $lead->forceFill([
