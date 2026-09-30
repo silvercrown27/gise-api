@@ -5,7 +5,6 @@
     $policies = [
         'Privacy Policy' => '/policies/privacy-policy',
         'Terms of Use' => '/policies/terms-of-use',
-        'Payments & Refunds' => '/policies/payments-refund-policy',
         'Cookie Policy' => '/policies/cookie-policy',
     ];
 @endphp

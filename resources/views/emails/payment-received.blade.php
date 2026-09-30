@@ -10,5 +10,5 @@
     @include('emails.partials.details', ['rows' => $rows])
     <p style="margin:20px 0 0;color:#44524b;">Your invoice is attached to this email as a PDF. You can download it again any time from the <a href="{{ $invoicesUrl }}" style="color:#0c6b44;">Payments page</a>.</p>
     @include('emails.partials.button', ['url' => $url, 'label' => 'Go to my courses'])
-    <p style="margin:24px 0 0;font-size:13px;color:#6b7a72;">Need a refund or have a question? See our <a href="{{ \App\Services\Mailer::url('/policies/payments-refund-policy') }}" style="color:#0c6b44;">Payments &amp; Refund Policy</a> or reply to this email.</p>
+    <p style="margin:24px 0 0;font-size:13px;color:#6b7a72;">Questions about your payment? Just reply to this email.</p>
 @endsection

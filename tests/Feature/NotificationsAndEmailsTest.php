@@ -374,9 +374,10 @@ class NotificationsAndEmailsTest extends TestCase
             $html = (string) $notification->toMail($learner)->render();
 
             $this->assertStringContainsString('https://giseafrica.test/brand/logo-email.png', $html, "{$name}: logo");
-            foreach (['privacy-policy', 'terms-of-use', 'payments-refund-policy', 'cookie-policy'] as $policy) {
+            foreach (['privacy-policy', 'terms-of-use', 'cookie-policy'] as $policy) {
                 $this->assertStringContainsString("https://giseafrica.test/policies/{$policy}", $html, "{$name}: {$policy} link");
             }
+            $this->assertStringNotContainsString('payments-refund-policy', $html, "{$name}: payments & refunds is not linked from emails");
             $this->assertStringContainsString('info@giseafrica.com', $html, "{$name}: contact");
             $this->assertStringContainsString('Bimz Plaza', $html, "{$name}: address");
         }
