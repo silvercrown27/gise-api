@@ -144,7 +144,7 @@ class Validations
             'changes.short_description'  => 'sometimes|nullable|string',
             'changes.full_description'   => 'sometimes|nullable|string',
             'changes.level'              => 'sometimes|required|string|in:beginner,intermediate,advanced,career_switch',
-            'changes.duration_weeks'     => 'sometimes|nullable|integer|min:1',
+            'changes.duration_weeks'     => 'sometimes|nullable|integer|min:1|max:13',
             'changes.language'           => 'sometimes|nullable|string|max:50',
             'message'                    => 'nullable|string|max:2000',
         ], [
@@ -235,7 +235,7 @@ class Validations
             'tag'                 => 'nullable|string|in:beginner_friendly,high_demand,portfolio_track,career_switch,leadership,new',
             'spine'               => 'nullable|string|in:green,blue,black,bright',
             'mode'                => 'nullable|string|in:physical,virtual,both',
-            'duration_weeks'      => 'nullable|integer|min:2|max:13',
+            'duration_weeks'      => 'nullable|integer|min:1|max:13',
             'language'            => 'nullable|string|max:50',
             'published_at'        => 'nullable|date',
         ]);
