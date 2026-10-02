@@ -240,4 +240,41 @@ class CourseCatalogueTest extends TestCase
         $this->assertSame(['id', 'code', 'title'], array_keys($rows[0]));
     }
 
+
+    public function test_suggest_returns_five_best_matches_and_flags_more(): void
+    {
+        foreach (range(1, 7) as $n) {
+            $this->publishedCourse(['title' => "Python Basics $n"]);
+        }
+        $this->publishedCourse(['title' => 'Advanced Python']);
+        $this->publishedCourse(['title' => 'Biology']);
+
+        $data = $this->getJson('/api/courses/suggest?q=python')->assertOk()->json('data');
+
+        $this->assertCount(5, $data['data']);
+        $this->assertTrue($data['has_more']);
+        // Titles that start with the term outrank "Advanced Python".
+        $this->assertStringStartsWith('Python', $data['data'][0]['title']);
+        $this->assertArrayNotHasKey('short_description', $data['data'][0]);
+    }
+
+    public function test_suggest_ignores_one_character_terms_and_hidden_courses(): void
+    {
+        $this->publishedCourse(['title' => 'Algebra']);
+        $this->publishedCourse(['title' => 'Algorithms', 'status' => 'draft']);
+
+        $this->assertSame([], $this->getJson('/api/courses/suggest?q=a')->json('data.data'));
+
+        $titles = collect($this->getJson('/api/courses/suggest?q=alg')->json('data.data'))->pluck('title')->all();
+        $this->assertSame(['Algebra'], $titles);
+    }
+
+    public function test_search_survives_array_and_oversized_terms(): void
+    {
+        $this->publishedCourse();
+
+        $this->getJson('/api/courses?q[]=x&q[]=y')->assertOk();
+        $this->getJson('/api/courses/suggest?q[]=x')->assertOk();
+        $this->getJson('/api/courses?q=' . str_repeat('a', 5000))->assertOk();
+    }
 }

@@ -7,6 +7,7 @@ use App\Models\Cohort;
 use App\Models\Course;
 use App\Models\Tool;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,6 +23,9 @@ class CourseCatalogue
         'certification_type', 'certification_level',
     ];
 
+    /** Longest search term honoured; anything longer can't be a real course title or code. */
+    public const MAX_QUERY_LENGTH = 100;
+
     private const LIST_COLUMNS = [
         'id', 'code', 'slug', 'title', 'tagline', 'short_description', 'classification', 'category_id',
         'pace_id', 'certificate_kind', 'recognized_body', 'level', 'mode', 'price', 'original_price',
@@ -35,6 +39,26 @@ class CourseCatalogue
             fn ($value) => is_string($value) ? trim($value) : $value,
             array_intersect_key($filters, array_flip(self::FILTERS))
         );
+
+        // Filters arrive from the query string, so a value may be an array; keep scalars only.
+        $this->filters = array_filter($this->filters, 'is_scalar');
+        if (isset($this->filters['q'])) {
+            $this->filters['q'] = self::cleanTerm((string) $this->filters['q']);
+        }
+    }
+
+    /** Trim, collapse whitespace and cap the length of a search term. */
+    public static function cleanTerm(string $term): string
+    {
+        return mb_substr(trim(preg_replace('/\s+/u', ' ', $term)), 0, self::MAX_QUERY_LENGTH);
+    }
+
+    /** Escape LIKE wildcards so "100%" or "_" are searched literally, not as patterns. */
+    private static function like(string $term, bool $prefixOnly = false): string
+    {
+        $escaped = addcslashes($term, '\\%_');
+
+        return ($prefixOnly ? '' : '%') . $escaped . '%';
     }
 
     /**
@@ -49,7 +73,7 @@ class CourseCatalogue
             ->where('courses.admin_approval_status', 'approved');
 
         if (!empty($f['q'])) {
-            $term = '%' . $f['q'] . '%';
+            $term = self::like($f['q']);
             $query->where(fn ($q) => $q->where('courses.title', 'like', $term)
                 ->orWhere('courses.code', 'like', $term)
                 ->orWhere('courses.tagline', 'like', $term));
@@ -104,6 +128,44 @@ class CourseCatalogue
     {
         return $cohorts->whereDate('start_date', '>=', now()->toDateString())
             ->whereNotIn('status', ['completed', 'closed']);
+    }
+
+    /**
+     * Search-as-you-type: the best few matches by title/code, nothing else.
+     * Asks for one row more than $limit so the caller can tell whether a
+     * "view all" link is warranted without a second COUNT over the table,
+     * and remembers answers briefly so a burst of identical keystrokes from
+     * many visitors costs one query.
+     *
+     * @return array{data: array, has_more: bool}
+     */
+    public function suggest(int $limit = 5): array
+    {
+        $term = $this->filters['q'] ?? '';
+        if (mb_strlen($term) < 2) {
+            return ['data' => [], 'has_more' => false];
+        }
+
+        $key = 'course-suggest:' . $limit . ':' . md5(mb_strtolower($term));
+
+        return Cache::remember($key, 30, function () use ($term, $limit) {
+            // Codes and title starts outrank matches buried mid-title.
+            $rows = $this->query()
+                ->select('courses.id', 'courses.code', 'courses.title', 'courses.classification')
+                ->orderByRaw(
+                    'case when courses.code like ? then 0 when courses.title like ? then 1 else 2 end',
+                    [self::like($term, true), self::like($term, true)]
+                )
+                ->orderBy('courses.title')
+                ->orderBy('courses.id')
+                ->limit($limit + 1)
+                ->get();
+
+            return [
+                'data' => $rows->take($limit)->map->toArray()->values()->all(),
+                'has_more' => $rows->count() > $limit,
+            ];
+        });
     }
 
     /**

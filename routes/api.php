@@ -97,6 +97,7 @@ Route::prefix('certification-paces')->group(function () {
 Route::prefix('courses')->group(function () {
     Route::get('/',        [CourseController::class, 'index']);
     Route::get('/facets',  [CourseController::class, 'facets']);
+    Route::get('/suggest', [CourseController::class, 'suggest']);
     Route::get('/popular', [CourseController::class, 'popular']);
     Route::middleware('auth:sanctum')->get('/mine', [CourseController::class, 'mine']);
     Route::middleware('auth:sanctum')->get('/summary', [CourseController::class, 'summary']);

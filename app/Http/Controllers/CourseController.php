@@ -65,6 +65,24 @@ class CourseController extends Controller
         }
     }
 
+    public function suggest(Request $request)
+    {
+        try {
+            $catalogue = new CourseCatalogue(['q' => $request->input('q', '')]);
+
+            return response()->json([
+                'status' => 200,
+                'data'   => $catalogue->suggest(5),
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@suggest: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 500,
+                'message' => 'An error occurred while searching courses.',
+            ], 500);
+        }
+    }
+
     public function facets(Request $request)
     {
         try {
