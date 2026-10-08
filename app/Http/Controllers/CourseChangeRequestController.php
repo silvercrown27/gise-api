@@ -25,7 +25,7 @@ class CourseChangeRequestController extends Controller
 
     public function index(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role === 'student') {
             return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
@@ -59,7 +59,7 @@ class CourseChangeRequestController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
         $course = Course::find($request->input('course_id'));
 
         if (!$user || $user->role !== 'instructor' || !$course || !$course->isManageableBy($request->user()->id)) {

@@ -14,7 +14,7 @@ class UserSettingsController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $query = UserSettings::query();
 
@@ -54,7 +54,7 @@ class UserSettingsController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $isAdmin = $user && $user->isAdmin();
 
             $data = $request->all();
@@ -84,7 +84,7 @@ class UserSettingsController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $userSetting = UserSettings::find($id);
 
             if (!$userSetting) {
@@ -130,7 +130,7 @@ class UserSettingsController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $userSetting = UserSettings::find($id);
 
             if (!$userSetting) {
@@ -175,7 +175,7 @@ class UserSettingsController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $userSetting = UserSettings::find($id);
 
             if (!$userSetting) {

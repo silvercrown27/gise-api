@@ -17,7 +17,7 @@ class LessonProgressController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $query = LessonProgress::query();
 
@@ -55,7 +55,7 @@ class LessonProgressController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
 
             if (!$isElevated) {
@@ -92,7 +92,7 @@ class LessonProgressController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $lessonProgress = LessonProgress::find($id);
 
             if (!$lessonProgress) {
@@ -138,7 +138,7 @@ class LessonProgressController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $lessonProgress = LessonProgress::find($id);
 
             if (!$lessonProgress) {
@@ -179,7 +179,7 @@ class LessonProgressController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 return response()->json([

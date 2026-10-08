@@ -28,8 +28,8 @@ class InstructorDocument extends Model
 
     public const TYPES = ['national_id', 'cv', 'academic_certificate', 'other'];
 
-    /** Largest single upload, in kilobytes (10 MB). Keep in step with the frontend and server limits. */
-    public const MAX_UPLOAD_KB = 10240;
+    /** Largest single upload, in kilobytes (25 MB). Keep in step with the frontend (MAX_DOCUMENT_MB) and server limits. */
+    public const MAX_UPLOAD_KB = 25600;
 
     /** File types accepted; checked against the file's real contents, not its name. */
     public const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];

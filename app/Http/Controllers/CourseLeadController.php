@@ -20,7 +20,7 @@ class CourseLeadController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $query = CourseLead::with('course:id,title,brochure_url');
 
@@ -97,7 +97,7 @@ class CourseLeadController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || $user->role === 'student') {
                 return response()->json([
@@ -141,7 +141,7 @@ class CourseLeadController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || $user->role === 'student') {
                 return response()->json([
@@ -178,7 +178,7 @@ class CourseLeadController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || $user->role === 'student') {
                 return response()->json([
@@ -264,7 +264,7 @@ class CourseLeadController extends Controller
      */
     public function reviewBrochureRequest(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);

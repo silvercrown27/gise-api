@@ -14,7 +14,7 @@ class CoursePricingHistoryController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || $user->role === 'student') {
                 return response()->json([
@@ -48,7 +48,7 @@ class CoursePricingHistoryController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role === 'student') {
             return response()->json([
@@ -89,7 +89,7 @@ class CoursePricingHistoryController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $coursePricingHistory = CoursePricingHistory::find($id);
 
             if (!$coursePricingHistory) {
@@ -126,7 +126,7 @@ class CoursePricingHistoryController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role === 'student') {
             return response()->json([
@@ -173,7 +173,7 @@ class CoursePricingHistoryController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role === 'student') {
             return response()->json([

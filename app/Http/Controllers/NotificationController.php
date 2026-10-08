@@ -75,7 +75,7 @@ class NotificationController extends Controller
      */
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([

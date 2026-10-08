@@ -20,7 +20,7 @@ class ExamSubmissionController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $query = ExamSubmission::with('exam.course');
 
@@ -66,7 +66,7 @@ class ExamSubmissionController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
 
             $data = $request->all();
@@ -139,7 +139,7 @@ class ExamSubmissionController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $examSubmission = ExamSubmission::with(['exam.course', 'answers.question'])->find($id);
 
             if (!$examSubmission) {
@@ -185,7 +185,7 @@ class ExamSubmissionController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $examSubmission = ExamSubmission::find($id);
 
             if (!$examSubmission) {
@@ -230,7 +230,7 @@ class ExamSubmissionController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 return response()->json([

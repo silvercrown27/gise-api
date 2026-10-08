@@ -14,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn() => null);
         $middleware->trustProxies(at: '*');
+        $middleware->alias([
+            'cache.public' => \App\Http\Middleware\CachePublicResponse::class,
+            'chunked'      => \App\Http\Middleware\ResolveChunkedUpload::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(function ($request, $throwable) {

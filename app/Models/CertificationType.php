@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasTimezone;
+use App\Traits\FlushesPublicCache;
 use App\Traits\UUID;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,7 +12,7 @@ use Illuminate\Support\Str;
 
 class CertificationType extends Model
 {
-    use HasFactory, UUID, HasTimezone, SoftDeletes;
+    use HasFactory, UUID, HasTimezone, SoftDeletes, FlushesPublicCache;
 
     protected $primaryKey = 'id';
     protected $table = 'certification_types';

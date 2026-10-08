@@ -65,7 +65,7 @@ class CourseModuleController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -168,7 +168,7 @@ class CourseModuleController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -197,7 +197,7 @@ class CourseModuleController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$this->canManageCourse($request, $courseModule->course)) {
                 return response()->json([
@@ -242,7 +242,7 @@ class CourseModuleController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -285,7 +285,7 @@ class CourseModuleController extends Controller
 
     public function forReview(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([
@@ -323,7 +323,7 @@ class CourseModuleController extends Controller
 
     public function setApprovalStatus(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Approvals are a super admin decision.
         if (!$user || !$user->isSuperAdmin()) {
@@ -401,7 +401,7 @@ class CourseModuleController extends Controller
      */
     public function approveAllForCourse(Request $request, string $courseId)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isSuperAdmin()) {
             return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);

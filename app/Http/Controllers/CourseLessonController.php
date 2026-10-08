@@ -55,7 +55,7 @@ class CourseLessonController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -66,27 +66,13 @@ class CourseLessonController extends Controller
 
         $data = $request->all();
 
-        if ($request->hasFile('content_file')) {
-            $file = $request->file('content_file');
-            $upload = Utilities::uploadFile($file, 'course-lessons/' . ($data['module_id'] ?? 'general'));
-
-            if ($upload['status'] !== 200) {
-                return response()->json([
-                    'status'  => 500,
-                    'message' => $upload['message'],
-                ], 500);
-            }
-
-            $data['content_url_or_body'] = Storage::url($upload['path']);
-        }
-
         $validator = Validations::validateCourseLesson($data);
 
-        if ($validator->fails()) {
+        if ($validator->fails() || ($fileError = $this->contentFileError($request))) {
             return response()->json([
                 'status'  => 422,
                 'message' => 'Validation failed.',
-                'errors'  => $validator->messages(),
+                'errors'  => $validator->fails() ? $validator->messages() : ['content_file' => [$fileError]],
             ], 422);
         }
 
@@ -97,6 +83,11 @@ class CourseLessonController extends Controller
                 'status'  => 403,
                 'message' => 'Forbidden.',
             ], 403);
+        }
+
+        // Only now - validated and authorised - is the upload written to disk.
+        if ($failed = $this->storeContentFile($request, $data)) {
+            return $failed;
         }
 
         try {
@@ -151,7 +142,7 @@ class CourseLessonController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -162,27 +153,13 @@ class CourseLessonController extends Controller
 
         $data = $request->all();
 
-        if ($request->hasFile('content_file')) {
-            $file = $request->file('content_file');
-            $upload = Utilities::uploadFile($file, 'course-lessons/' . ($data['module_id'] ?? 'general'));
-
-            if ($upload['status'] !== 200) {
-                return response()->json([
-                    'status'  => 500,
-                    'message' => $upload['message'],
-                ], 500);
-            }
-
-            $data['content_url_or_body'] = Storage::url($upload['path']);
-        }
-
         $validator = Validations::validateCourseLesson($data);
 
-        if ($validator->fails()) {
+        if ($validator->fails() || ($fileError = $this->contentFileError($request))) {
             return response()->json([
                 'status'  => 422,
                 'message' => 'Validation failed.',
-                'errors'  => $validator->messages(),
+                'errors'  => $validator->fails() ? $validator->messages() : ['content_file' => [$fileError]],
             ], 422);
         }
 
@@ -209,6 +186,10 @@ class CourseLessonController extends Controller
                 unset($data['module_id']);
             }
 
+            if ($failed = $this->storeContentFile($request, $data)) {
+                return $failed;
+            }
+
             $courseLesson->update($data);
             $this->markReviewStatus($user, $courseLesson);
 
@@ -230,7 +211,7 @@ class CourseLessonController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -280,7 +261,7 @@ class CourseLessonController extends Controller
      */
     public function setApprovalStatus(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isSuperAdmin()) {
             return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
@@ -345,7 +326,7 @@ class CourseLessonController extends Controller
      */
     public function approveAllInModule(Request $request, string $moduleId)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isSuperAdmin()) {
             return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
@@ -432,5 +413,39 @@ class CourseLessonController extends Controller
             'module_review',
             "{$user->email} changed a lesson in the module \"{$module->title}\", which needs re-review."
         );
+    }
+
+    /** A lesson's uploaded file may be any document or media, up to the 100 MB the API accepts. */
+    private function contentFileError(Request $request): ?string
+    {
+        if (!$request->hasFile('content_file')) {
+            return null;
+        }
+
+        $check = \Illuminate\Support\Facades\Validator::make(
+            ['content_file' => $request->file('content_file')],
+            ['content_file' => 'file|max:102400'],
+            ['content_file.max' => 'The file must be 100 MB or smaller.', 'content_file.uploaded' => 'The upload failed - the file may be too large.']
+        );
+
+        return $check->fails() ? $check->errors()->first() : null;
+    }
+
+    /** Saves the uploaded lesson file and points the lesson's content at it. */
+    private function storeContentFile(Request $request, array &$data): ?\Illuminate\Http\JsonResponse
+    {
+        if (!$request->hasFile('content_file')) {
+            return null;
+        }
+
+        $upload = Utilities::uploadFile($request->file('content_file'), 'course-lessons/' . ($data['module_id'] ?? 'general'));
+
+        if ($upload['status'] !== 200) {
+            return response()->json(['status' => 500, 'message' => $upload['message']], 500);
+        }
+
+        $data['content_url_or_body'] = Storage::url($upload['path']);
+
+        return null;
     }
 }

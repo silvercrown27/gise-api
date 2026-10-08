@@ -405,7 +405,7 @@ class CourseController extends Controller
 
     public function forReview(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([
@@ -471,7 +471,7 @@ class CourseController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Courses are centrally managed by the super admin. Instructors take
         // part by applying to mentor a cohort, not by creating courses.
@@ -608,7 +608,7 @@ class CourseController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $isAdmin = $user && $user->isAdmin();
             if (!$isAdmin) {
@@ -679,7 +679,7 @@ class CourseController extends Controller
 
     public function setApprovalStatus(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Approvals are a super admin decision.
         if (!$user || !$user->isSuperAdmin()) {
@@ -768,7 +768,7 @@ class CourseController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $isAdmin = $user && $user->isAdmin();
             if (!$isAdmin) {

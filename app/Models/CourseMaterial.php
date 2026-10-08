@@ -25,7 +25,7 @@ class CourseMaterial extends Model
         'module_slides' => ['ppt', 'pptx', 'pdf'],
     ];
 
-    public const MAX_UPLOAD_KB = 51200; // 50 MB
+    public const MAX_UPLOAD_KB = 102400; // 100 MB: the nginx and Cloudflare ceiling
 
     public static function mimeTypesFor(array $extensions): array
     {

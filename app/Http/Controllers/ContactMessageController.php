@@ -15,7 +15,7 @@ class ContactMessageController extends Controller
 {
     public function index(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([
@@ -102,7 +102,7 @@ class ContactMessageController extends Controller
 
     public function show(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([
@@ -136,7 +136,7 @@ class ContactMessageController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([
@@ -186,7 +186,7 @@ class ContactMessageController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([

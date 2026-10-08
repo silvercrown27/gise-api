@@ -44,7 +44,7 @@ class CategoryController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Sub-distinctions shape the public catalogue, so only admins manage them.
         if (!$user || !$user->isAdmin()) {
@@ -110,7 +110,7 @@ class CategoryController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Sub-distinctions shape the public catalogue, so only admins manage them.
         if (!$user || !$user->isAdmin()) {
@@ -170,7 +170,7 @@ class CategoryController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Sub-distinctions shape the public catalogue, so only admins manage them.
         if (!$user || !$user->isAdmin()) {

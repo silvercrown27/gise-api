@@ -49,7 +49,7 @@ class PaystackController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $course = Course::find($request->input('course_id'));
             $cohort = $request->filled('cohort_id') ? Cohort::find($request->input('cohort_id')) : null;
             $withLicences = $request->boolean('with_licences');
@@ -149,7 +149,7 @@ class PaystackController extends Controller
     public function verify(Request $request, string $reference)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $payment = Payment::where('reference', $reference)->first();
 
             if (!$payment || (!$user?->isAdmin() && (string) $payment->learner_id !== (string) $request->user()->id)) {

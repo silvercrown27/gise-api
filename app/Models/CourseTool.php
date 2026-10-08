@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasTimezone;
+use App\Traits\FlushesPublicCache;
 use App\Traits\UUID;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +11,7 @@ use Illuminate\Support\Str;
 
 class CourseTool extends Model
 {
-    use HasFactory, UUID, HasTimezone;
+    use HasFactory, UUID, HasTimezone, FlushesPublicCache;
 
     protected $primaryKey = 'id';
     protected $table = 'course_tools';

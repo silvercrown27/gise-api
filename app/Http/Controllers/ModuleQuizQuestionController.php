@@ -57,7 +57,7 @@ class ModuleQuizQuestionController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -118,7 +118,7 @@ class ModuleQuizQuestionController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -157,7 +157,7 @@ class ModuleQuizQuestionController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$this->canManageCourse($request, $question->quiz?->module?->course)) {
                 return response()->json([
@@ -191,7 +191,7 @@ class ModuleQuizQuestionController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([

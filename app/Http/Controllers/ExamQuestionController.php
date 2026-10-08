@@ -19,7 +19,7 @@ class ExamQuestionController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $query = ExamQuestion::query();
 
@@ -68,7 +68,7 @@ class ExamQuestionController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role === 'student') {
             return response()->json([
@@ -120,7 +120,7 @@ class ExamQuestionController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $examQuestion = ExamQuestion::find($id);
 
             if (!$examQuestion) {
@@ -149,7 +149,7 @@ class ExamQuestionController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role === 'student') {
             return response()->json([
@@ -211,7 +211,7 @@ class ExamQuestionController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role === 'student') {
             return response()->json([

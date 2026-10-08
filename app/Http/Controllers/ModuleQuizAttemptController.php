@@ -276,7 +276,7 @@ class ModuleQuizAttemptController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $isAdmin = $user && $user->isAdmin();
             $isOwner = (string) $attempt->enrollment->learner_id === (string) $request->user()->id;
 

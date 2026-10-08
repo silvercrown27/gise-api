@@ -18,7 +18,7 @@ class ScholarUserController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || !$user->isAdmin()) {
                 $query = ScholarUser::where('id', $request->user()->id);
@@ -59,7 +59,7 @@ class ScholarUserController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([
@@ -100,7 +100,7 @@ class ScholarUserController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $scholarUser = ScholarUser::with('user')->find($id);
 
             if (!$scholarUser) {
@@ -143,7 +143,7 @@ class ScholarUserController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $scholarUser = ScholarUser::find($id);
 
             if (!$scholarUser) {
@@ -190,7 +190,7 @@ class ScholarUserController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || !$user->isAdmin()) {
                 return response()->json([
@@ -230,7 +230,7 @@ class ScholarUserController extends Controller
      */
     public function setRole(Request $request, string $id)
     {
-        $caller = ScholarUser::find($request->user()->id);
+        $caller = $request->scholarUser();
 
         if (!$caller || !$caller->isSuperAdmin()) {
             return response()->json(['status' => 403, 'message' => 'Only a super admin can change roles.'], 403);

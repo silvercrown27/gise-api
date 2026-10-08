@@ -20,7 +20,7 @@ class CohortMentorApplicationController extends Controller
 {
     public function index(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role === 'student') {
             return response()->json([
@@ -63,7 +63,7 @@ class CohortMentorApplicationController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role !== 'instructor') {
             return response()->json([
@@ -134,7 +134,7 @@ class CohortMentorApplicationController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $isAdmin = $user && $user->isAdmin();
             $isApplicant = (string) $application->instructor_id === (string) $request->user()->id;
 
@@ -164,7 +164,7 @@ class CohortMentorApplicationController extends Controller
 
     public function setApprovalStatus(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Approvals are a super admin decision.
         if (!$user || !$user->isSuperAdmin()) {
@@ -259,7 +259,7 @@ class CohortMentorApplicationController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $isAdmin = $user && $user->isAdmin();
             $isApplicant = (string) $application->instructor_id === (string) $request->user()->id;
 

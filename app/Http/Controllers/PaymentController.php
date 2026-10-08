@@ -15,7 +15,7 @@ class PaymentController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $query = Payment::with('course');
 
@@ -40,7 +40,7 @@ class PaymentController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Payments are recorded by the Paystack checkout (PaystackController);
         // only admins may add or correct records by hand.
@@ -83,7 +83,7 @@ class PaymentController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $payment = Payment::find($id);
 
             if (!$payment) {
@@ -119,7 +119,7 @@ class PaymentController extends Controller
     public function invoice(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $payment = Payment::find($id);
 
             // Someone else's payment reads as missing rather than forbidden.
@@ -149,7 +149,7 @@ class PaymentController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Payments are recorded by the Paystack checkout (PaystackController);
         // only admins may add or correct records by hand.
@@ -199,7 +199,7 @@ class PaymentController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || !$user->isAdmin()) {
                 return response()->json([

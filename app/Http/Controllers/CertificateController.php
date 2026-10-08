@@ -14,7 +14,7 @@ class CertificateController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $query = Certificate::with('enrollment.course');
 
@@ -56,7 +56,7 @@ class CertificateController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 return response()->json([
@@ -86,7 +86,7 @@ class CertificateController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $certificate = Certificate::find($id);
 
             if (!$certificate) {
@@ -132,7 +132,7 @@ class CertificateController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
                 return response()->json([
@@ -169,7 +169,7 @@ class CertificateController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || !$user->isAdmin()) {
                 return response()->json([

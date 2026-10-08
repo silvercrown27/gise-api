@@ -43,7 +43,7 @@ class ModuleQuizController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -148,7 +148,7 @@ class ModuleQuizController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -177,7 +177,7 @@ class ModuleQuizController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$this->canManageCourse($request, $quiz->module?->course)) {
                 return response()->json([
@@ -222,7 +222,7 @@ class ModuleQuizController extends Controller
 
     public function delete(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !in_array($user->role, ['instructor', 'admin', 'super_admin'])) {
             return response()->json([
@@ -265,7 +265,7 @@ class ModuleQuizController extends Controller
 
     public function forReview(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([
@@ -303,7 +303,7 @@ class ModuleQuizController extends Controller
 
     public function setApprovalStatus(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Approvals are a super admin decision.
         if (!$user || !$user->isSuperAdmin()) {

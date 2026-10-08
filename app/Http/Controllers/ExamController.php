@@ -20,7 +20,7 @@ class ExamController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $query = Exam::withCount('questions');
 
@@ -61,7 +61,7 @@ class ExamController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role === 'student') {
             return response()->json([
@@ -123,7 +123,7 @@ class ExamController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $exam = Exam::with(['course.instructor', 'questions' => function ($q) {
                 $q->orderBy('order_index', 'asc');
             }])->withCount('questions')->find($id);
@@ -178,7 +178,7 @@ class ExamController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $isAdmin = $user && $user->isAdmin();
             $isOwningInstructor = $user && $user->role === 'instructor'
@@ -248,7 +248,7 @@ class ExamController extends Controller
                 ], 404);
             }
 
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $isAdmin = $user && $user->isAdmin();
             $isOwningInstructor = $user && $user->role === 'instructor'
@@ -279,7 +279,7 @@ class ExamController extends Controller
 
     public function forReview(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([
@@ -317,7 +317,7 @@ class ExamController extends Controller
 
     public function setApprovalStatus(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         // Approvals are a super admin decision.
         if (!$user || !$user->isSuperAdmin()) {

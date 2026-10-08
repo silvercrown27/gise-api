@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use App\Listeners\AddPlainTextAlternative;
+use App\Models\ScholarUser;
 use Illuminate\Http\Request;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Event;
@@ -29,6 +30,8 @@ class AppServiceProvider extends ServiceProvider
         'brochure' => 6,
         'checkout' => 10,
         'documents' => 30,
+        // One 100 MB file is ~20 chunks; this leaves room for several files and retries.
+        'upload-chunks' => 300,
     ];
 
     public function register(): void
@@ -38,6 +41,17 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // $request->scholarUser(): the signed-in user's role/profile row, read once per request.
+        Request::macro('scholarUser', function () {
+            /** @var Request $this */
+            if (!$this->attributes->has('scholar_user')) {
+                $auth = $this->user();
+                $this->attributes->set('scholar_user', $auth ? ScholarUser::find($auth->id) : null);
+            }
+
+            return $this->attributes->get('scholar_user');
+        });
+
         // Every HTML email also carries a plain-text version (see the listener).
         Event::listen(MessageSending::class, AddPlainTextAlternative::class);
 

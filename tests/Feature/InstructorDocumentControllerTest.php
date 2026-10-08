@@ -153,7 +153,7 @@ class InstructorDocumentControllerTest extends TestCase
 
         $this->upload([], UploadedFile::fake()->create('big.pdf', InstructorDocument::MAX_UPLOAD_KB + 1, 'application/pdf'))
             ->assertStatus(422)
-            ->assertJsonPath('message', 'That file is too large. The limit is 10 MB.');
+            ->assertJsonPath('message', 'That file is too large. The limit is 25 MB.');
     }
 
     public function test_store_needs_a_real_file_and_ignores_a_supplied_url(): void

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
+use App\Jobs\NotifyStaff;
 use App\Models\InstructorDocument;
 use App\Models\InstructorProfile;
 use App\Models\ScholarUser;
@@ -18,7 +19,7 @@ class InstructorDocumentController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             if (!$user || $user->role === 'student') {
                 return response()->json([
@@ -53,7 +54,7 @@ class InstructorDocumentController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || $user->role !== 'instructor') {
             return response()->json([
@@ -146,7 +147,7 @@ class InstructorDocumentController extends Controller
     public function show(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $document = InstructorDocument::find($id);
 
             if (!$document) {
@@ -182,7 +183,7 @@ class InstructorDocumentController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $document = InstructorDocument::find($id);
 
             if (!$document) {
@@ -228,7 +229,7 @@ class InstructorDocumentController extends Controller
      */
     public function download(Request $request, string $id)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
         $document = InstructorDocument::find($id);
 
         $allowed = $document && ($user?->isAdmin() || (string) $document->instructor_id === (string) $request->user()->id);
@@ -262,7 +263,8 @@ class InstructorDocumentController extends Controller
     {
         $profileId = InstructorProfile::where('user_id', $instructorId)->value('id');
 
-        NotificationService::notifyAdmins(
+        NotifyStaff::dispatch(
+            'admins',
             'system',
             "{$request->user()->name} has uploaded all required verification documents and is ready for review.",
             $profileId ? "/admin/instructors/{$profileId}" : '/admin/instructors'

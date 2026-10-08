@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
 use App\Helpers\Utilities;
+use App\Jobs\NotifyStaff;
 use App\Models\AdminAuditLog;
 use App\Models\Course;
 use App\Models\CourseMaterial;
@@ -35,7 +36,7 @@ class CourseMaterialController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             // Super admins see everything admins do.
             $role = $user?->isAdmin() ? 'admin' : ($user->role ?? 'student');
 
@@ -55,7 +56,7 @@ class CourseMaterialController extends Controller
                 }
             }
 
-            $perPage = min(max((int) $request->input('per_page', 50), 1), 200);
+            $perPage = min(max((int) $request->input('per_page', 25), 1), 100);
 
             return response()->json([
                 'status' => 200,
@@ -97,7 +98,7 @@ class CourseMaterialController extends Controller
         ], [
             'file.extensions'       => 'Upload a ' . strtoupper(implode(' or ', $extensions)) . ' file.',
             'file.mimetypes'        => 'Upload a ' . strtoupper(implode(' or ', $extensions)) . ' file.',
-            'file.max'              => 'The file must be 50 MB or smaller.',
+            'file.max'              => 'The file must be 100 MB or smaller.',
             'module_id.required_if' => 'Choose the module these slides belong to.',
         ]);
 
@@ -143,7 +144,8 @@ class CourseMaterialController extends Controller
             if ($isAdmin) {
                 $this->syncCourseBrochure($course);
             } else {
-                NotificationService::notifySuperAdmins(
+                NotifyStaff::dispatch(
+                    'super_admins',
                     'course_material',
                     "New {$this->label($material)} uploaded for \"{$course->title}\" - awaiting review.",
                     '/admin/materials'

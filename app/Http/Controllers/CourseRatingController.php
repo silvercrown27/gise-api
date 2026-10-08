@@ -14,7 +14,7 @@ class CourseRatingController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
 
             $query = CourseRating::query();
 
@@ -50,7 +50,7 @@ class CourseRatingController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $isElevated = $user && in_array($user->role, ['instructor', 'admin', 'super_admin']);
 
             $data = $request->all();
@@ -115,7 +115,7 @@ class CourseRatingController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $courseRating = CourseRating::find($id);
 
             if (!$courseRating) {
@@ -160,7 +160,7 @@ class CourseRatingController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $courseRating = CourseRating::find($id);
 
             if (!$courseRating) {

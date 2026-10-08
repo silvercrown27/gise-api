@@ -18,7 +18,7 @@ class EnrollmentController extends Controller
     public function index(Request $request)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             // Super admins see everything admins do.
             $role = $user?->isAdmin() ? 'admin' : ($user->role ?? 'student');
 
@@ -73,7 +73,7 @@ class EnrollmentController extends Controller
 
     public function store(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
         $isAdmin = $user && $user->isAdmin();
 
         $data = $request->all();
@@ -189,7 +189,7 @@ class EnrollmentController extends Controller
         }
 
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $enrollment = Enrollment::find($id);
 
             if (!$enrollment) {
@@ -244,7 +244,7 @@ class EnrollmentController extends Controller
     public function delete(Request $request, string $id)
     {
         try {
-            $user = ScholarUser::find($request->user()->id);
+            $user = $request->scholarUser();
             $enrollment = Enrollment::find($id);
 
             if (!$enrollment) {
@@ -281,7 +281,7 @@ class EnrollmentController extends Controller
 
     private function canView(Request $request, Enrollment $enrollment): bool
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if ((string) $enrollment->learner_id === (string) $request->user()->id) {
             return true;

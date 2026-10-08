@@ -21,7 +21,7 @@ class AdminController extends Controller
 {
     public function dashboard(Request $request)
     {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user || !$user->isAdmin()) {
             return response()->json([

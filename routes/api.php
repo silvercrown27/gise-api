@@ -51,6 +51,7 @@ use App\Http\Controllers\TeamMemberController;
 use App\Http\Controllers\PlatformStatController;
 use App\Http\Controllers\SiteUpdateController;
 use App\Http\Controllers\UserSettingsController;
+use App\Http\Controllers\UploadChunkController;
 
 use App\Models\ScholarUser;
 
@@ -75,41 +76,41 @@ Route::prefix('auth')->group(function () {
 // ── Public content (no auth) ──────────────────────────────────────────────────
 // Course catalogue browsing - matches the frontend's public courses/course-detail pages.
 Route::prefix('categories')->group(function () {
-    Route::get('/',     [CategoryController::class, 'index']);
+    Route::middleware('cache.public:300')->get('/',     [CategoryController::class, 'index']);
     Route::get('/{id}', [CategoryController::class, 'show']);
 });
 
 Route::prefix('certification-types')->group(function () {
-    Route::get('/',     [CertificationTypeController::class, 'index']);
+    Route::middleware('cache.public:300')->get('/',     [CertificationTypeController::class, 'index']);
     Route::get('/{id}', [CertificationTypeController::class, 'show']);
 });
 
 Route::prefix('certification-levels')->group(function () {
-    Route::get('/',     [CertificationLevelController::class, 'index']);
+    Route::middleware('cache.public:300')->get('/',     [CertificationLevelController::class, 'index']);
     Route::get('/{id}', [CertificationLevelController::class, 'show']);
 });
 
 Route::prefix('certification-paces')->group(function () {
-    Route::get('/',     [CertificationPaceController::class, 'index']);
+    Route::middleware('cache.public:300')->get('/',     [CertificationPaceController::class, 'index']);
     Route::get('/{id}', [CertificationPaceController::class, 'show']);
 });
 
 Route::prefix('courses')->group(function () {
-    Route::get('/',        [CourseController::class, 'index']);
-    Route::get('/facets',  [CourseController::class, 'facets']);
+    Route::middleware('cache.public:60')->get('/',        [CourseController::class, 'index']);
+    Route::middleware('cache.public:120')->get('/facets',  [CourseController::class, 'facets']);
     Route::get('/suggest', [CourseController::class, 'suggest']);
-    Route::get('/popular', [CourseController::class, 'popular']);
+    Route::middleware('cache.public:120')->get('/popular', [CourseController::class, 'popular']);
     Route::middleware('auth:sanctum')->get('/mine', [CourseController::class, 'mine']);
     Route::middleware('auth:sanctum')->get('/summary', [CourseController::class, 'summary']);
     Route::middleware('auth:sanctum')->get('/for-review', [CourseController::class, 'forReview']);
     Route::middleware('auth:sanctum')->get('/{id}/curriculum', [CourseController::class, 'curriculum']);
     Route::middleware('auth:sanctum')->patch('/{id}/approval-status', [CourseController::class, 'setApprovalStatus']);
-    Route::get('/{id}',    [CourseController::class, 'show']);
+    Route::middleware('cache.public:60')->get('/{id}',    [CourseController::class, 'show']);
 });
 
 Route::prefix('cohorts')->group(function () {
-    Route::get('/',     [CohortController::class, 'index']);
-    Route::get('/next', [CohortController::class, 'next']);
+    Route::middleware('cache.public:60')->get('/',     [CohortController::class, 'index']);
+    Route::middleware('cache.public:60')->get('/next', [CohortController::class, 'next']);
     Route::middleware('auth:sanctum')->get('/{id}/module-progress', [CohortController::class, 'moduleProgress']);
     Route::get('/{id}', [CohortController::class, 'show']);
 });
@@ -146,21 +147,21 @@ Route::prefix('course-mentors')->group(function () {
 });
 
 Route::prefix('testimonials')->group(function () {
-    Route::get('/',     [TestimonialController::class, 'index']);
+    Route::middleware('cache.public:300')->get('/',     [TestimonialController::class, 'index']);
     Route::get('/{id}', [TestimonialController::class, 'show']);
 });
 
 Route::prefix('team-members')->group(function () {
-    Route::get('/',     [TeamMemberController::class, 'index']);
+    Route::middleware('cache.public:300')->get('/',     [TeamMemberController::class, 'index']);
     Route::get('/{id}', [TeamMemberController::class, 'show']);
 });
 
 Route::prefix('platform-stats')->group(function () {
-    Route::get('/',     [PlatformStatController::class, 'index']);
+    Route::middleware('cache.public:300')->get('/',     [PlatformStatController::class, 'index']);
     Route::get('/{id}', [PlatformStatController::class, 'show']);
 });
 
-Route::get('/tools', [ToolController::class, 'index']);
+Route::middleware('cache.public:300')->get('/tools', [ToolController::class, 'index']);
 
 // Public brochure requests - stored as leads, rate-limited per visitor.
 Route::middleware('throttle:brochure')->post('/courses/{id}/brochure-requests', [CourseLeadController::class, 'requestBrochure']);
@@ -175,7 +176,7 @@ Route::middleware('throttle:contact')->post('/contact-messages', [ContactMessage
 // ── Authenticated user routes ─────────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
         $instructorApprovalStatus = ($user->role ?? null) === 'instructor'
             ? InstructorProfile::where('user_id', $user->id)->value('approval_status')
             : null;
@@ -209,10 +210,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [InstructorProfileController::class, 'delete']);
     });
 
+    // Chunked uploads: big files arrive in small pieces, then are attached by upload_id
+    // to the create request of whatever they belong to (see ResolveChunkedUpload).
+    Route::prefix('uploads')->group(function () {
+        Route::middleware('throttle:upload-chunks')->post('/chunks', [UploadChunkController::class, 'store']);
+        Route::delete('/{uploadId}', [UploadChunkController::class, 'destroy']);
+    });
+
     // Instructor documents
     Route::prefix('instructor-documents')->group(function () {
         Route::get('/',       [InstructorDocumentController::class, 'index']);
-        Route::middleware('throttle:documents')->post('/', [InstructorDocumentController::class, 'store']);
+        Route::middleware(['throttle:documents', 'chunked:file'])->post('/', [InstructorDocumentController::class, 'store']);
         Route::get('/{id}/download', [InstructorDocumentController::class, 'download']);
         Route::get('/{id}',   [InstructorDocumentController::class, 'show']);
         Route::delete('/{id}', [InstructorDocumentController::class, 'delete']);
@@ -291,16 +299,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Course lessons - write actions only (index/show are public above)
     Route::prefix('course-lessons')->group(function () {
-        Route::post('/',      [CourseLessonController::class, 'store']);
-        Route::patch('/{id}', [CourseLessonController::class, 'update']);
+        Route::middleware('chunked:content_file')->post('/',      [CourseLessonController::class, 'store']);
+        Route::middleware('chunked:content_file')->patch('/{id}', [CourseLessonController::class, 'update']);
         Route::patch('/{id}/approval-status', [CourseLessonController::class, 'setApprovalStatus']);
         Route::delete('/{id}', [CourseLessonController::class, 'delete']);
     });
 
     // Course resources - write actions only (index/show are public above)
     Route::prefix('course-resources')->group(function () {
-        Route::post('/',      [CourseResourceController::class, 'store']);
-        Route::patch('/{id}', [CourseResourceController::class, 'update']);
+        Route::middleware('chunked:file')->post('/',      [CourseResourceController::class, 'store']);
+        Route::middleware('chunked:file')->patch('/{id}', [CourseResourceController::class, 'update']);
         Route::delete('/{id}', [CourseResourceController::class, 'delete']);
     });
 
@@ -455,7 +463,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Course materials: content PDF, brochure and module slides - mentors upload, admins approve
     Route::prefix('course-materials')->group(function () {
         Route::get('/',       [CourseMaterialController::class, 'index']);
-        Route::post('/',      [CourseMaterialController::class, 'store']);
+        Route::middleware('chunked:file')->post('/',      [CourseMaterialController::class, 'store']);
         Route::patch('/{id}/status', [CourseMaterialController::class, 'setStatus']);
         Route::delete('/{id}', [CourseMaterialController::class, 'delete']);
     });

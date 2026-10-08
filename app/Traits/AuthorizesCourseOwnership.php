@@ -20,7 +20,7 @@ trait AuthorizesCourseOwnership
             return false;
         }
 
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user) {
             return false;
@@ -35,7 +35,7 @@ trait AuthorizesCourseOwnership
 
     protected function isAdminRequest(Request $request): bool
     {
-        $user = $request->user() ? ScholarUser::find($request->user()->id) : null;
+        $user = $request->user() ? $request->scholarUser() : null;
 
         return $user && $user->isAdmin();
     }
@@ -46,7 +46,7 @@ trait AuthorizesCourseOwnership
      */
     protected function isSuperAdminRequest(Request $request): bool
     {
-        $user = $request->user() ? ScholarUser::find($request->user()->id) : null;
+        $user = $request->user() ? $request->scholarUser() : null;
 
         return $user && $user->isSuperAdmin();
     }

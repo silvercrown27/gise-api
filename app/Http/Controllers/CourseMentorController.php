@@ -186,7 +186,7 @@ class CourseMentorController extends Controller
             return false;
         }
 
-        $user = ScholarUser::find($request->user()->id);
+        $user = $request->scholarUser();
 
         if (!$user) {
             return false;
