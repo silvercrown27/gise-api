@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Abandoned chunked uploads (closed tab, lost connection) would otherwise sit on disk forever.
 Schedule::command('uploads:prune-chunks')->hourly()->withoutOverlapping();
+
+// Tokens past their one-week life are already refused; this just removes the rows.
+Schedule::command('sanctum:prune-expired --hours=24')->daily();
