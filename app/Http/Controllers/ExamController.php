@@ -22,7 +22,8 @@ class ExamController extends Controller
         try {
             $user = $request->scholarUser();
 
-            $query = Exam::withCount('questions');
+            // The course name rides along so the list needn't hold every course just to label its exams.
+            $query = Exam::withCount('questions')->with('course:id,title,code');
 
             if ($user && $user->role === 'instructor') {
                 $query->whereHas('course', function ($q) use ($request) {

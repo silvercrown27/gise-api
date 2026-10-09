@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
 use App\Models\ScholarUser;
+use App\Support\TextSearch;
 use Illuminate\Support\Facades\DB;
 use App\Services\LifecycleNotifier;
 use App\Services\NotificationService;
@@ -26,28 +27,64 @@ class ScholarUserController extends Controller
                 $query = ScholarUser::query();
             }
 
+            $isAdmin = $user && $user->isAdmin();
+
             $query->with('user');
+
+            if ($isAdmin) {
+                // Learner count for the students list, as one subquery rather than a query per row.
+                $query->addSelect([
+                    'scholar_users.*',
+                    'enrollments_count' => \App\Models\Enrollment::selectRaw('count(*)')->whereColumn('enrollments.learner_id', 'scholar_users.id'),
+                ]);
+            }
 
             if ($role = trim($request->input('role', ''))) {
                 $query->where('role', $role);
             }
 
-            if ($q = trim($request->input('q', ''))) {
-                $query->where(function ($outer) use ($q) {
-                    $outer->where('phone', 'like', '%' . $q . '%')
-                        ->orWhereHas('user', function ($inner) use ($q) {
-                            $inner->where('name', 'like', '%' . $q . '%')
-                                ->orWhere('email', 'like', '%' . $q . '%');
-                        });
-                });
+            if ($status = trim($request->input('status', ''))) {
+                $query->where('status', $status);
             }
 
-            $results = $query->orderBy('created_at', 'desc')->paginate(min(max((int) $request->input('per_page', 10), 1), 100));
+            if ($q = TextSearch::clean((string) $request->input('q', ''))) {
+                if (preg_match('/^[\d+()\-\s]+$/', $q)) {
+                    // Looks like a phone number: search just that column.
+                    $query->whereRaw("scholar_users.phone like ? escape '!'", ['%' . TextSearch::escape($q) . '%']);
+                } else {
+                    // Name and email through the FULLTEXT index; one indexed lookup, not a subquery per row.
+                    $query->whereIn('scholar_users.id', \App\Models\User::query()->select('users.id')->tap(
+                        fn ($users) => TextSearch::apply($users, $q, ['users.name', 'users.email'])
+                    ));
+                }
+            }
 
-            return response()->json([
-                'status' => 200,
-                'data'   => $results,
-            ], 200);
+            match ((string) $request->input('sort', 'newest')) {
+                'oldest' => $query->orderBy('created_at'),
+                'login' => $query->orderByRaw('last_login_at is null')->orderByDesc('last_login_at'),
+                'enrollments' => $isAdmin ? $query->orderByDesc('enrollments_count') : $query->orderByDesc('created_at'),
+                default => $query->orderByDesc('created_at'),
+            };
+
+            $results = $query->paginate(min(max((int) $request->input('per_page', 10), 1), 100));
+
+            $payload = ['status' => 200, 'data' => $results];
+
+            if ($isAdmin) {
+                // Tab badges: everyone by role, plus the suspended ones.
+                $c = ScholarUser::selectRaw(
+                    "count(*) as total,
+                     sum(case when role = 'student' then 1 else 0 end) as student,
+                     sum(case when role = 'instructor' then 1 else 0 end) as instructor,
+                     sum(case when role = 'admin' then 1 else 0 end) as admin,
+                     sum(case when role = 'super_admin' then 1 else 0 end) as super_admin,
+                     sum(case when status = 'suspended' then 1 else 0 end) as suspended,
+                     sum(case when role = 'student' and status = 'suspended' then 1 else 0 end) as student_suspended"
+                )->first();
+                $payload['counts'] = collect(['total', 'student', 'instructor', 'admin', 'super_admin', 'suspended', 'student_suspended'])->mapWithKeys(fn ($k) => [$k => (int) ($c->{$k} ?? 0)]);
+            }
+
+            return response()->json($payload, 200);
         } catch (\Exception $e) {
             Log::error('ScholarUserController@index: ' . $e->getMessage());
             return response()->json([

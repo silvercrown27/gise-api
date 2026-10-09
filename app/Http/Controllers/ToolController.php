@@ -23,7 +23,23 @@ class ToolController extends Controller
             $query = Tool::withCount('courses');
 
             if ($q = trim($request->input('q', ''))) {
-                $query->where('name', 'like', '%' . $q . '%');
+                $query->whereRaw("name like ? escape '!'", ['%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $q) . '%']);
+            }
+
+            // The tools list is public; the usage filter and counts are for admins.
+            $counts = null;
+            // (this route has no auth middleware, so read the token through the sanctum guard)
+            $authUser = $request->user('sanctum');
+            if ($authUser && \App\Models\ScholarUser::find($authUser->id)?->isAdmin()) {
+                $total = Tool::count();
+                $withCourses = Tool::has('courses')->count();
+                $counts = ['total' => $total, 'with_courses' => $withCourses, 'without_courses' => $total - $withCourses];
+
+                match ((string) $request->input('has_courses', '')) {
+                    'with' => $query->has('courses'),
+                    'without' => $query->doesntHave('courses'),
+                    default => null,
+                };
             }
 
             $perPage = min(max((int) $request->input('per_page', 20), 1), 200);
@@ -31,6 +47,7 @@ class ToolController extends Controller
             return response()->json([
                 'status' => 200,
                 'data'   => $query->orderBy('name')->paginate($perPage),
+                'counts' => $counts,
             ], 200);
         } catch (\Exception $e) {
             Log::error('ToolController@index: ' . $e->getMessage());

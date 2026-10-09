@@ -12,6 +12,7 @@ use App\Models\ScholarUser;
 use App\Notifications\InstructorAccountDecisionNotification;
 use App\Services\Mailer;
 use App\Services\NotificationService;
+use App\Support\TextSearch;
 
 class InstructorProfileController extends Controller
 {
@@ -27,7 +28,11 @@ class InstructorProfileController extends Controller
                 ], 403);
             }
 
-            $query = InstructorProfile::with('user');
+            $query = InstructorProfile::with('user')->addSelect([
+                'instructor_profiles.*',
+                // How many verification documents they have uploaded (admins review these).
+                'documents_count' => \App\Models\InstructorDocument::selectRaw('count(*)')->whereColumn('instructor_documents.instructor_id', 'instructor_profiles.user_id'),
+            ]);
 
             if ($user->role === 'instructor') {
                 $query->where('user_id', $request->user()->id);
@@ -37,12 +42,34 @@ class InstructorProfileController extends Controller
                 $query->where('approval_status', $status);
             }
 
-            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+            if ($q = TextSearch::clean((string) $request->input('q', ''))) {
+                $query->where(function ($outer) use ($q) {
+                    $outer->whereIn('instructor_profiles.user_id', \App\Models\User::query()->select('users.id')->tap(
+                        fn ($users) => TextSearch::apply($users, $q, ['users.name', 'users.email'])
+                    ))->orWhere(fn ($tags) => TextSearch::apply($tags, $q, ['instructor_profiles.expertise_tags']));
+                });
+            }
 
-            return response()->json([
-                'status' => 200,
-                'data'   => $results,
-            ], 200);
+            match ((string) $request->input('sort', 'newest')) {
+                'oldest' => $query->orderBy('created_at'),
+                default => $query->orderByDesc('created_at'),
+            };
+
+            $results = $query->paginate(min(max((int) $request->input('per_page', 10), 1), 100));
+
+            $payload = ['status' => 200, 'data' => $results];
+
+            if ($user->role !== 'instructor') {
+                $c = InstructorProfile::selectRaw(
+                    "count(*) as total,
+                     sum(case when approval_status = 'pending' then 1 else 0 end) as pending,
+                     sum(case when approval_status = 'approved' then 1 else 0 end) as approved,
+                     sum(case when approval_status = 'banned' then 1 else 0 end) as banned"
+                )->first();
+                $payload['counts'] = collect(['total', 'pending', 'approved', 'banned'])->mapWithKeys(fn ($k) => [$k => (int) ($c->{$k} ?? 0)]);
+            }
+
+            return response()->json($payload, 200);
         } catch (\Exception $e) {
             Log::error('InstructorProfileController@index: ' . $e->getMessage());
             return response()->json([

@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Cohort;
 use App\Models\Course;
 use App\Models\Tool;
+use App\Support\TextSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,9 @@ class CourseCatalogue
 
     /** Longest search term honoured; anything longer can't be a real course title or code. */
     public const MAX_QUERY_LENGTH = 100;
+
+    /** Exactly the columns of the courses_search_ft FULLTEXT index. */
+    public const SEARCH_COLUMNS = ['courses.title', 'courses.code', 'courses.tagline', 'courses.short_description'];
 
     private const LIST_COLUMNS = [
         'id', 'code', 'slug', 'title', 'tagline', 'short_description', 'classification', 'category_id',
@@ -73,10 +77,8 @@ class CourseCatalogue
             ->where('courses.admin_approval_status', 'approved');
 
         if (!empty($f['q'])) {
-            $term = self::like($f['q']);
-            $query->where(fn ($q) => $q->where('courses.title', 'like', $term)
-                ->orWhere('courses.code', 'like', $term)
-                ->orWhere('courses.tagline', 'like', $term));
+            // FULLTEXT on MySQL (see TextSearch), so a keystroke doesn't scan every course.
+            TextSearch::apply($query, $f['q'], self::SEARCH_COLUMNS, ['courses.slug']);
         }
 
         if (!empty($f['classification'])) {

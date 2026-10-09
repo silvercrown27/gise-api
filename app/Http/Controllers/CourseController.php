@@ -22,6 +22,7 @@ use App\Models\LessonProgress;
 use App\Models\ScholarUser;
 use App\Services\ModuleAccessService;
 use App\Services\CourseCatalogue;
+use App\Support\TextSearch;
 use App\Services\LifecycleNotifier;
 use App\Services\NotificationService;
 use App\Traits\AuthorizesCourseOwnership;
@@ -874,15 +875,13 @@ class CourseController extends Controller
                 default => null,
             };
 
-            if ($term = CourseCatalogue::cleanTerm((string) $request->input('q', ''))) {
-                // "!" is the escape character (named explicitly so it behaves the same on MySQL
-                // and SQLite), which makes "100%" or "_" search for those literal characters.
-                $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term) . '%';
-                $query->where(function ($q) use ($like) {
-                    foreach (['title', 'code', 'slug', 'tagline', 'short_description'] as $column) {
-                        $q->orWhereRaw("{$column} like ? escape '!'", [$like]);
-                    }
-                    $q->orWhereHas('category', fn ($c) => $c->whereRaw("name like ? escape '!'", [$like]));
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $query->where(function ($search) use ($term) {
+                    // Title, code, tagline and description through the FULLTEXT index; slug from the start.
+                    TextSearch::apply($search, $term, CourseCatalogue::SEARCH_COLUMNS, ['courses.slug']);
+
+                    // ...or filed under a category whose name matches (a handful of rows, so a plain match is fine).
+                    $search->orWhereIn('courses.category_id', Category::query()->select('id')->whereRaw("name like ? escape '!'", ['%' . TextSearch::escape($term) . '%']));
                 });
             }
 
