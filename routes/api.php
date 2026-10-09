@@ -101,6 +101,7 @@ Route::prefix('courses')->group(function () {
     Route::get('/suggest', [CourseController::class, 'suggest']);
     Route::middleware('cache.public:120')->get('/popular', [CourseController::class, 'popular']);
     Route::middleware('auth:sanctum')->get('/mine', [CourseController::class, 'mine']);
+    Route::middleware('auth:sanctum')->get('/admin', [CourseController::class, 'adminIndex']);
     Route::middleware('auth:sanctum')->get('/summary', [CourseController::class, 'summary']);
     Route::middleware('auth:sanctum')->get('/for-review', [CourseController::class, 'forReview']);
     Route::middleware('auth:sanctum')->get('/{id}/curriculum', [CourseController::class, 'curriculum']);
@@ -269,6 +270,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}/tools', [CourseController::class, 'syncTools']);
         Route::post('/{id}/approve-modules', [CourseModuleController::class, 'approveAllForCourse']);
         Route::post('/',      [CourseController::class, 'store']);
+        Route::post('/bulk',  [CourseController::class, 'bulk']);
+        Route::post('/{id}/restore', [CourseController::class, 'restore']);
         Route::patch('/{id}', [CourseController::class, 'update']);
         Route::delete('/{id}', [CourseController::class, 'delete']);
     });

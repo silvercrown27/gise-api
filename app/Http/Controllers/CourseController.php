@@ -485,6 +485,10 @@ class CourseController extends Controller
         $data = $request->all();
         $data['instructor_id'] = Course::superAdminId() ?? $request->user()->id;
 
+        if ($error = $this->thumbnailError($request)) {
+            return response()->json(['status' => 422, 'message' => $error, 'errors' => ['thumbnail' => [$error]]], 422);
+        }
+
         if ($request->hasFile('thumbnail')) {
             $upload = $this->uploadThumbnail($request);
             if (!$upload['success']) {
@@ -619,6 +623,11 @@ class CourseController extends Controller
             }
 
             $data = $request->all();
+            $oldThumbnail = $course->thumbnail_url;
+
+            if ($error = $this->thumbnailError($request)) {
+                return response()->json(['status' => 422, 'message' => $error, 'errors' => ['thumbnail' => [$error]]], 422);
+            }
 
             if ($request->hasFile('thumbnail')) {
                 $upload = $this->uploadThumbnail($request);
@@ -629,6 +638,8 @@ class CourseController extends Controller
                     ], 500);
                 }
                 $data['thumbnail_url'] = $upload['url'];
+            } elseif ($request->boolean('remove_thumbnail')) {
+                $data['thumbnail_url'] = null;
             }
 
             // Ownership is fixed to the super admin - validate against it rather
@@ -659,6 +670,11 @@ class CourseController extends Controller
             }
 
             $course->update($data);
+
+            // The old picture is no longer referenced once it has been replaced or removed.
+            if (array_key_exists('thumbnail_url', $data) && $data['thumbnail_url'] !== $oldThumbnail) {
+                $this->deleteThumbnailFile($oldThumbnail);
+            }
 
             // Tell the other super admins what changed (in-app only).
             LifecycleNotifier::courseUpdated($course, $user, array_keys($course->getChanges()));
@@ -709,38 +725,7 @@ class CourseController extends Controller
                 ], 404);
             }
 
-            $course->forceFill([
-                'admin_approval_status' => $status,
-                'admin_rejection_reason' => $status === 'rejected' ? $request->input('admin_rejection_reason') : null,
-            ])->save();
-
-            // The public catalogue lists published AND approved courses, so an
-            // approved draft would stay invisible forever. Approving a draft
-            // puts it live; archived courses stay archived.
-            if ($status === 'approved' && $course->status === 'draft') {
-                $course->forceFill(['status' => 'published', 'published_at' => $course->published_at ?? now()])->save();
-            }
-
-            $actionByStatus = [
-                'approved' => 'approve_course',
-                'rejected' => 'reject_course',
-                'pending' => 'reset_course_approval',
-            ];
-
-            AdminAuditLog::create([
-                'admin_id' => $request->user()->id,
-                'action' => $actionByStatus[$status],
-                'target_type' => 'course',
-                'target_id' => $course->id,
-                'notes' => $status === 'rejected' ? $course->admin_rejection_reason : null,
-            ]);
-
-            $link = '/admin/courses/' . $course->id;
-            if ($status === 'approved') {
-                NotificationService::notifyReviewOutcome('course_review', "The course \"{$course->title}\" was approved" . ($course->status === 'published' ? ' and is now live.' : '.'), $link, $request->user()->id);
-            } elseif ($status === 'rejected') {
-                NotificationService::notifyReviewOutcome('course_review', "The course \"{$course->title}\" was rejected." . ($course->admin_rejection_reason ? " Reason: {$course->admin_rejection_reason}" : ''), $link, $request->user()->id);
-            }
+            $this->applyApprovalStatus($course, $status, $request->input('admin_rejection_reason'), $request);
 
             return response()->json([
                 'status'  => 200,
@@ -778,11 +763,21 @@ class CourseController extends Controller
                 ], 403);
             }
 
+            // Removing a course hides it from learners too, so make the admin sure about it.
+            if (!$request->boolean('force') && ($enrolled = $this->activeEnrollments($course)) > 0) {
+                return response()->json([
+                    'status'  => 409,
+                    'message' => "{$enrolled} learner(s) are enrolled in this course. Removing it hides it from them as well.",
+                    'enrollments_count' => $enrolled,
+                ], 409);
+            }
+
             $course->delete();
+            AdminAuditLog::create(['admin_id' => $request->user()->id, 'action' => 'remove_course', 'target_type' => 'course', 'target_id' => $course->id]);
 
             return response()->json([
                 'status'  => 200,
-                'message' => 'Course deleted successfully.',
+                'message' => 'Course removed. It can be restored from the Removed list.',
             ], 200);
         } catch (\Exception $e) {
             Log::error('CourseController@delete: ' . $e->getMessage());
@@ -790,6 +785,293 @@ class CourseController extends Controller
                 'status'  => 500,
                 'message' => 'An error occurred while deleting the course.',
             ], 500);
+        }
+    }
+
+
+    /**
+     * Sets a course's approval status and everything that follows from it: approving a
+     * draft puts it live, the decision is audit-logged and staff are told.
+     */
+    private function applyApprovalStatus(Course $course, string $status, ?string $reason, Request $request): void
+    {
+        $course->forceFill([
+            'admin_approval_status' => $status,
+            'admin_rejection_reason' => $status === 'rejected' ? $reason : null,
+        ])->save();
+
+        // The public catalogue lists published AND approved courses, so an
+        // approved draft would stay invisible forever. Approving a draft
+        // puts it live; archived courses stay archived.
+        if ($status === 'approved' && $course->status === 'draft') {
+            $course->forceFill(['status' => 'published', 'published_at' => $course->published_at ?? now()])->save();
+        }
+
+        $actionByStatus = [
+            'approved' => 'approve_course',
+            'rejected' => 'reject_course',
+            'pending' => 'reset_course_approval',
+        ];
+
+        AdminAuditLog::create([
+            'admin_id' => $request->user()->id,
+            'action' => $actionByStatus[$status],
+            'target_type' => 'course',
+            'target_id' => $course->id,
+            'notes' => $status === 'rejected' ? $course->admin_rejection_reason : null,
+        ]);
+
+        $link = '/admin/courses/' . $course->id;
+        if ($status === 'approved') {
+            NotificationService::notifyReviewOutcome('course_review', "The course \"{$course->title}\" was approved" . ($course->status === 'published' ? ' and is now live.' : '.'), $link, $request->user()->id);
+        } elseif ($status === 'rejected') {
+            NotificationService::notifyReviewOutcome('course_review', "The course \"{$course->title}\" was rejected." . ($course->admin_rejection_reason ? " Reason: {$course->admin_rejection_reason}" : ''), $link, $request->user()->id);
+        }
+    }
+
+    /** Courses with learners still enrolled can't be removed by accident. */
+    private function activeEnrollments(Course $course): int
+    {
+        return $course->enrollments()->whereNotIn('enrollment_status', ['dropped'])->count();
+    }
+
+    /**
+     * The admin course list: one query for the page of rows and one for the tab counts.
+     * Filters are combined (search + view + level + category + needs-attention flag).
+     */
+    public function adminIndex(Request $request)
+    {
+        $user = $request->scholarUser();
+
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
+        }
+
+        try {
+            $recentDays = 30;
+            $view = (string) $request->input('view', 'all');
+
+            $query = $view === 'removed' ? Course::onlyTrashed() : Course::query();
+
+            $query->select([
+                'id', 'code', 'slug', 'title', 'tagline', 'status', 'admin_approval_status', 'admin_rejection_reason', 'classification',
+                'category_id', 'certificate_kind', 'price', 'original_price', 'currency', 'thumbnail_url', 'mode', 'level',
+                'duration_weeks', 'published_at', 'created_at', 'updated_at', 'deleted_at', 'instructor_id',
+            ])
+                ->with('category:id,name,slug,classification')
+                ->withCount([
+                    'enrollments as enrollments_count' => fn ($q) => $q->whereNotIn('enrollment_status', ['dropped']),
+                    'cohorts as upcoming_cohorts_count' => fn ($q) => CourseCatalogue::upcoming($q),
+                ]);
+
+            match ($view) {
+                'pending' => $query->where('admin_approval_status', 'pending'),
+                'rejected' => $query->where('admin_approval_status', 'rejected'),
+                'published' => $query->where('status', 'published'),
+                'draft' => $query->where('status', 'draft'),
+                'archived' => $query->where('status', 'archived'),
+                'recent' => $query->where('status', 'published')->where('published_at', '>=', now()->subDays($recentDays)),
+                default => null,
+            };
+
+            if ($term = CourseCatalogue::cleanTerm((string) $request->input('q', ''))) {
+                // "!" is the escape character (named explicitly so it behaves the same on MySQL
+                // and SQLite), which makes "100%" or "_" search for those literal characters.
+                $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term) . '%';
+                $query->where(function ($q) use ($like) {
+                    foreach (['title', 'code', 'slug', 'tagline', 'short_description'] as $column) {
+                        $q->orWhereRaw("{$column} like ? escape '!'", [$like]);
+                    }
+                    $q->orWhereHas('category', fn ($c) => $c->whereRaw("name like ? escape '!'", [$like]));
+                });
+            }
+
+            foreach (['status', 'admin_approval_status', 'classification', 'category_id', 'mode', 'level', 'certificate_kind'] as $filter) {
+                if (($value = trim((string) $request->input($filter, ''))) !== '') {
+                    $query->where($filter, $value);
+                }
+            }
+
+            // "Needs attention" shortcuts for tidying the catalogue.
+            match ((string) $request->input('issue', '')) {
+                'no_image' => $query->where(fn ($q) => $q->whereNull('thumbnail_url')->orWhere('thumbnail_url', '')),
+                'no_category' => $query->whereNull('category_id'),
+                'no_cohort' => $query->whereDoesntHave('cohorts', fn ($q) => CourseCatalogue::upcoming($q)),
+                'no_price' => $query->where('price', 0),
+                default => null,
+            };
+
+            match ((string) $request->input('sort', $view === 'recent' ? 'published' : 'newest')) {
+                'oldest' => $query->orderBy('created_at'),
+                'updated' => $query->orderByDesc('updated_at'),
+                'published' => $query->orderByDesc('published_at'),
+                'title' => $query->orderBy('title'),
+                'code' => $query->orderBy('code'),
+                'price_asc' => $query->orderBy('price'),
+                'price_desc' => $query->orderByDesc('price'),
+                'learners' => $query->orderByDesc('enrollments_count'),
+                'removed' => $query->orderByDesc('deleted_at'),
+                default => $query->orderByDesc('created_at'),
+            };
+            $query->orderBy('id');
+
+            $results = $query->paginate(min(max((int) $request->input('per_page', 25), 10), 100));
+
+            $c = Course::withTrashed()->selectRaw(
+                "sum(case when deleted_at is null then 1 else 0 end) as total,
+                 sum(case when deleted_at is null and admin_approval_status = 'pending' then 1 else 0 end) as pending,
+                 sum(case when deleted_at is null and admin_approval_status = 'rejected' then 1 else 0 end) as rejected,
+                 sum(case when deleted_at is null and status = 'published' then 1 else 0 end) as published,
+                 sum(case when deleted_at is null and status = 'draft' then 1 else 0 end) as draft,
+                 sum(case when deleted_at is null and status = 'archived' then 1 else 0 end) as archived,
+                 sum(case when deleted_at is null and status = 'published' and published_at >= ? then 1 else 0 end) as recent,
+                 sum(case when deleted_at is not null then 1 else 0 end) as removed",
+                [now()->subDays($recentDays)]
+            )->first();
+
+            return response()->json([
+                'status' => 200,
+                'data' => $results,
+                'counts' => collect(['total', 'pending', 'rejected', 'published', 'draft', 'archived', 'recent', 'removed'])
+                    ->mapWithKeys(fn ($k) => [$k => (int) ($c->{$k} ?? 0)]),
+                'recent_days' => $recentDays,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@adminIndex: ' . $e->getMessage());
+            return response()->json(['status' => 500, 'message' => 'An error occurred while loading the courses.'], 500);
+        }
+    }
+
+    public function restore(Request $request, string $id)
+    {
+        $user = $request->scholarUser();
+
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
+        }
+
+        $course = Course::onlyTrashed()->find($id);
+
+        if (!$course) {
+            return response()->json(['status' => 404, 'message' => 'Removed course not found.'], 404);
+        }
+
+        $course->restore();
+
+        AdminAuditLog::create(['admin_id' => $request->user()->id, 'action' => 'restore_course', 'target_type' => 'course', 'target_id' => $course->id]);
+
+        return response()->json(['status' => 200, 'message' => 'Course restored.', 'data' => $course], 200);
+    }
+
+    /**
+     * One action across many courses (the list's checkboxes). Each course is handled on its
+     * own, so one that can't be changed doesn't stop the rest; the response says which.
+     */
+    public function bulk(Request $request)
+    {
+        $user = $request->scholarUser();
+
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
+        }
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'action' => 'required|string|in:publish,draft,archive,approve,remove,restore',
+            'ids' => 'required|array|min:1|max:100',
+            'ids.*' => 'uuid',
+            'force' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => 422, 'message' => $validator->errors()->first(), 'errors' => $validator->messages()], 422);
+        }
+
+        $action = $request->input('action');
+
+        // Approvals are a super admin decision, same as the single-course endpoint.
+        if ($action === 'approve' && !$user->isSuperAdmin()) {
+            return response()->json(['status' => 403, 'message' => 'Only a super admin can approve courses.'], 403);
+        }
+
+        $ids = array_values(array_unique($request->input('ids')));
+        $courses = ($action === 'restore' ? Course::onlyTrashed() : Course::query())->whereIn('id', $ids)->get()->keyBy('id');
+
+        $done = [];
+        $skipped = [];
+
+        foreach ($ids as $id) {
+            $course = $courses->get($id);
+
+            if (!$course) {
+                $skipped[] = ['id' => $id, 'reason' => $action === 'restore' ? 'Not found in the removed courses.' : 'Course not found.'];
+                continue;
+            }
+
+            try {
+                switch ($action) {
+                    case 'publish':
+                        $course->forceFill(['status' => 'published', 'published_at' => $course->published_at ?? now()])->save();
+                        break;
+                    case 'draft':
+                    case 'archive':
+                        $course->forceFill(['status' => $action === 'draft' ? 'draft' : 'archived'])->save();
+                        break;
+                    case 'approve':
+                        $this->applyApprovalStatus($course, 'approved', null, $request);
+                        break;
+                    case 'remove':
+                        if (!$request->boolean('force') && ($n = $this->activeEnrollments($course)) > 0) {
+                            $skipped[] = ['id' => $id, 'title' => $course->title, 'reason' => "{$n} learner(s) are enrolled."];
+                            continue 2;
+                        }
+                        $course->delete();
+                        AdminAuditLog::create(['admin_id' => $request->user()->id, 'action' => 'remove_course', 'target_type' => 'course', 'target_id' => $course->id]);
+                        break;
+                    case 'restore':
+                        $course->restore();
+                        AdminAuditLog::create(['admin_id' => $request->user()->id, 'action' => 'restore_course', 'target_type' => 'course', 'target_id' => $course->id]);
+                        break;
+                }
+                $done[] = $id;
+            } catch (\Exception $e) {
+                Log::error("CourseController@bulk ({$action}) {$id}: " . $e->getMessage());
+                $skipped[] = ['id' => $id, 'title' => $course->title, 'reason' => 'Something went wrong.'];
+            }
+        }
+
+        return response()->json([
+            'status' => 200,
+            'message' => count($done) . ' course(s) updated' . ($skipped ? ', ' . count($skipped) . ' skipped.' : '.'),
+            'data' => ['done' => $done, 'skipped' => $skipped],
+        ], 200);
+    }
+
+    /** Checks an uploaded course image before it is stored: a real picture, not a script. */
+    private function thumbnailError(Request $request): ?string
+    {
+        if (!$request->hasFile('thumbnail')) {
+            return null;
+        }
+
+        $check = \Illuminate\Support\Facades\Validator::make(
+            ['thumbnail' => $request->file('thumbnail')],
+            ['thumbnail' => 'file|image|mimes:jpg,jpeg,png,webp|max:8192'],
+            [
+                'thumbnail.image' => 'The course image must be a JPG, PNG or WebP picture.',
+                'thumbnail.mimes' => 'The course image must be a JPG, PNG or WebP picture.',
+                'thumbnail.max' => 'The course image must be 8 MB or smaller.',
+                'thumbnail.uploaded' => 'The image upload failed - it may be too large.',
+            ]
+        );
+
+        return $check->fails() ? $check->errors()->first() : null;
+    }
+
+    /** Deletes a stored course image (only ones this app stored, never an outside URL). */
+    private function deleteThumbnailFile(?string $url): void
+    {
+        if ($url && preg_match('#/storage/(course-thumbnails/[^?\#]+)$#', $url, $m)) {
+            Storage::disk('public')->delete($m[1]);
         }
     }
 

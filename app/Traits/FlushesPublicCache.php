@@ -13,5 +13,9 @@ trait FlushesPublicCache
 
         static::saved($flush);
         static::deleted($flush);
+        // Only models that use SoftDeletes can be restored.
+        if (method_exists(static::class, 'restored')) {
+            static::restored($flush);
+        }
     }
 }
