@@ -53,14 +53,17 @@ class TextSearchTest extends TestCase
 
     public function test_mysql_falls_back_to_contains_for_short_or_stopword_terms(): void
     {
-        foreach (['ab', 'supply for'] as $term) {
-            $query = DB::connection('mysql')->table('courses');
-            TextSearch::apply($query, $term, ['courses.title', 'courses.code'], ['courses.slug']);
+        $short = DB::connection('mysql')->table('courses');
+        TextSearch::apply($short, 'ab', ['courses.title', 'courses.code'], ['courses.slug']);
+        $this->assertStringNotContainsStringIgnoringCase('match(', $short->toSql());
+        $this->assertSame(['%ab%', '%ab%', '%ab%'], $short->getBindings());
 
-            $this->assertStringNotContainsStringIgnoringCase('match(', $query->toSql(), $term);
-            $this->assertStringContainsString("courses.title like ? escape '!'", $query->toSql());
-            $this->assertSame(["%{$term}%", "%{$term}%", "%{$term}%"], $query->getBindings());
-        }
+        // Every word must be present, in any order; a stopword is just another word here.
+        $stop = DB::connection('mysql')->table('courses');
+        TextSearch::apply($stop, 'supply for', ['courses.title', 'courses.code']);
+        $this->assertStringNotContainsStringIgnoringCase('match(', $stop->toSql());
+        $this->assertSame(['%supply%', '%supply%', '%for%', '%for%'], $stop->getBindings());
+        $this->assertSame("select * from `courses` where ((courses.title like ? escape '!' or courses.code like ? escape '!') and (courses.title like ? escape '!' or courses.code like ? escape '!'))", $stop->toSql());
     }
 
     public function test_sqlite_always_uses_the_contains_fallback(): void
@@ -69,7 +72,15 @@ class TextSearchTest extends TestCase
         TextSearch::apply($query, 'Procurement', self::COLUMNS);
 
         $this->assertStringNotContainsStringIgnoringCase('match(', $query->toSql());
-        $this->assertSame(['%Procurement%', '%Procurement%', '%Procurement%', '%Procurement%'], $query->getBindings());
+        $this->assertSame(array_fill(0, 4, '%procurement%'), $query->getBindings());
+    }
+
+    public function test_a_term_of_only_symbols_is_searched_as_typed_with_wildcards_escaped(): void
+    {
+        $query = DB::connection('sqlite')->table('courses');
+        TextSearch::apply($query, '%*', ['courses.title']);
+
+        $this->assertSame(['%!%*%'], $query->getBindings());
     }
 
     public function test_an_empty_search_adds_no_condition(): void

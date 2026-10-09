@@ -95,7 +95,7 @@ class TextSearch
         $escaped = self::escape($term);
         $words = self::words($term);
 
-        $query->where(function ($group) use ($fulltext, $prefix, $escaped, $words, $query) {
+        $query->where(function ($group) use ($fulltext, $prefix, $escaped, $words, $term, $query) {
             if (self::supportsFulltext($query) && self::canUseFulltext($words)) {
                 $group->whereRaw('match(' . implode(', ', $fulltext) . ') against (? in boolean mode)', [self::booleanQuery($words)]);
 
@@ -106,8 +106,18 @@ class TextSearch
                 return;
             }
 
-            foreach (array_merge($fulltext, $prefix) as $column) {
-                $group->orWhereRaw("{$column} like ? escape '!'", ['%' . $escaped . '%']);
+            // No FULLTEXT: every word must appear somewhere in the columns, in any order, as a plain
+            // contains-match. The same answers as above, just without an index to lean on.
+            $columns = array_merge($fulltext, $prefix);
+            $needles = $words !== [] ? $words : [$term];
+
+            foreach ($needles as $needle) {
+                $like = '%' . self::escape($needle) . '%';
+                $group->where(function ($any) use ($columns, $like) {
+                    foreach ($columns as $column) {
+                        $any->orWhereRaw("{$column} like ? escape '!'", [$like]);
+                    }
+                });
             }
         });
     }
