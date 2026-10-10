@@ -62,6 +62,34 @@ class AdminControllerTest extends TestCase
         ]);
     }
 
+    public function test_dashboard_has_trends_top_courses_upcoming_cohorts_and_extra_queues(): void
+    {
+        $admin = User::factory()->create();
+        ScholarUser::factory()->create(['id' => $admin->id, 'role' => 'super_admin']);
+        Sanctum::actingAs($admin);
+
+        $course = \App\Models\Course::factory()->create(['title' => 'Procurement', 'status' => 'published']);
+        \App\Models\Enrollment::factory()->count(2)->create(['course_id' => $course->id, 'enrolled_at' => now()->subDay()]);
+        \App\Models\Cohort::factory()->create(['course_id' => $course->id, 'status' => 'upcoming', 'start_date' => now()->addDays(10)->toDateString()]);
+
+        $data = $this->getJson('/api/admin/dashboard')->assertOk()->json('data');
+
+        $this->assertCount(30, $data['enrollments']['trend']);
+        $this->assertCount(30, $data['users']['signup_trend']);
+        $this->assertCount(30, $data['courses']['published_trend']);
+        $this->assertGreaterThanOrEqual(1, $data['users']['last_30_days']);
+        $this->assertSame(2, collect($data['enrollments']['trend'])->sum('value'));
+        $this->assertSame('Procurement', $data['top_courses'][0]['title']);
+        $this->assertSame(2, (int) $data['top_courses'][0]['enrollments']);
+        $this->assertCount(1, $data['upcoming_cohorts']);
+        $this->assertFalse($data['upcoming_cohorts'][0]['has_mentor']);
+        $this->assertSame(1, $data['published_without_modules']);
+        $this->assertCount(30, $data['revenue_trend']);
+        foreach (['pending_change_requests', 'pending_materials', 'pending_brochure_requests', 'previous_revenue_30_days'] as $key) {
+            $this->assertArrayHasKey($key, $data);
+        }
+    }
+
     public function test_dashboard_hides_revenue_and_review_queues_from_plain_admins(): void
     {
         $admin = User::factory()->create();
@@ -70,7 +98,7 @@ class AdminControllerTest extends TestCase
 
         $data = $this->getJson('/api/admin/dashboard')->assertStatus(200)->json('data');
 
-        foreach (['revenue', 'pending_instructors', 'pending_courses', 'pending_quizzes', 'pending_mentor_applications', 'pending_exams', 'pending_modules'] as $key) {
+        foreach (['revenue', 'revenue_trend', 'pending_change_requests', 'published_without_modules', 'pending_instructors', 'pending_courses', 'pending_quizzes', 'pending_mentor_applications', 'pending_exams', 'pending_modules'] as $key) {
             $this->assertArrayNotHasKey($key, $data);
         }
         foreach (['users', 'courses', 'cohorts', 'enrollments', 'recent_audit_logs'] as $key) {
