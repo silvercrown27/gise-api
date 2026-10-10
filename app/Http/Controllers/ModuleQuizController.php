@@ -278,19 +278,12 @@ class ModuleQuizController extends Controller
             $query = ModuleQuiz::with(['module.course.instructor'])
                 ->withCount('questions');
 
-            if ($q = trim($request->input('q', ''))) {
-                $query->where('title', 'like', '%' . $q . '%');
-            }
-
-            if ($status = trim($request->input('admin_approval_status', ''))) {
-                $query->where('admin_approval_status', $status);
-            }
-
-            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+            $queue = \App\Support\ReviewQueue::run($query, $request, 'module.course');
 
             return response()->json([
                 'status' => 200,
-                'data'   => $results,
+                'data'   => $queue['data'],
+                'counts' => $queue['counts'],
             ], 200);
         } catch (\Exception $e) {
             Log::error('ModuleQuizController@forReview: ' . $e->getMessage());

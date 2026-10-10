@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\StatusCounts;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -50,6 +52,14 @@ class CourseMaterialController extends Controller
                     ->whereIn('course_id', Enrollment::where('learner_id', $request->user()->id)->select('course_id'));
             }
 
+            $counts = StatusCounts::of($query, 'course_materials.status', ['pending', 'approved', 'rejected']);
+
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $like = '%' . TextSearch::escape($term) . '%';
+                $query->where(fn ($s) => $s->whereRaw("course_materials.title like ? escape '!'", [$like])
+                    ->orWhereHas('course', fn ($c) => $c->whereRaw("courses.title like ? escape '!'", [$like])->orWhereRaw("courses.code like ? escape '!'", [$like])));
+            }
+
             foreach (['course_id', 'module_id', 'type', 'status'] as $filter) {
                 if ($value = trim($request->input($filter, ''))) {
                     $query->where($filter, $value);
@@ -61,6 +71,7 @@ class CourseMaterialController extends Controller
             return response()->json([
                 'status' => 200,
                 'data'   => $query->orderBy('created_at', 'desc')->paginate($perPage),
+                'counts' => $counts,
             ], 200);
         } catch (\Exception $e) {
             Log::error('CourseMaterialController@index: ' . $e->getMessage());

@@ -381,19 +381,34 @@ class CourseController extends Controller
                 $query->manageableBy($request->user()->id);
             }
 
-            if ($q = trim($request->input('q', ''))) {
-                $query->where('title', 'like', '%' . $q . '%');
+            // Tab counts ignore the search and the status tab, so switching tabs never changes them.
+            $countQuery = Course::query();
+            if (!$this->isAdminRequest($request)) {
+                $countQuery->manageableBy($request->user()->id);
+            }
+            $counts = $countQuery->selectRaw('courses.status as status, count(*) as total')->groupBy('courses.status')->pluck('total', 'status');
+
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $query->where(function ($search) use ($term) {
+                    TextSearch::apply($search, $term, CourseCatalogue::SEARCH_COLUMNS, ['courses.slug']);
+                });
             }
 
             if ($status = trim($request->input('status', ''))) {
                 $query->where('status', $status);
             }
 
-            $results = $query->orderBy('created_at', 'desc')->paginate(min(max((int) $request->input('per_page', 10), 1), 100));
+            $results = $query->orderBy('created_at', $request->input('sort') === 'oldest' ? 'asc' : 'desc')->paginate(min(max((int) $request->input('per_page', 10), 1), 100));
 
             return response()->json([
                 'status' => 200,
                 'data'   => $results,
+                'counts' => [
+                    'total' => (int) $counts->sum(),
+                    'published' => (int) ($counts['published'] ?? 0),
+                    'draft' => (int) ($counts['draft'] ?? 0),
+                    'archived' => (int) ($counts['archived'] ?? 0),
+                ],
             ], 200);
         } catch (\Exception $e) {
             Log::error('CourseController@mine: ' . $e->getMessage());
@@ -940,6 +955,110 @@ class CourseController extends Controller
             ], 200);
         } catch (\Exception $e) {
             Log::error('CourseController@adminIndex: ' . $e->getMessage());
+            return response()->json(['status' => 500, 'message' => 'An error occurred while loading the courses.'], 500);
+        }
+    }
+
+
+    /**
+     * The course list behind the Modules & quizzes / Lessons / Exams workspaces: every course the
+     * caller can author for (all of them for admins, their own for instructors) with how much
+     * content it has and how much of it is waiting for review.
+     *
+     * focus = modules | lessons | exams decides what "with", "without" and "pending" mean:
+     *   modules -> course modules (and their quizzes)   lessons -> lessons   exams -> exams
+     * filter = with | without | pending narrows the list; the counts for each come back too.
+     */
+    public function contentIndex(Request $request)
+    {
+        $user = $request->scholarUser();
+
+        if (!$user || !in_array($user->role, ['admin', 'super_admin', 'instructor'], true)) {
+            return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
+        }
+
+        try {
+            $focus = in_array($request->input('focus'), ['modules', 'lessons', 'exams', 'cohorts'], true) ? $request->input('focus') : 'modules';
+            $filter = (string) $request->input('filter', '');
+
+            $query = Course::query();
+            if ($user->role === 'instructor') {
+                $query->manageableBy($request->user()->id);
+            }
+
+            // Live (not soft-deleted) rows only. Each fragment is true when the course has such a row.
+            $modules = fn (string $extra = '') => "exists (select 1 from course_modules cm where cm.course_id = courses.id and cm.deleted_at is null{$extra})";
+            $lessons = fn (string $extra = '') => "exists (select 1 from course_lessons cl join course_modules cm on cm.id = cl.module_id where cm.course_id = courses.id and cl.deleted_at is null and cm.deleted_at is null{$extra})";
+            $quizzes = fn (string $extra = '') => "exists (select 1 from module_quizzes mq join course_modules cm on cm.id = mq.module_id where cm.course_id = courses.id and mq.deleted_at is null and cm.deleted_at is null{$extra})";
+            $exams = fn (string $extra = '') => "exists (select 1 from exams ex where ex.course_id = courses.id and ex.deleted_at is null{$extra})";
+
+            $cohorts = fn (string $extra = '') => "exists (select 1 from cohorts co where co.course_id = courses.id and co.deleted_at is null{$extra})";
+            // Mentor applications waiting on any of the course's cohorts.
+            $applications = "exists (select 1 from cohort_mentor_applications ma join cohorts co on co.id = ma.cohort_id where co.course_id = courses.id and ma.deleted_at is null and co.deleted_at is null and ma.status = 'pending')";
+
+            [$with, $pending] = match ($focus) {
+                'cohorts' => [$cohorts(), $applications],
+                'lessons' => [$lessons(), $lessons(" and cl.admin_approval_status = 'pending'")],
+                'exams' => [$exams(), $exams(" and ex.admin_approval_status = 'pending'")],
+                // A module's quiz is reviewed alongside the module, so pending quizzes count too.
+                default => [$modules(), '(' . $modules(" and cm.admin_approval_status = 'pending'") . ' or ' . $quizzes(" and mq.admin_approval_status = 'pending'") . ')'],
+            };
+
+            // The tab counts are for everything this person can see, whatever is typed in the search box.
+            $c = (clone $query)->selectRaw(
+                "count(*) as total,
+                 sum(case when {$with} then 1 else 0 end) as with_items,
+                 sum(case when {$pending} then 1 else 0 end) as pending_items"
+            )->first();
+
+            $query->select(['courses.id', 'courses.code', 'courses.slug', 'courses.title', 'courses.status', 'courses.admin_approval_status', 'courses.thumbnail_url', 'courses.updated_at'])
+                ->addSelect([
+                    'modules_count' => DB::table('course_modules')->selectRaw('count(*)')->whereColumn('course_modules.course_id', 'courses.id')->whereNull('course_modules.deleted_at'),
+                    'pending_modules_count' => DB::table('course_modules')->selectRaw('count(*)')->whereColumn('course_modules.course_id', 'courses.id')->whereNull('course_modules.deleted_at')->where('course_modules.admin_approval_status', 'pending'),
+                    'lessons_count' => DB::table('course_lessons')->join('course_modules', 'course_modules.id', '=', 'course_lessons.module_id')->selectRaw('count(*)')->whereColumn('course_modules.course_id', 'courses.id')->whereNull('course_lessons.deleted_at')->whereNull('course_modules.deleted_at'),
+                    'pending_lessons_count' => DB::table('course_lessons')->join('course_modules', 'course_modules.id', '=', 'course_lessons.module_id')->selectRaw('count(*)')->whereColumn('course_modules.course_id', 'courses.id')->whereNull('course_lessons.deleted_at')->whereNull('course_modules.deleted_at')->where('course_lessons.admin_approval_status', 'pending'),
+                    'quizzes_count' => DB::table('module_quizzes')->join('course_modules', 'course_modules.id', '=', 'module_quizzes.module_id')->selectRaw('count(*)')->whereColumn('course_modules.course_id', 'courses.id')->whereNull('module_quizzes.deleted_at')->whereNull('course_modules.deleted_at'),
+                    'pending_quizzes_count' => DB::table('module_quizzes')->join('course_modules', 'course_modules.id', '=', 'module_quizzes.module_id')->selectRaw('count(*)')->whereColumn('course_modules.course_id', 'courses.id')->whereNull('module_quizzes.deleted_at')->whereNull('course_modules.deleted_at')->where('module_quizzes.admin_approval_status', 'pending'),
+                    'cohorts_count' => DB::table('cohorts')->selectRaw('count(*)')->whereColumn('cohorts.course_id', 'courses.id')->whereNull('cohorts.deleted_at'),
+                    'pending_cohorts_count' => DB::table('cohort_mentor_applications')->join('cohorts', 'cohorts.id', '=', 'cohort_mentor_applications.cohort_id')->selectRaw('count(*)')->whereColumn('cohorts.course_id', 'courses.id')->whereNull('cohorts.deleted_at')->whereNull('cohort_mentor_applications.deleted_at')->where('cohort_mentor_applications.status', 'pending'),
+                    'exams_count' => DB::table('exams')->selectRaw('count(*)')->whereColumn('exams.course_id', 'courses.id')->whereNull('exams.deleted_at'),
+                    'pending_exams_count' => DB::table('exams')->selectRaw('count(*)')->whereColumn('exams.course_id', 'courses.id')->whereNull('exams.deleted_at')->where('exams.admin_approval_status', 'pending'),
+                ]);
+
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                TextSearch::apply($query, $term, CourseCatalogue::SEARCH_COLUMNS, ['courses.slug']);
+            }
+
+            match ($filter) {
+                'with' => $query->whereRaw($with),
+                'without' => $query->whereRaw("not {$with}"),
+                'pending' => $query->whereRaw($pending),
+                default => null,
+            };
+
+            match ((string) $request->input('sort', 'attention')) {
+                'title' => $query->orderBy('courses.title'),
+                'updated' => $query->orderByDesc('courses.updated_at'),
+                'content' => $query->orderByDesc(['exams' => 'exams_count', 'lessons' => 'lessons_count', 'cohorts' => 'cohorts_count'][$focus] ?? 'modules_count'),
+                // Courses with something waiting first, then the ones with nothing yet, then the rest.
+                default => $query->orderByRaw("case when {$pending} then 0 when not {$with} then 1 else 2 end")->orderBy('courses.title'),
+            };
+            $query->orderBy('courses.id');
+
+            $results = $query->paginate(min(max((int) $request->input('per_page', 10), 1), 50));
+
+            return response()->json([
+                'status' => 200,
+                'data' => $results,
+                'counts' => [
+                    'total' => (int) ($c->total ?? 0),
+                    'with' => (int) ($c->with_items ?? 0),
+                    'without' => (int) ($c->total ?? 0) - (int) ($c->with_items ?? 0),
+                    'pending' => (int) ($c->pending_items ?? 0),
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CourseController@contentIndex: ' . $e->getMessage());
             return response()->json(['status' => 500, 'message' => 'An error occurred while loading the courses.'], 500);
         }
     }

@@ -102,6 +102,7 @@ Route::prefix('courses')->group(function () {
     Route::middleware('cache.public:120')->get('/popular', [CourseController::class, 'popular']);
     Route::middleware('auth:sanctum')->get('/mine', [CourseController::class, 'mine']);
     Route::middleware('auth:sanctum')->get('/admin', [CourseController::class, 'adminIndex']);
+    Route::middleware('auth:sanctum')->get('/content', [CourseController::class, 'contentIndex']);
     Route::middleware('auth:sanctum')->get('/summary', [CourseController::class, 'summary']);
     Route::middleware('auth:sanctum')->get('/for-review', [CourseController::class, 'forReview']);
     Route::middleware('auth:sanctum')->get('/{id}/curriculum', [CourseController::class, 'curriculum']);
@@ -450,6 +451,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Cohort mentor applications (the "apply to mentor a cohort" marketplace)
     Route::prefix('cohort-mentor-applications')->group(function () {
         Route::get('/',       [CohortMentorApplicationController::class, 'index']);
+        Route::get('/openings', [CohortMentorApplicationController::class, 'openings']);
         Route::post('/',      [CohortMentorApplicationController::class, 'store']);
         Route::get('/{id}',   [CohortMentorApplicationController::class, 'show']);
         Route::patch('/{id}/approval-status', [CohortMentorApplicationController::class, 'setApprovalStatus']);

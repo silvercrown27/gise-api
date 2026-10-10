@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\StatusCounts;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -32,20 +34,25 @@ class CourseLeadController extends Controller
                 $query->whereHas('course', fn ($q) => $q->manageableBy($request->user()->id));
             }
 
-            if ($courseId = trim($request->input('course_id', ''))) {
-                $query->where('course_id', $courseId);
-            }
-
             if ($source = trim($request->input('source', ''))) {
                 $query->where('source', $source);
+            }
+
+            $counts = StatusCounts::of($query, 'course_leads.brochure_status', ['pending', 'sent', 'declined']);
+
+            if ($courseId = trim($request->input('course_id', ''))) {
+                $query->where('course_id', $courseId);
             }
 
             if ($brochureStatus = trim($request->input('brochure_status', ''))) {
                 $query->where('brochure_status', $brochureStatus);
             }
 
-            if ($q = trim($request->input('q', ''))) {
-                $query->where('full_name', 'like', '%' . $q . '%');
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $like = '%' . TextSearch::escape($term) . '%';
+                $query->where(fn ($s) => $s->whereRaw("course_leads.full_name like ? escape '!'", [$like])
+                    ->orWhereRaw("course_leads.email like ? escape '!'", [$like])
+                    ->orWhereHas('course', fn ($c) => $c->whereRaw("courses.title like ? escape '!'", [$like])));
             }
 
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
@@ -53,6 +60,7 @@ class CourseLeadController extends Controller
             return response()->json([
                 'status' => 200,
                 'data'   => $results,
+                'counts' => $counts,
             ], 200);
         } catch (\Exception $e) {
             Log::error('CourseLeadController@index: ' . $e->getMessage());

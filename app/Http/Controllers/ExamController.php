@@ -45,6 +45,10 @@ class ExamController extends Controller
                 $query->where('title', 'like', '%' . $q . '%');
             }
 
+            if ($courseId = trim((string) $request->input('course_id', ''))) {
+                $query->where('course_id', $courseId);
+            }
+
             $results = $query->orderBy('created_at', 'desc')->paginate(min(max((int) $request->input('per_page', 10), 1), 100));
 
             return response()->json([
@@ -293,19 +297,12 @@ class ExamController extends Controller
             $query = Exam::with(['course.instructor'])
                 ->withCount('questions');
 
-            if ($q = trim($request->input('q', ''))) {
-                $query->where('title', 'like', '%' . $q . '%');
-            }
-
-            if ($status = trim($request->input('admin_approval_status', ''))) {
-                $query->where('admin_approval_status', $status);
-            }
-
-            $results = $query->orderBy('created_at', 'desc')->paginate(10);
+            $queue = \App\Support\ReviewQueue::run($query, $request, 'course');
 
             return response()->json([
                 'status' => 200,
-                'data'   => $results,
+                'data'   => $queue['data'],
+                'counts' => $queue['counts'],
             ], 200);
         } catch (\Exception $e) {
             Log::error('ExamController@forReview: ' . $e->getMessage());

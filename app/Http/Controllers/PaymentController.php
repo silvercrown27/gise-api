@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\StatusCounts;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -23,11 +25,23 @@ class PaymentController extends Controller
                 $query->where('learner_id', $request->user()->id);
             }
 
+            $counts = StatusCounts::of($query, 'payments.status', ['pending', 'completed', 'failed', 'refunded']);
+
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $like = '%' . TextSearch::escape($term) . '%';
+                $query->whereHas('course', fn ($c) => $c->whereRaw("courses.title like ? escape '!'", [$like])->orWhereRaw("courses.code like ? escape '!'", [$like]));
+            }
+
+            if ($status = trim((string) $request->input('status', ''))) {
+                $query->where('payments.status', $status);
+            }
+
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
 
             return response()->json([
                 'status' => 200,
                 'data'   => $results,
+                'counts' => $counts,
             ], 200);
         } catch (\Exception $e) {
             Log::error('PaymentController@index: ' . $e->getMessage());

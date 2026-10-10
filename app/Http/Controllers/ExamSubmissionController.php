@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\StatusCounts;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -38,11 +40,24 @@ class ExamSubmissionController extends Controller
                 }
             }
 
+            $counts = StatusCounts::of($query, 'exam_submissions.status', ['in_progress', 'submitted', 'graded']);
+
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $like = '%' . TextSearch::escape($term) . '%';
+                $query->whereHas('exam', fn ($e) => $e->whereRaw("exams.title like ? escape '!'", [$like])
+                    ->orWhereHas('course', fn ($c) => $c->whereRaw("courses.title like ? escape '!'", [$like])));
+            }
+
+            if ($status = trim((string) $request->input('status', ''))) {
+                $query->where('exam_submissions.status', $status);
+            }
+
             $results = $query->orderBy('created_at', 'desc')->paginate(10);
 
             return response()->json([
                 'status' => 200,
                 'data'   => $results,
+                'counts' => $counts,
             ], 200);
         } catch (\Exception $e) {
             Log::error('ExamSubmissionController@index: ' . $e->getMessage());

@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\StatusCounts;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Helpers\Validations;
@@ -38,8 +41,16 @@ class CohortMentorApplicationController extends Controller
                 $query->where('instructor_id', $instructorId);
             }
 
+            $counts = StatusCounts::of($query, 'cohort_mentor_applications.status', ['pending', 'approved', 'rejected']);
+
             if ($cohortId = trim($request->input('cohort_id', ''))) {
                 $query->where('cohort_id', $cohortId);
+            }
+
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $like = '%' . TextSearch::escape($term) . '%';
+                $query->where(fn ($s) => $s->whereHas('instructor', fn ($i) => $i->whereRaw("users.name like ? escape '!'", [$like])->orWhereRaw("users.email like ? escape '!'", [$like]))
+                    ->orWhereHas('cohort.course', fn ($c) => $c->whereRaw("courses.title like ? escape '!'", [$like])->orWhereRaw("courses.code like ? escape '!'", [$like])));
             }
 
             if ($status = trim($request->input('status', ''))) {
@@ -51,6 +62,7 @@ class CohortMentorApplicationController extends Controller
             return response()->json([
                 'status' => 200,
                 'data'   => $results,
+                'counts' => $counts,
             ], 200);
         } catch (\Exception $e) {
             Log::error('CohortMentorApplicationController@index: ' . $e->getMessage());
@@ -58,6 +70,60 @@ class CohortMentorApplicationController extends Controller
                 'status'  => 500,
                 'message' => 'An error occurred while retrieving mentor applications.',
             ], 500);
+        }
+    }
+
+    /**
+     * The mentor network for the signed-in instructor: cohorts still to run (or ones they have already
+     * applied to), each with their own application. `state` is open (not applied yet), pending,
+     * approved or rejected; the counts behind the tabs ignore the search.
+     */
+    public function openings(Request $request)
+    {
+        $user = $request->scholarUser();
+
+        if (!$user || $user->role !== 'instructor') {
+            return response()->json(['status' => 403, 'message' => 'Forbidden.'], 403);
+        }
+
+        try {
+            $me = $request->user()->id;
+            $today = now()->toDateString();
+
+            $mine = fn () => CohortMentorApplication::query()->where('instructor_id', $me)->whereColumn('cohort_mentor_applications.cohort_id', 'cohorts.id');
+            $running = fn ($q) => $q->where('cohorts.status', '!=', 'completed')->where(fn ($d) => $d->whereNull('cohorts.end_date')->orWhere('cohorts.end_date', '>=', $today));
+
+            $query = \App\Models\Cohort::query()
+                ->where(fn ($q) => $running($q)->orWhereExists($mine()->select(DB::raw(1))))
+                ->with(['course:id,title,slug,code', 'mentorApplications' => fn ($a) => $a->where('instructor_id', $me)->select('id', 'cohort_id', 'status', 'rejection_reason')]);
+
+            // Count by the instructor's own application ("open" = none yet).
+            $state = "coalesce((select ma.status from cohort_mentor_applications ma where ma.cohort_id = cohorts.id and ma.instructor_id = ? and ma.deleted_at is null limit 1), 'open')";
+            $rows = (clone $query)->toBase()->cloneWithout(['columns', 'orders'])->cloneWithoutBindings(['select'])
+                ->selectRaw("{$state} as state, count(*) as total", [$me])->groupByRaw($state, [$me])->pluck('total', 'state');
+            $counts = ['total' => (int) $rows->sum()];
+            foreach (['open', 'pending', 'approved', 'rejected'] as $key) {
+                $counts[$key] = (int) ($rows[$key] ?? 0);
+            }
+
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $like = '%' . TextSearch::escape($term) . '%';
+                $query->where(fn ($s) => $s->whereRaw("cohorts.label like ? escape '!'", [$like])
+                    ->orWhereHas('course', fn ($c) => $c->whereRaw("courses.title like ? escape '!'", [$like])->orWhereRaw("courses.code like ? escape '!'", [$like])));
+            }
+
+            if (in_array($filter = (string) $request->input('state', ''), ['open', 'pending', 'approved', 'rejected'], true)) {
+                $query->whereRaw("{$state} = ?", [$me, $filter]);
+            }
+
+            return response()->json([
+                'status' => 200,
+                'data'   => $query->orderBy('cohorts.start_date')->paginate(10),
+                'counts' => $counts,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('CohortMentorApplicationController@openings: ' . $e->getMessage());
+            return response()->json(['status' => 500, 'message' => 'An error occurred while retrieving cohorts.'], 500);
         }
     }
 

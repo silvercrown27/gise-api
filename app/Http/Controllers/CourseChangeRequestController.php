@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\StatusCounts;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -39,8 +41,16 @@ class CourseChangeRequestController extends Controller
                 $query->where('instructor_id', $request->user()->id);
             }
 
+            $counts = StatusCounts::of($query, 'course_change_requests.status', ['pending', 'approved', 'rejected']);
+
             if ($courseId = trim($request->input('course_id', ''))) {
                 $query->where('course_id', $courseId);
+            }
+
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $like = '%' . TextSearch::escape($term) . '%';
+                $query->where(fn ($s) => $s->whereHas('course', fn ($c) => $c->whereRaw("courses.title like ? escape '!'", [$like])->orWhereRaw("courses.code like ? escape '!'", [$like]))
+                    ->orWhereHas('instructor', fn ($i) => $i->whereRaw("users.name like ? escape '!'", [$like])));
             }
 
             if ($status = trim($request->input('status', ''))) {
@@ -49,7 +59,8 @@ class CourseChangeRequestController extends Controller
 
             return response()->json([
                 'status' => 200,
-                'data'   => $query->orderBy('created_at', 'desc')->paginate(20),
+                'data'   => $query->orderBy('created_at', 'desc')->paginate(10),
+                'counts' => $counts,
             ], 200);
         } catch (\Exception $e) {
             Log::error('CourseChangeRequestController@index: ' . $e->getMessage());

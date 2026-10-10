@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\StatusCounts;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -24,8 +26,10 @@ class CertificateController extends Controller
                 });
             }
 
-            if ($q = trim($request->input('q', ''))) {
-                $query->where('certificate_number', 'like', '%' . $q . '%');
+            if ($term = TextSearch::clean((string) $request->input('q', ''))) {
+                $like = '%' . TextSearch::escape($term) . '%';
+                $query->where(fn ($s) => $s->whereRaw("certificates.certificate_number like ? escape '!'", [$like])
+                    ->orWhereHas('enrollment.course', fn ($c) => $c->whereRaw("courses.title like ? escape '!'", [$like])));
             }
 
             $results = $query->orderBy('created_at', 'desc')->paginate(10);

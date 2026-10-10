@@ -55,12 +55,34 @@ class EnrollmentController extends Controller
                 $query->where('learner_id', $learnerId);
             }
 
+            // Tab counts for the scope above, ignoring the search and the status tab.
+            $counts = (clone $query)->reorder()->toBase()->cloneWithout(['columns', 'eagerLoad'])
+                ->selectRaw('enrollments.enrollment_status as status, count(*) as total')
+                ->groupBy('enrollments.enrollment_status')->pluck('total', 'status');
+
+            if ($term = \App\Support\TextSearch::clean((string) $request->input('q', ''))) {
+                $like = '%' . \App\Support\TextSearch::escape($term) . '%';
+                $query->whereHas('course', fn ($c) => $c->whereRaw("courses.title like ? escape '!'", [$like])
+                    ->orWhereRaw("courses.code like ? escape '!'", [$like]));
+            }
+
+            if ($status = trim((string) $request->input('status', ''))) {
+                $query->where('enrollment_status', $status);
+            }
+
             $perPage = min(max((int) $request->input('per_page', 10), 1), 100);
             $results = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
             return response()->json([
                 'status' => 200,
                 'data'   => $results,
+                'counts' => [
+                    'total' => (int) $counts->sum(),
+                    'active' => (int) ($counts['active'] ?? 0),
+                    'completed' => (int) ($counts['completed'] ?? 0),
+                    'dropped' => (int) ($counts['dropped'] ?? 0),
+                    'failed' => (int) ($counts['failed'] ?? 0),
+                ],
             ], 200);
         } catch (\Exception $e) {
             Log::error('EnrollmentController@index: ' . $e->getMessage());
