@@ -272,7 +272,7 @@ class CourseController extends Controller
     public function curriculum(Request $request, string $id)
     {
         try {
-            $course = Course::with('instructor')->find($id);
+            $course = Course::with(['instructor', 'mentor', 'creator:id,name'])->find($id);
 
             if (!$course) {
                 return response()->json([
@@ -485,6 +485,8 @@ class CourseController extends Controller
 
         $data = $request->all();
         $data['instructor_id'] = Course::superAdminId() ?? $request->user()->id;
+        // Courses are filed under the platform owner, so remember who actually made this one.
+        $data['created_by'] = $request->user()->id;
 
         if ($error = $this->thumbnailError($request)) {
             return response()->json(['status' => 422, 'message' => $error, 'errors' => ['thumbnail' => [$error]]], 422);
@@ -646,6 +648,7 @@ class CourseController extends Controller
             // Ownership is fixed to the super admin - validate against it rather
             // than requiring every edit form to resend it.
             $data['instructor_id'] = $course->instructor_id;
+            unset($data['created_by']); // who made the course is not editable
 
             $validator = Validations::validateCourse($data, $id);
 

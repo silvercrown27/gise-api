@@ -19,6 +19,7 @@ class Course extends Model
 
     protected $fillable = [
         'instructor_id',
+        'created_by',
         'category_id',
         'pace_id',
         'classification',
@@ -81,6 +82,12 @@ class Course extends Model
     public function instructor()
     {
         return $this->belongsTo(User::class, 'instructor_id');
+    }
+
+    /** The admin who created the course (not the owner it is filed under). Empty for older courses. */
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
